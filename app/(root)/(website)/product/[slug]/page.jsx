@@ -1,34 +1,47 @@
-"use client";
-import React, { useEffect, useState } from "react";
-import ProductDetails from "./ProductDetails";
+import React from 'react';
+import ProductDetails from './ProductDetails';
 
-const ProductPage = ({ params }) => {
-  const { slug } = params;
-  const [data, setData] = useState(null);
+const ProductPage = async ({ params }) => {
+  // Extract slug correctly (Next.js 15+ requires awaiting params)
+  const { slug } = await params;
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/product/details/${slug}`)
-      .then(res => res.json())
-      .then(setData)
-      .catch(err => console.error(err));
-  }, [slug]);
+  // Fetch the product details. 
+  // IMPORTANT: Ensure your backend API returns an "allVariants" array in the data.
+  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/product/details/${slug}`;
 
-  if (!data) return <div className="text-center py-20">Loading...</div>;
-  if (!data.success || !data.data) return <div className="text-center py-20">Product not found</div>;
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 60 }, // ✅ enables caching
+    });
 
-  const { product, variant, colors, sizes, allVariants } = data.data;
+    const result = await response.json();
 
-  return (
-    <main>
-      <ProductDetails
-        product={product}
-        initialVariant={variant}
-        allVariants={allVariants}
-        colors={colors}
-        sizes={sizes}
-      />
-    </main>
-  );
+    if (!result.success || !result.data) {
+      return (
+        <div className='flex justify-center items-center py-20'>
+          <h1 className='text-2xl font-semibold text-gray-500'>Product not found.</h1>
+        </div>
+      );
+    }
+
+    const { product, variant, colors, sizes, allVariants } = result.data;
+
+    console.log(result.data)
+    return (
+      <main>
+        <ProductDetails
+          product={product}
+          initialVariant={variant}
+          allVariants={allVariants} // New prop: contains every variant (color/size combo)
+          colors={colors}
+          sizes={sizes}
+        />
+      </main>
+    );
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return <div className="text-center py-20">Something went wrong.</div>;
+  }
 };
 
 export default ProductPage;
