@@ -170,15 +170,17 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
-      {/* Floating chat button */}
+{/* 
+      Floating chat button
       <button
         aria-label="Chat"
         className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-[#2aa7ff] text-white shadow-lg hover:opacity-90"
       >
-        {/* simple chat bubble */}
+  
         <span className="text-lg">💬</span>
-      </button>
+      </button> */}
+
+      
     </footer>
   );
 }
