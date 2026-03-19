@@ -7,11 +7,16 @@ import { persistor, store } from "@/store/store";
 import Loading from "./Loading";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
-const queryClient = new QueryClient();
+const ReactQueryDevtools = React.lazy(() =>
+  import("@tanstack/react-query-devtools").then((mod) => ({
+    default: mod.ReactQueryDevtools,
+  }))
+);
 
 export default function GlobalStoreProvider({ children }) {
+  const [queryClient] = React.useState(() => new QueryClient());
+
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
@@ -20,7 +25,6 @@ export default function GlobalStoreProvider({ children }) {
         </PersistGate>
       </Provider>
 
-      {/* ✅ Only show Devtools in development */}
       <Suspense fallback={null}>
         {process.env.NODE_ENV === "development" && (
           <ReactQueryDevtools initialIsOpen={false} />
