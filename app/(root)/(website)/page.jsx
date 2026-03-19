@@ -1,4 +1,5 @@
 import EmblaSlider from "@/components/ui/Application/website/EmblaSlider";
+import Sharee from "@/components/ui/Application/website/Saree";
 import dynamic from "next/dynamic";
 
 // ✅ Lazy load heavy sections
@@ -38,8 +39,9 @@ const Home = () => {
   return (
     <div>
       {/* ✅ LCP element should load first */}
-      <h1>test</h1>
+    
        <EmblaSlider />
+       <Sharee />
 
       {/* ✅ Everything else loads after initial render */}
       <Featuredproducts />
