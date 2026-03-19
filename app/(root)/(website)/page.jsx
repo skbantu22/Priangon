@@ -1,5 +1,5 @@
 import EmblaSlider from "@/components/ui/Application/website/EmblaSlider";
-import Sharee from "@/components/ui/Application/website/Saree";
+
 import dynamic from "next/dynamic";
 
 // ✅ Lazy load heavy sections
