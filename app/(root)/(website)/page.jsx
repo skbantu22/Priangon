@@ -38,6 +38,7 @@ const Home = () => {
   return (
     <div>
       {/* ✅ LCP element should load first */}
+      <h1>test</h1>
        <EmblaSlider />
 
       {/* ✅ Everything else loads after initial render */}
