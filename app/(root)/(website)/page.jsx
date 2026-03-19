@@ -11,29 +11,29 @@ const Featuredproducts = dynamic(
 );
 
 // Uncomment any of these if you want them loaded
-// const MenProducts = dynamic(() => import("@/components/ui/Application/website/men"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const MenProducts = dynamic(() => import("@/components/ui/Application/website/men"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
-// const Womenproducts = dynamic(() => import("@/components/ui/Application/website/women"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const Womenproducts = dynamic(() => import("@/components/ui/Application/website/women"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
-// const Jewelleryproducts = dynamic(() => import("@/components/ui/Application/website/Jewellery"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const Jewelleryproducts = dynamic(() => import("@/components/ui/Application/website/Jewellery"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
-// const BoxGift = dynamic(() => import("@/components/ui/Application/website/BoxGift"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const BoxGift = dynamic(() => import("@/components/ui/Application/website/BoxGift"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
-// const Threepis = dynamic(() => import("@/components/ui/Application/website/Threepis"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const Threepis = dynamic(() => import("@/components/ui/Application/website/Threepis"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
-// const Sharee = dynamic(() => import("@/components/ui/Application/website/Saree"), {
-//   loading: () => <div className="min-h-[200px]" />,
-// });
+const Sharee = dynamic(() => import("@/components/ui/Application/website/Saree"), {
+  loading: () => <div className="min-h-[200px]" />,
+});
 
 const Home = () => {
   return (
@@ -41,17 +41,16 @@ const Home = () => {
       {/* ✅ LCP element should load first */}
     
        <EmblaSlider />
-       <Sharee />
+   
 
-      {/* ✅ Everything else loads after initial render */}
       <Featuredproducts />
-      {/* Uncomment these if you want them rendered */}
-      {/* <Threepis />
+    
+      <Threepis />
       <Sharee />
       <Womenproducts />
       <Jewelleryproducts />
       <BoxGift />
-      <MenProducts /> */}
+      <MenProducts />
     </div>
   );
 };
