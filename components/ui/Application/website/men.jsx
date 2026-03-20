@@ -24,9 +24,9 @@ const MenProducts = async () => {
 
   return (
     <div>
-      <section className="lg:px-32 px-4 sm:py-4">
-        <div className="flex justify-between">
-          <h1 className="sm:text-4xl text-2xl font-semibold">
+      <section className="">
+        <div className="flex justify-between px-2">
+          <h1 className="text-xl md:text-2xl font-semibold">
             Mens
           </h1>
 
@@ -39,7 +39,7 @@ const MenProducts = async () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2  px-2">
           {!productData?.success ? (
             <div className="text-center py-5 col-span-full">
               Data not found
