@@ -38,7 +38,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-white/90">
               <li>
                 <Link className="hover:text-white" href="#">
-                  About Fabrilife
+                  About Priangone
                 </Link>
               </li>
               <li>
@@ -161,7 +161,7 @@ export default function Footer() {
                     </button>
                   </div>
                   <div className="text-xs text-slate-600">
-                    902K followers • 1 following
+                    49K followers • 1 following
                   </div>
                 </div>
               </div>
