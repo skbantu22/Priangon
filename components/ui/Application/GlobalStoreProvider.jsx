@@ -14,7 +14,7 @@ export default function GlobalStoreProvider({ children }) {
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <PersistGate persistor={persistor} loading={<Loading />}>
+        <PersistGate persistor={persistor} >
           {children}
         </PersistGate>
       </Provider>
