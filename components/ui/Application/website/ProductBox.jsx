@@ -1,24 +1,67 @@
-'use client'
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import imagePlaceholder from "@/public/assets/img-placeholder.webp";
-import { WEBSITE_PRODUCT_DETAILS } from "@/Route/Websiteroute";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import WishlistButton from "./WishlistButton";
+import { WEBSITE_PRODUCT_DETAILS } from "@/Route/Websiteroute";
+import { useDispatch } from "react-redux";
+import { addIntoCart } from "@/store/reducer/cartReducer";
+import { showToast } from "@/lib/showToast";
+import { useRouter } from "next/navigation";
 
-const ProductBox = ({ product, userId, refreshWishlist }) => {
-  const [imgLoaded, setImgLoaded] = useState(false); // track image loading
+const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
+  const dispatch = useDispatch();
+  const router = useRouter();
+
+  // Prefer allVariants if product.variants is empty
+  const variants = product?.variants?.length > 0 ? product.variants : allVariants;
+
+  // Smart initial image: variant → product → null
+  const [activeImage, setActiveImage] = useState(() => {
+    const img =
+      variants?.[0]?.media?.[0]?.secure_url ||
+      product?.media?.[0]?.secure_url ||
+      null;
+    console.log("Initial activeImage:", img);
+    return img;
+  });
+
+  // Selected variant
+  const selectedVariant = useMemo(() => variants?.[0] || null, [variants]);
+
+  const handleAddToCart = () => {
+    if (!product) return;
+
+    const cartProduct = {
+      productId: product._id,
+      variantId: selectedVariant?._id || null,
+      name: product.name,
+      slug: product.slug,
+     media:
+  selectedVariant?.media?.[0]?.secure_url ||
+  product?.media?.[0]?.secure_url ||
+  "/placeholder.png",
+      mrp: selectedVariant?.mrp || product?.mrp,
+      sellingPrice: selectedVariant?.sellingPrice || product?.sellingPrice,
+      quantity: 1,
+    };
+
+    console.log("Adding to cart:", cartProduct);
+    dispatch(addIntoCart(cartProduct));
+    showToast("Added to cart 🛒");
+    router.push("/cart"); 
+  };
 
   const formatTk = (amount = 0) =>
-    `৳${new Intl.NumberFormat("en-BD").format(Number(amount) || 0)}`;
+    `Tk ${new Intl.NumberFormat("en-BD").format(Number(amount) || 0)}`;
 
   const href = WEBSITE_PRODUCT_DETAILS(product.slug || product._id);
 
-  // TanStack Query v5 - fetch wishlist status
+  // Wishlist check
   const { data: isWishlisted, isLoading: wishlistLoading } = useQuery({
     queryKey: ["wishlistStatus", userId, product._id],
     queryFn: async () => {
@@ -27,42 +70,31 @@ const ProductBox = ({ product, userId, refreshWishlist }) => {
       const wishlistProducts = res.data.data.map((item) => item.productId._id);
       return wishlistProducts.includes(product._id);
     },
-    enabled: !!userId, // only fetch if user is logged in
+    enabled: !!userId,
   });
 
-  // Skeleton while product is missing
-  if (!product) {
-    return (
-      <div className="border rounded-sm p-5 animate-pulse flex flex-col gap-2 h-[360px]">
-        <div className="w-full h-60 bg-gray-200 rounded" />
-        <div className="h-4 bg-gray-200 rounded w-3/4" />
-        <div className="h-4 bg-gray-200 rounded w-1/2 mt-auto" />
-        <div className="h-10 bg-gray-300 rounded mt-2" />
-      </div>
-    );
-  }
+  if (!product) return null;
 
   return (
-    <div className="group relative border border-gray-100 bg-white flex flex-col rounded-sm overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-      
-      {/* Image Area */}
-      <Link href={href} className="relative w-full h-[260px] sm:h-[320px] block overflow-hidden">
-        
-        {/* Image Skeleton */}
-        {!imgLoaded && (
-          <div className="absolute inset-0 bg-gray-200 animate-pulse rounded" />
-        )}
+    <div className="group bg-white w-full py-2 ">
+      {/* IMAGE */}
+      <div className="relative overflow-hidden">
+        <Link href={href} className="block relative w-full aspect-[3/4]">
+          {activeImage ? (
+            <Image
+              src={activeImage}
+              alt={product?.name || "Product"}
+              fill
+              className="object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-xs text-gray-400">
+              No Image
+            </div>
+          )}
+        </Link>
 
-        <Image
-          src={product?.media?.[0]?.secure_url || imagePlaceholder.src}
-          alt={product?.name || "Product"}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className={`object-contain w-full h-full pt-2 transition-transform duration-700 ease-out group-hover:scale-110 transition-opacity duration-500 ease-in-out ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-          onLoadingComplete={() => setImgLoaded(true)}
-        />
-
-        {/* Wishlist Button */}
+        {/* Wishlist */}
         <div className="absolute top-3 right-3 z-10">
           {wishlistLoading ? (
             <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
@@ -73,64 +105,75 @@ const ProductBox = ({ product, userId, refreshWishlist }) => {
               refreshWishlist={refreshWishlist}
               isWishlisted={isWishlisted}
             >
-              <Heart
-                className={`w-4 h-4 transition-colors duration-300 ${
-                  isWishlisted ? "text-red-500" : "text-gray-400"
-                }`}
-              />
+              <div className="bg-white p-2 rounded-full shadow hover:scale-110 transition">
+                <Heart
+                  className={`w-4 h-4 ${
+                    isWishlisted ? "text-red-500" : "text-gray-600"
+                  }`}
+                />
+              </div>
             </WishlistButton>
           )}
         </div>
 
-        {/* Discount Badge */}
-        {product?.discountPercentage > 0 && (
-          <div className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm z-10">
-            {Math.round(product.discountPercentage)}% Off
-          </div>
-        )}
-
-        {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-      </Link>
-
-      {/* Info Area */}
-      <div className="p-5 flex flex-col flex-1">
-        {product?.categoryName && (
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-            {product.categoryName}
-          </span>
-        )}
-
-        <Link href={href} className="mb-2">
-          <h4 className="font-bold text-gray-800 text-sm sm:text-[15px] leading-tight line-clamp-2 group-hover:text-yellow-600 transition-colors">
-            {product?.name}
-          </h4>
-        </Link>
-
-        <div className="mt-auto mb-4 flex items-baseline gap-2">
-          <span className="text-xl font-extrabold text-gray-900">
-            {formatTk(product?.sellingPrice || product?.mrp)}
-          </span>
-          {product?.discountPercentage > 0 && (
-            <span className="text-gray-400 text-xs line-through decoration-red-400/50">
-              {formatTk(product?.mrp)}
-            </span>
-          )}
-        </div>
-
-        <Link
-          href={href}
-          className="w-full bg-gray-900 text-white group-hover:bg-yellow-500 group-hover:text-black font-bold py-3 px-4 transition-all duration-300 text-center text-sm flex items-center justify-center gap-2"
+        {/* ADD TO CART (Desktop Hover) */}
+        <div
+          onClick={handleAddToCart}
+          className="hidden md:block absolute bottom-0 left-0 w-full bg-black text-white text-center py-3 text-sm opacity-0 group-hover:opacity-100 transition duration-300 cursor-pointer"
         >
-          <span>Buy Now</span>
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" 
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
+          Add to cart
+        </div>
+      </div>
+
+      {/* ADD TO CART (Mobile) */}
+      <div
+        onClick={handleAddToCart}
+        className="block md:hidden w-full bg-black text-white text-center py-2 mt-2 text-sm cursor-pointer font-bold"
+      >
+        Add to cart
+      </div>
+
+      {/* INFO */}
+      <div className="pt-3 text-center">
+        <Link href={href}>
+          <h3 className="text-sm text-gray-800 hover:underline">
+            {product?.name}
+          </h3>
         </Link>
+
+        <p className="text-sm mt-1 font-medium">
+          {formatTk(selectedVariant?.sellingPrice || product?.sellingPrice || product?.mrp)}
+        </p>
+
+        {/* VARIANT THUMBNAILS */}
+        <div className="flex justify-center gap-2 mt-4">
+          {variants?.map((variant, i) => {
+            const img = variant?.media?.[0]?.secure_url || product?.media?.[0]?.secure_url;
+            if (!img) return null;
+            console.log("Thumbnail image:", i, img);
+
+            return (
+              <button
+                key={variant._id || i}
+                onClick={() => setActiveImage(img)}
+                onMouseEnter={() => setActiveImage(img)}
+                className={`h-6 w-6 flex items-center justify-center border overflow-hidden transition-transform hover:scale-105 ${
+                  activeImage === img
+                    ? "opacity-100 border-2 border-black"
+                    : "opacity-60 hover:opacity-100 border border-gray-300"
+                }`}
+              >
+                <Image
+                  src={img}
+                  alt={variant?.name || "variant"}
+                  width={24}
+                  height={24}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
