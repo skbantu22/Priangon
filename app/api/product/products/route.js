@@ -57,13 +57,6 @@ export async function GET(request) {
         .populate("category", "name slug")
         .populate("subcategory", "name slug")
         .populate("media", "secure_url") 
-        .populate({
-  path: "variants",
-  populate: {
-    path: "media",
-    select: "secure_url"
-  }
-})
          .lean(),
       ProductModel.countDocuments(filter),
     ]);
