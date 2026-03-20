@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import SearchBox from "@/components/ui/Application/Admin/SearchBox";
+import ProductBox from "@/components/ui/Application/website/ProductBox";
 
 const money = (n) => `৳ ${Number(n || 0).toLocaleString("en-BD")}`;
 
@@ -154,7 +155,7 @@ function ShopPageInner() {
   };
 
   const clearAll = () => {
-    router.push("/testh");
+    router.push("/shop");
     setMobileOpen(false);
     setSearchText("");
   };
@@ -524,47 +525,20 @@ const products = useMemo(() => {
                   </div>
                 ))}
 
-              {!isLoading &&
-                products.map((p) => {
-                  const img =
-                    p?.media?.[0]?.secure_url ||
-                    "https://via.placeholder.com/600x600?text=Product";
-
-                  return (
-                    <Link
-                    key={p._id}
-                    href={`/product/${p.slug || p._id}`}
-                    className="group block"
-                  >
-                    <div className="h-full rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                      <div className="relative w-full aspect-[3/4] sm:aspect-square bg-gray-50 overflow-hidden">
-                        <Image
-                          src={img}
-                          alt={p.name}
-                          fill
-                          className="object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        />
-                      </div>
-
-                      <div className="p-3 sm:p-4">
-                        <h3 className="text-sm sm:text-base lg:text-lg font-extrabold leading-snug line-clamp-2 min-h-[40px] sm:min-h-[48px]">
-                          {p.name}
-                        </h3>
-
-                        <div className="mt-2 text-lg sm:text-xl font-bold text-orange-600">
-                          {money(p.sellingPrice)}
-                        </div>
-
-                        <div className="mt-2 w-full rounded-lg bg-gray-900 text-white py-2 text-center text-sm sm:text-base font-bold transition group-hover:bg-black">
-                          View
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                  );
-                })}
-
+            {!isLoading &&
+  products.map((p) => {
+    console.log("Product:", p.name, "Variants:", p.allVariants || p.variants);
+    return (
+      <ProductBox
+        key={p._id}
+        product={p}
+        userId={null} // pass your userId if available
+        allVariants={p.allVariants || p.variants || []} // ✅ pass variants
+        refreshWishlist={() => queryClient.invalidateQueries(["wishlistStatus"])}
+      />
+    );
+  })
+}
               {!isLoading && products.length === 0 ? (
   <div className="col-span-2 lg:col-span-4 text-gray-900 font-extrabold">
     No products found.
