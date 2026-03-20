@@ -28,11 +28,11 @@ const MenProducts = async () => {
       <section className="">
         <div className="flex justify-between px-2">
           <h1 className="text-xl md:text-2xl font-semibold">
-            Mens
+            New
           </h1>
 
           <Link
-            href=""
+            href="/shop"
             className="flex items-center hover:text-primary gap-2"
           >
             View All
