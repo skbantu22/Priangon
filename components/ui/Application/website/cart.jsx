@@ -71,12 +71,20 @@ const Cart = ({ active }) => {
       </SheetTrigger>
 
       {/* 👉 Your existing SheetContent stays SAME */}
-      <SheetContent
-        side="right"
-        className="w-full max-w-[400px] p-0 bg-white border-l shadow-xl flex flex-col"
-      >
-        <SheetHeader className="border-b px-6 py-6 flex justify-center">
-          <SheetTitle className="text-[14px] font-bold uppercase tracking-[0.2em]">
+     <SheetContent
+  side="right"
+  className="
+       w-72     /* full width on mobile */
+    !sm:w-60         /* small tablet */
+    md:w-[400px]    /* fixed 400px on desktop */
+    lg:w-[400px]    /* ensure PC mode uses 400px */
+    p-0 bg-white border-l shadow-xl flex flex-col
+  "
+>
+
+     
+        <SheetHeader className="flex flex-start w-full bg-gray-100  border-b text-center py-4 px-2 mt-1">
+          <SheetTitle className="text-xs font-semibold tracking-widest uppercase">
             Shopping Bag
           </SheetTitle>
         </SheetHeader>
@@ -166,10 +174,10 @@ const Cart = ({ active }) => {
         </div>
 
         {products.length > 0 && (
-          <div className="p-4 border-t">
-            <div className="flex justify-between font-bold text-sm mb-3">
-              <span>Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
+          <div className="py-3 px-2 border-t">
+            <div className="flex justify-between font-bold text-2xl text-sm mb-3">
+              <span className="px-2 text-xl">Subtotal</span>
+              <span className="text-xl">{formatPrice(subtotal)}</span>
             </div>
 
             <Button className="w-full">Checkout</Button>
