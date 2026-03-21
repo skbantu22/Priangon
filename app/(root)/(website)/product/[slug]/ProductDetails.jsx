@@ -10,7 +10,7 @@ import Breadcums from "@/components/ui/Application/Admin/Breadcums";
 import { AccordionBasic } from "./Acording";
 import WishlistButton from "@/components/ui/Application/website/WishlistButton";
 
-import SimilarProductBox from "@/components/ui/Application/website/SimilarProductBox";
+
 
 import DetailsSlider from "@/components/ui/Application/website/detailsslider";
 
