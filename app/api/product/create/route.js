@@ -23,6 +23,7 @@ export async function POST(request) {
       media: true,
       offers: true,            // ✅ optional (if your zSchema has it)
       freeDelivery: true,      // ✅ optional (if your zSchema has it)
+      
     });
 
     const validate = schema.safeParse(payload);
@@ -45,6 +46,7 @@ export async function POST(request) {
       media: productData.media,
       offers: productData.offers || [],          // ✅ safe
       freeDelivery: productData.freeDelivery || false, // ✅ safe
+       variants: productData.variants || [], // ✅ add variant array if passed
     });
 
     await newProduct.save();

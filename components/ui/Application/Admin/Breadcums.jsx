@@ -8,7 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 
-export default function Breadcums({ items,className }) {
+export default function Breadcums({ items, className }) {
   return (
     <Breadcrumb className={className}>
       <BreadcrumbList>
@@ -16,15 +16,19 @@ export default function Breadcums({ items,className }) {
           <div key={index} className="flex items-center">
             <BreadcrumbItem>
               {item.href ? (
-                <BreadcrumbLink href={item.href}>
+                <BreadcrumbLink href={item.href} className="text-[8px] md:text-sm font-medium hover:text-gray-700 ">
                   {item.label}
                 </BreadcrumbLink>
               ) : (
-                <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                <BreadcrumbPage className="text-[8px] md:text-sm font-medium hover:text-gray-700 ">
+                  {item.label}
+                </BreadcrumbPage>
               )}
             </BreadcrumbItem>
 
-            {index < items.length - 1 && <BreadcrumbSeparator />}
+            {index < items.length - 1 && (
+              <BreadcrumbSeparator />
+            )}
           </div>
         ))}
       </BreadcrumbList>

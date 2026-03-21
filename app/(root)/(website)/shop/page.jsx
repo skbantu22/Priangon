@@ -92,7 +92,7 @@ function ShopPageInner() {
     const next = params.toString();
     if (current === next) return;
 
-    const url = next ? `/testh?${next}` : "/shop";
+    const url = next ? `/shop?${next}` : "/shop";
     if (mode === "replace") router.replace(url);
     else router.push(url);
   };
@@ -368,7 +368,7 @@ const products = useMemo(() => {
 
           <button
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden px-4 py-2 rounded-full font-extrabold text-sm border border-gray-200 bg-white hover:bg-gray-50 shadow-sm text-gray-950"
+            className="lg:hidden px-4 py-2  font-extrabold text-sm border border-gray-200 bg-white hover:bg-gray-50 shadow-sm text-gray-950"
           >
             Filters
           </button>

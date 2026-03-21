@@ -1,7 +1,8 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
-import ProductVariantModel from "@/models/ProductVariant.model "; // ✅ FIX: removed extra space
+import ProductVariantModel from "@/models/ProductVariant.model "; // removed extra space
+import ProductModel from "@/models/Product.model"; // ✅ import Product to push variants
 
 export async function POST(request) {
   try {
@@ -16,7 +17,11 @@ export async function POST(request) {
     });
 
     if (existingVariant) {
-      return response(false, 400, "এই কালার এবং সাইজের ভ্যারিয়েন্ট ইতিমধ্যে যোগ করা হয়েছে।");
+      return response(
+        false,
+        400,
+        "এই কালার এবং সাইজের ভ্যারিয়েন্ট ইতিমধ্যে যোগ করা হয়েছে।"
+      );
     }
 
     // ২. SKU ইউনিক চেক (SKU সবসময় ইউনিক হতে হবে)
@@ -25,6 +30,7 @@ export async function POST(request) {
       return response(false, 400, "এই SKU টি অন্য একটি ভ্যারিয়েন্টে ব্যবহার করা হয়েছে।");
     }
 
+    // ৩. Zod validation
     const schema = zSchema.pick({
       product: true,
       sku: true,
@@ -45,9 +51,10 @@ export async function POST(request) {
 
     const variantData = validate.data;
 
-    // ৩. স্টক নেগেটিভ হওয়া যাবে না
+    // ৪. স্টক নেগেটিভ হলে ০ করে দিন
     const initialStock = variantData.stock < 0 ? 0 : variantData.stock;
 
+    // ৫. Create Variant
     const newProductVariant = new ProductVariantModel({
       ...variantData,
       stock: initialStock,
@@ -55,6 +62,11 @@ export async function POST(request) {
     });
 
     await newProductVariant.save();
+
+    // ৬. Push variant ID into Product.variants
+    await ProductModel.findByIdAndUpdate(variantData.product, {
+      $addToSet: { variants: newProductVariant._id }, // prevents duplicates
+    });
 
     return response(true, 201, "ভ্যারিয়েন্ট সফলভাবে তৈরি হয়েছে।", {
       variantId: newProductVariant._id,

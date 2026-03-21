@@ -42,6 +42,7 @@ export function AccordionBasic({ product, initialVariant }) {
          <AccordionItem value="descriptionDesktop">
           <AccordionTrigger>Product Description</AccordionTrigger>
           <AccordionContent>
+            <h1 className="">Description</h1>
             <div
               className="text-sm text-gray-600 leading-relaxed"
               dangerouslySetInnerHTML={{
@@ -66,7 +67,15 @@ export function AccordionBasic({ product, initialVariant }) {
               <AccordionTrigger>Product Description</AccordionTrigger>
             </SheetTrigger>
             <SheetContent 
-  className=" w-full rounded-t-xl overflow-y-auto" >
+  className=" w-full  overflow-y-auto" >
+             
+
+  <div className="flex flex-start w-full bg-gray-100  border-b text-center py-4 px-2">
+  <h2 className="text-xs font-semibold tracking-widest uppercase">
+   Product Description
+  </h2>
+</div>
+
               <div
                 className="text-sm text-gray-600 leading-relaxed p-4 "
                 dangerouslySetInnerHTML={{
@@ -76,22 +85,64 @@ export function AccordionBasic({ product, initialVariant }) {
             </SheetContent>
           </Sheet>
         </AccordionItem>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       )}
+
+ {/* Product Size Card */}
+      {isMobile ? (
+
+         <AccordionItem value="descriptionDesktop">
+          <AccordionTrigger>Product Size Card</AccordionTrigger>
+          <AccordionContent>
+            <h1 className="">Size Card</h1>
+            <div
+              className="text-sm text-gray-600 leading-relaxed"
+              dangerouslySetInnerHTML={{
+                __html: decode(product?.description || "No description available."),
+              }}
+            />
+          </AccordionContent>
+        </AccordionItem>
+        // Mobile: Sheet
+        
+      ) : (
+        // Desktop: normal accordion
+       
+<AccordionItem value="descriptionMobile">
+          <Sheet>
+            <SheetTitle>
+              <VisuallyHidden>Product Description</VisuallyHidden>
+
+
+            </SheetTitle>
+            <SheetTrigger asChild>
+              <AccordionTrigger>Size Card</AccordionTrigger>
+            </SheetTrigger>
+            <SheetContent 
+  className=" w-full  overflow-y-auto" >
+              
+
+              <div className="flex flex-start w-full bg-gray-100  border-b text-center py-4 px-2">
+  <h2 className="text-xs font-semibold tracking-widest uppercase">
+    Size Guide
+  </h2>
+</div>
+              <div
+                className="text-sm text-gray-600 leading-relaxed p-4 "
+                dangerouslySetInnerHTML={{
+                  __html: decode(product?.description || "No description available."),
+                }}
+              />
+            </SheetContent>
+          </Sheet>
+        </AccordionItem>
+      )}
+
+
+
+
+      
+
+      
 
       {/* Return Policy */}
       <AccordionItem value="returns">
@@ -101,5 +152,9 @@ export function AccordionBasic({ product, initialVariant }) {
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+
+
+
+
   )
 }

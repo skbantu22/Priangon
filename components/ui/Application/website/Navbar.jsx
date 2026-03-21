@@ -5,7 +5,11 @@ import Link from "next/link";
 import { Menu, Search, Heart, X, MapPin, User } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { USER_DASHBOARD, WEBSITE_HOME, WEBSITE_LOGIN } from "@/Route/Websiteroute";
+import {
+  USER_DASHBOARD,
+  WEBSITE_HOME,
+  WEBSITE_LOGIN,
+} from "@/Route/Websiteroute";
 import Cart from "./cart";
 import { Avatar, AvatarImage } from "../../avatar";
 import userIcon from "@/public/assets/user.png";
@@ -23,11 +27,9 @@ const Navbar = () => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     router.push(`/shop?${params.toString()}`);
-    setShowMobileSearch(false); // close search after submit
+    setShowMobileSearch(false);
   };
-  
 
-  // Click outside to close mobile search
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -40,15 +42,20 @@ const Navbar = () => {
     };
   }, []);
 
+  const iconItem =
+    "flex flex-col items-center justify-center gap-1 text-black hover:text-gray-500 cursor-pointer";
+
   return (
-    <header className="w-full border-b bg-white relative z-50">
+   
+<header className="sticky top-0 z-50 w-full border-b bg-white/90 backdrop-blur-md transition-shadow">
+
       <div className="mx-auto max-w-[1400px] px-4 lg:px-8">
         <div className="flex items-center justify-between py-3 lg:py-4">
-          {/* Mobile Menu Button */}
+          
+          {/* Mobile Menu */}
           <button
             className="p-2 lg:hidden"
             onClick={() => setOpenMenu(true)}
-            aria-label="Open Menu"
           >
             <Menu size={24} />
           </button>
@@ -56,37 +63,36 @@ const Navbar = () => {
           {/* Logo */}
           <Link
             href={WEBSITE_HOME}
-            className="flex flex-1 items-center justify-center gap-2 lg:flex-none lg:justify-start lg:gap-3"
+            className="flex flex-1 justify-center lg:flex-none lg:justify-start"
           >
-            <h1 className="text-2xl font-black leading-none tracking-[-0.05em] text-[#0f172a] transition-all duration-500 md:text-4xl">
+            <h1 className="text-2xl md:text-4xl font-black tracking-[-0.05em] text-[#0f172a]">
               PRIYAN<span className="font-extralight text-blue-600">GON</span>
             </h1>
           </Link>
 
           {/* Mobile Icons */}
-          <div className="flex items-center gap-3 lg:hidden relative">
-            <button
-              className="p-2"
-              aria-label="Search"
-              onClick={() => setShowMobileSearch(!showMobileSearch)}
-            >
+          <div className="flex items-center gap-3 lg:hidden">
+            <button onClick={() => setShowMobileSearch(!showMobileSearch)}>
               <Search size={22} />
             </button>
-            <button className="p-2" aria-label="Wishlist">
+            <button>
               <Heart size={22} />
             </button>
           </div>
 
-          {/* Desktop Navbar */}
-          <div className="hidden items-center gap-10 lg:flex">
+          {/* Desktop */}
+          <div className="hidden lg:flex items-center gap-10">
+            
+            {/* Menu */}
             <nav className="flex gap-8 text-sm font-semibold uppercase">
-              <Link href="#" className="hover:text-gray-500">Men</Link>
-              <Link href="#" className="hover:text-gray-500">Women</Link>
-              <Link href="#" className="hover:text-gray-500">Combo</Link>
-              <Link href="#" className="hover:text-gray-500">Kids</Link>
-              <Link href="#" className="hover:text-gray-500">Sports</Link>
+              <Link href="#">Men</Link>
+              <Link href="#">Women</Link>
+              <Link href="#">Combo</Link>
+              <Link href="#">Kids</Link>
+              <Link href="#">Accessories</Link>
             </nav>
 
+            {/* Search */}
             <div className="w-[350px]">
               <SearchBox
                 value={query}
@@ -95,25 +101,23 @@ const Navbar = () => {
               />
             </div>
 
+            {/* Icons */}
             <div className="flex items-center gap-8 text-xs font-semibold">
-              <button className="flex flex-col items-center gap-1 hover:text-gray-500">
+
+              {/* Store */}
+              <div className={iconItem}>
                 <MapPin size={20} />
                 <span>Stores</span>
-              </button>
+              </div>
 
+              {/* Account */}
               {!auth ? (
-                <Link
-                  href={WEBSITE_LOGIN}
-                  className="flex flex-col items-center gap-1 hover:text-gray-500"
-                >
+                <Link href={WEBSITE_LOGIN} className={iconItem}>
                   <User size={20} />
                   <span>Profile</span>
                 </Link>
               ) : (
-                <Link
-                  href={USER_DASHBOARD}
-                  className="flex flex-col items-center gap-1 hover:text-gray-500"
-                >
+                <Link href={USER_DASHBOARD} className={iconItem}>
                   <Avatar className="h-6 w-6">
                     <AvatarImage src={auth?.avatar?.url || userIcon.src} />
                   </Avatar>
@@ -121,26 +125,26 @@ const Navbar = () => {
                 </Link>
               )}
 
-
-              <button className="flex flex-col items-center gap-1 hover:text-gray-500">
+              {/* Wishlist */}
+              <div className={iconItem}>
                 <Heart size={20} />
                 <span>Wishlist</span>
-              </button>
+              </div>
 
-               
-              <button className="">
-                              <Cart  />
-
-              </button>
-              
-              
+              {/* Cart ✅ FIXED */}
+              <div className={iconItem}>
+                <div className="h-6 w-6 flex items-center justify-center">
+                  <Cart />
+                </div>
+                <span>Cart</span>
+              </div>
 
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Search Dropdown */}
+      {/* Mobile Search */}
       {showMobileSearch && (
         <div
           ref={searchRef}
@@ -150,8 +154,6 @@ const Navbar = () => {
             value={query}
             onChange={setQuery}
             onSubmit={handleSearchSubmit}
-            placeholder="Search entire store here..."
-            onSelect={() => setShowMobileSearch(false)}
           />
         </div>
       )}
@@ -164,23 +166,24 @@ const Navbar = () => {
             onClick={() => setOpenMenu(false)}
           />
           <div className="absolute left-0 top-0 h-full w-[280px] bg-white p-4 shadow-lg">
-            <div className="flex items-center justify-between border-b pb-3">
+            <div className="flex justify-between border-b pb-3">
               <span className="font-bold">Menu</span>
-              <button onClick={() => setOpenMenu(false)} aria-label="Close Menu">
+              <button onClick={() => setOpenMenu(false)}>
                 <X size={22} />
               </button>
             </div>
+
             <nav className="flex flex-col gap-4 pt-4 text-sm font-semibold uppercase">
-              <Link href="#" onClick={() => setOpenMenu(false)}>Men</Link>
-              <Link href="#" onClick={() => setOpenMenu(false)}>Women</Link>
-              <Link href="#" onClick={() => setOpenMenu(false)}>Teens</Link>
-              <Link href="#" onClick={() => setOpenMenu(false)}>Kids</Link>
-              <Link href="#" onClick={() => setOpenMenu(false)}>Sports</Link>
+              <Link href="#">Men</Link>
+              <Link href="#">Women</Link>
+              <Link href="#">Teens</Link>
+              <Link href="#">Kids</Link>
+              <Link href="#">Sports</Link>
 
               {!auth ? (
-                <Link href={WEBSITE_LOGIN} onClick={() => setOpenMenu(false)}>Login</Link>
+                <Link href={WEBSITE_LOGIN}>Login</Link>
               ) : (
-                <Link href={USER_DASHBOARD} onClick={() => setOpenMenu(false)}>My Account</Link>
+                <Link href={USER_DASHBOARD}>My Account</Link>
               )}
             </nav>
           </div>

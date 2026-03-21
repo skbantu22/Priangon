@@ -136,7 +136,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
       {/* INFO */}
       <div className="pt-3 text-center">
         <Link href={href}>
-          <h3 className="text-sm text-gray-800 hover:underline">
+          <h3 className="text-md text-black hover:underline">
             {product?.name}
           </h3>
         </Link>
@@ -166,8 +166,8 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
                 <Image
                   src={img}
                   alt={variant?.name || "variant"}
-                  width={24}
-                  height={24}
+                  width={20}
+                  height={20}
                   className="h-full w-full object-cover"
                 />
               </button>

@@ -51,19 +51,51 @@ const producVariantSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-producVariantSchema.index({ product: 1, color: 1, size: 1 }, { unique: true });
+// Unique combination of product + color + size
+producVariantSchema.index(
+  { product: 1, color: 1, size: 1 },
+  { unique: true }
+);
 
-// ✅ auto-calc discount
-producVariantSchema.pre("save", async function () {
-  // 'this' refers to the document being saved. 
-  // No 'next' parameter is needed for async middleware.
-  
+//
+// 🔹 PRE SAVE: AUTO CALCULATE DISCOUNT (async-safe)
+//
+producVariantSchema.pre("save", function () {
   if (this.mrp > 0 && this.sellingPrice >= 0) {
     const pct = ((this.mrp - this.sellingPrice) / this.mrp) * 100;
     this.discountPercentage = Math.max(0, Math.min(100, Math.round(pct)));
   }
-  
-  // Mongoose automatically moves forward when the async function finishes.
+  // ✅ no next() needed because this is not async
+});
+
+//
+// 🔹 POST SAVE: AUTO PUSH VARIANT → PRODUCT
+//
+producVariantSchema.post("save", async function (doc) {
+  try {
+    if (!doc.product) return;
+    await mongoose.model("Product").findByIdAndUpdate(doc.product, {
+      $addToSet: { variants: doc._id },
+    });
+  } catch (err) {
+    console.error("Error linking variant to product:", err);
+  }
+});
+
+//
+// 🔹 POST DELETE: REMOVE VARIANT FROM PRODUCT
+// (optional; use only if you want Product.variants to stay clean)
+//
+producVariantSchema.post("findOneAndDelete", async function (doc) {
+  try {
+    if (doc && doc.product) {
+      await mongoose.model("Product").findByIdAndUpdate(doc.product, {
+        $pull: { variants: doc._id },
+      });
+    }
+  } catch (err) {
+    console.error("Error removing variant from product:", err);
+  }
 });
 
 const ProductVariantModel =

@@ -25,7 +25,7 @@ const MenProducts = async () => {
   return (
     <div>
       <section className="px-1 lg:px-3">
-        <div className="flex justify-between px-2">
+        <div className="flex justify-between px-3">
           <h1 className="text-xl md:text-2xl font-semibold">
             Mens
           </h1>

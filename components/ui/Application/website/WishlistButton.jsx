@@ -68,7 +68,7 @@ e.preventDefault();
     <button
       onClick={handleWishlist}
       disabled={loading}
-      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+      className={`p-2 rounded-full bg-gray-50 hover:bg-red-100 transition-colors ${
         isInWishlist ? "text-red-500" : "text-gray-500"
       }`}
     >
