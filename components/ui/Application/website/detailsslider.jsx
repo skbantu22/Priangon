@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import SimilarProductBox from "./SimilarProductBox";
 
+
 const DetailsSlider = ({ products = [] }) => {
-  console.log("Products:", products);
+  
   const [emblaRef, embla] = useEmblaCarousel({ loop: false });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
