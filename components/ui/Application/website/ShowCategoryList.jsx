@@ -16,7 +16,7 @@ import Link from "next/link";
 
 export default function CategoryGrid() {
   return (
-    <div className="px-1 md:px-6 py-4 md:py-12">
+    <div className="px-1 md:px-4 py-4 md:py-12">
 {/* Header */}
   <div className="flex items-center gap-4 md:gap-6 mb-3 md:mb-10">
         <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-black to-transparent" />
