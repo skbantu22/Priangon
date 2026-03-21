@@ -11,7 +11,6 @@ import { AccordionBasic } from "./Acording";
 import WishlistButton from "@/components/ui/Application/website/WishlistButton";
 
 
-
 import DetailsSlider from "@/components/ui/Application/website/detailsslider";
 
 const ProductDetails = ({
@@ -176,7 +175,7 @@ const ProductDetails = ({
 
   return (
     <div className="min-h-screen bg-white text-gray-900 antialiased">
-      <div className="max-w-7xl mx-auto px-6 py-3 md:py-6 flex items-center gap-2 text-[9px] uppercase text-gray-400">
+      <div className="max-w-7xl mx-auto px-2 md:px-6 py-2 md:py-6 flex items-center gap-2 text-[9px] uppercase text-gray-400">
         <Breadcums items={breadcrumbItems} />
       </div> 
 
@@ -240,7 +239,7 @@ const ProductDetails = ({
 
 
             {/* PRICE */}
-            <div className="flex items-center gap-4 mb-4 md:mb-8">
+            <div className="flex items-center gap-4 mb-4 md:mb-8 mt-2">
               <span className="text-2xl font-light text-gray-900">
                 ৳{Number(displaySellingPrice).toLocaleString("en-BD")}
               </span>
@@ -251,12 +250,12 @@ const ProductDetails = ({
               )}
             </div>
 
-            <div className="space-y-4 md:space-y-5 mb-3 md:mb-4">
+            <div className="space-y-4 md:space-y-5 mb-3 md:mb-4 px-2">
               {/* COLOR */}
               {colors?.length > 0 && (
   <div className=" select-none">
     
-    <h3 className="text-[10px] md:text-lg font-medium mb-2 lg:mb-3 text-gray-900">COLOR</h3>
+    <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Color</h3>
 
     {/* Compact Mobile-First Container */}
     <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -270,8 +269,9 @@ const ProductDetails = ({
             onClick={() => setSelectedColor(color)}
             className={`
               relative flex items-center gap-2
-              /* Smaller height and padding for mobile */
-              h-8 px-3 md:h-11 md:px-5 
+              /* Smaller height and padding for mobile */    min-w-[30px] h-[25px] md:h-[40px] px-4
+            text-xs transition-all duration-200 
+            
               rounded-full border transition-all duration-300
               
               ${isSelected 
@@ -285,7 +285,7 @@ const ProductDetails = ({
             
 
             {/* Compact Text */}
-            <span className={`text-[9px] md:text-[12px] uppercase tracking-wider ${isSelected ? 'font-bold' : 'font-medium'}`}>
+            <span className={`text-[9px] md:text-[12px]  tracking-wider ${isSelected ? 'font-bold' : 'font-medium'}`}>
               {color}
             </span>
           </button>
@@ -299,9 +299,9 @@ const ProductDetails = ({
      
 
 <div className="mt-4">
-  <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900">Size</h3>
+  <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Size</h3>
 
-  <div className="flex flex-wrap items-center  gap-2 md:gap-3">
+  <div className="flex flex-wrap items-center  gap-2 md:gap-3 ">
     
     {dynamicSizes.length > 0 ? (
       dynamicSizes.map((item) => (
