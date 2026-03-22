@@ -26,7 +26,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
       variants?.[0]?.media?.[0]?.secure_url ||
       product?.media?.[0]?.secure_url ||
       null;
-    console.log("Initial activeImage:", img);
+   
     return img;
   });
 
@@ -97,7 +97,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
         {/* Wishlist */}
         <div className="absolute top-3 right-3 z-10">
           {wishlistLoading ? (
-            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
+            <div className="w-4 h-8 bg-gray-200 rounded-full animate-pulse" />
           ) : (
             <WishlistButton
               productId={product._id}

@@ -47,7 +47,7 @@ const Navbar = () => {
 
   return (
    
-<header className="sticky top-0 z-50 w-full border-b bg-white/90 backdrop-blur-md transition-shadow">
+<header className="sticky top-0 z-60 w-full border-b bg-white transition-shadow">
 
       <div className="mx-auto max-w-[1400px] px-4 lg:px-8">
         <div className="flex items-center justify-between py-3 lg:py-4">

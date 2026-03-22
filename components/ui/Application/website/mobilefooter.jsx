@@ -32,34 +32,31 @@ const footerData = [
   },
 ];
 
+// Types removed for .jsx compatibility
 const FooterSection = ({ title, links }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="border-b border-zinc-800/40 lg:border-none mt-2">
+    <div className="border-b border-zinc-800 lg:border-none">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between py-3.5 text-left focus:outline-none lg:cursor-default lg:py-0"
+        className="flex w-full items-center justify-between py-5 text-left focus:outline-none lg:cursor-default lg:py-0"
       >
-        <span className="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
+        <span className="text-[15px] font-bold uppercase tracking-wider text-white">
           {title}
         </span>
-        <span className="lg:hidden text-zinc-500">
-          {isOpen ? <Minus size={14} /> : <Plus size={14} />}
+        <span className="lg:hidden text-zinc-400">
+          {isOpen ? <Minus size={18} /> : <Plus size={18} />}
         </span>
       </button>
 
-      <div 
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          isOpen ? "max-h-96 pb-5" : "max-h-0"
-        } lg:max-h-none lg:block lg:mt-5`}
-      >
-        <ul className="space-y-2.5">
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? "max-h-96 pb-5" : "max-h-0"} lg:max-h-none lg:block lg:mt-6`}>
+        <ul className="space-y-3">
           {links.map((link) => (
             <li key={link.label}>
               <Link
                 href={link.href}
-                className="text-zinc-400 hover:text-red-600 transition-colors duration-200 text-[13px]"
+                className="text-zinc-400 hover:text-white transition-colors text-[14px] font-medium"
               >
                 {link.label}
               </Link>
@@ -72,11 +69,26 @@ const FooterSection = ({ title, links }) => {
 };
 
 export default function MobileFooter() {
+  const [isBouncing, setIsBouncing] = useState(false);
+
+  const handleLogoClick = () => {
+    setIsBouncing(true);
+    setTimeout(() => setIsBouncing(false), 600);
+  };
+
   return (
-    <div className="mt-1 lg:mt-5"><footer className="bg-[#0a0a0a] text-white pt-10 pb-8 px-6 lg:px-16 border-t border-zinc-900">
+    <footer className="bg-[#0f0f0f] text-white pt-16 pb-8 px-6 lg:px-16 border-t border-zinc-900">
       <div className="max-w-7xl mx-auto">
         
-        {/* Main Links Grid */}
+        <div className="mb-12">
+          <div 
+            onClick={handleLogoClick}
+            className={`inline-block cursor-pointer select-none transition-transform duration-500 ${isBouncing ? "animate-bounce" : ""}`}
+          >
+            <h2 className="text-3xl font-black italic tracking-tighter">KLOTHEN.</h2>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-x-12">
           {footerData.map((section) => (
             <FooterSection 
@@ -87,25 +99,10 @@ export default function MobileFooter() {
           ))}
         </div>
 
-        {/* Credits Section */}
-       
-
-
-        
-        
+        <div className="mt-16 pt-8 border-t border-zinc-900 text-center text-zinc-600 text-[11px]">
+          © {new Date().getFullYear()} KLOTHEN SHOP. POWERED BY NEXT.JS
+        </div>
       </div>
     </footer>
-    <div className="w-full border-t border-gray-100 ">
-  <div className="max-w-7xl mx-auto px-6 text-center">
-    <p className="text-gray-500 text-[13px] leading-relaxed">
-      Copyright © 2026 <span className="text-red-600 font-bold uppercase">Priangon</span> all reserved SKb Antu. 
-      <br />
-      Powered by <span className="text-red-600 font-bold uppercase">Ecommarce Solution BD 01619421979</span>
-    </p>
-  </div>
-</div>
-    
-    </div>
-    
   );
 }

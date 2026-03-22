@@ -79,7 +79,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
     <div className="group bg-white w-full py-2 ">
       {/* IMAGE */}
       <div className="relative overflow-hidden">
-        <Link href={href} className="block relative w-full aspect-[3/4]">
+        <Link href={href} className="block relative  aspect-[3/4] w-full">
           {activeImage ? (
             <Image
               src={activeImage}
@@ -97,7 +97,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
         {/* Wishlist */}
         <div className="absolute top-3 right-3 z-10">
           {wishlistLoading ? (
-            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
+            <div className="w-4 h-4 md:w-8 md:h-8 bg-gray-200 rounded-full animate-pulse" />
           ) : (
             <WishlistButton
               productId={product._id}
@@ -107,7 +107,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
             >
               <div className="bg-white p-2 rounded-full shadow hover:scale-110 transition">
                 <Heart
-                  className={`w-4 h-4 ${
+                  className={`w-2 h-2 ${
                     isWishlisted ? "text-red-500" : "text-gray-600"
                   }`}
                 />
@@ -136,7 +136,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
       {/* INFO */}
       <div className="pt-3 text-center">
         <Link href={href}>
-          <h3 className="text-md text-black hover:underline">
+          <h3 className="text-sm md:text-md text-black hover:underline">
             {product?.name}
           </h3>
         </Link>
@@ -166,8 +166,8 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
                 <Image
                   src={img}
                   alt={variant?.name || "variant"}
-                  width={20}
-                  height={20}
+                  width={24}
+                  height={24}
                   className="h-full w-full object-cover"
                 />
               </button>

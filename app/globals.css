@@ -170,3 +170,16 @@
   transform: scale(1.2);
   border-color: #000000;
 }
+
+/* Remove default Shadcn icons and focus rings */
+[data-radix-collection-item] svg.lucide-chevron-down {
+  display: none !important;
+}
+
+.group:hover {
+  text-decoration: none !important;
+}
+
+[data-state=open] > .group {
+  text-decoration: none !important;
+}

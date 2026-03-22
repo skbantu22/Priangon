@@ -12,6 +12,8 @@ import WishlistButton from "@/components/ui/Application/website/WishlistButton";
 
 
 import DetailsSlider from "@/components/ui/Application/website/detailsslider";
+import { ShoppingCart } from "lucide-react";
+import ProductGallery from "@/components/ui/Application/website/productgalary";
 
 const ProductDetails = ({
   product,
@@ -181,42 +183,22 @@ const ProductDetails = ({
 
       <main className="max-w-7xl mx-auto px-2 md:px-6 grid grid-cols-1 lg:grid-cols-12 gap-2 md:gap-10 pb-20">
         {/* LEFT GALLERY */}
-        <div className="lg:col-span-7 flex flex-col md:flex-row gap-3 h-auto md:h-[600px]">
-          <div className="flex md:flex-col gap-2 order-2 md:order-1 overflow-x-auto no-scrollbar md:w-24">
-            {galleryMedia.map((m, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setActiveThumb(m?.secure_url)}
-                className={`relative w-16 h-20 md:w-full md:h-[94px] flex-shrink-0 border transition-all duration-300 ${
-                  activeThumb === m?.secure_url
-                    ? "border-black"
-                    : "border-gray-100 bg-gray-50 opacity-70 hover:opacity-100"
-                }`}
-              >
-                <img
-                  src={m?.secure_url}
-                  alt={`thumb-${idx}`}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 order-1 md:order-2 bg-gray-50 border border-gray-100 overflow-hidden h-[450px] md:h-[600px] relative">
-            <img
-              src={activeThumb || galleryMedia?.[0]?.secure_url || ""}
-              alt={product?.name || "Product"}
-              className="w-full h-full object-cover transition-opacity duration-500"
-            />
-            {isOutOfStock && (
-              <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 text-[10px] font-bold tracking-tighter uppercase border border-gray-100">
-                Out of Stock
-              </div>
-            )}
-          </div>
-        </div>
+       {/* LEFT GALLERY */}
+<div className="lg:col-span-7">
+  <div className="relative">
+    <ProductGallery
+      galleryMedia={galleryMedia}
+      productName={product?.name}
+    />
+    
+    {/* Out of Stock overlay stays relative to the whole gallery */}
+    {isOutOfStock && (
+      <div className="absolute top-4 left-[110px] z-30 bg-black text-white px-3 py-1 text-[10px] font-bold tracking-tighter uppercase pointer-events-none">
+        Out of Stock
+      </div>
+    )}
+  </div>
+</div>
 
         {/* RIGHT INFO */}
         <div className="lg:col-span-5 flex flex-col">
@@ -235,7 +217,18 @@ const ProductDetails = ({
       
     </div>
 
+      
+           {/* SKU Text */}
+  <div className="text-[12px] md:text-sm tracking-wide text-gray-400">
+    <span className="uppercase font-medium text-gray-400">SKU: </span>
+    <span className="uppercase font-semibold">
+      {initialVariant?.sku || "N/A"}
 
+    </span>
+  </div>
+
+
+          
 
 
             {/* PRICE */}
@@ -250,12 +243,17 @@ const ProductDetails = ({
               )}
             </div>
 
-            <div className="space-y-4 md:space-y-5 mb-3 md:mb-4 px-2">
+            <div className="space-y-4 md:space-y-5 mb-3 md:mb-4 ">
               {/* COLOR */}
               {colors?.length > 0 && (
   <div className=" select-none">
     
-    <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Color</h3>
+    <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Color:
+      
+      <span className="font-normal text-gray-600 ml-1">{selectedColor || "Select"}</span>
+      
+      
+       </h3>
 
     {/* Compact Mobile-First Container */}
     <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -299,7 +297,12 @@ const ProductDetails = ({
      
 
 <div className="mt-4">
-  <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Size</h3>
+  <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">Size:
+
+<span className="font-normal text-gray-600 ml-1">{selectedSize || "Select"}</span>
+
+
+  </h3>
 
   <div className="flex flex-wrap items-center  gap-2 md:gap-3 ">
     
@@ -374,84 +377,91 @@ const ProductDetails = ({
   <div className="flex flex-col gap-2 items-stretch">
 
     <div className="flex gap-1 md:gap-2 items-stretch">
-      {/* Quantity Selector */}
-      <div className="flex items-center justify-between md:justify-start border border-gray-200 bg-gray-50  w-auto">
-        <button
-          type="button"
-          onClick={() =>
-            setQuantity((q) => {
-              if (q - 1 < 1) {
-                setToastMessage("Quantity can't be less than 1");
-                return 1;
-              }
-              return q - 1;
-            })
-          }
-          className="px-3 py-2 text-gray-500 text-sm hover:text-black"
-        >
-          -
-        </button>
+     {/* Quantity Selector */}
+<div className="flex items-center border border-black bg-white w-[110px] md:w-[130px] h-[40px] md:h-[42px] select-none">
+  {/* MINUS BUTTON */}
+  <button
+    type="button"
+    onClick={() =>
+      setQuantity((q) => {
+        if (q - 1 < 1) {
+          setToastMessage("Quantity can't be less than 1");
+          return 1;
+        }
+        return q - 1;
+      })
+    }
+    className="w-10 h-full flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+  >
+    <span className="text-xl font-light leading-none">-</span>
+  </button>
 
-        <span className="px-3 font-bold text-sm">{quantity}</span>
+  {/* QUANTITY DISPLAY - Centered with equal padding */}
+  <div className="flex-1 h-full flex items-center justify-center">
+    <span className="text-sm md:text-base font-bold text-gray-900">
+      {quantity}
+    </span>
+  </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            setQuantity((q) => {
-              if (q + 1 > displayVariant?.stock) {
-                setToastMessage(
-                  `Stock limit crossed! Only ${displayVariant?.stock} left`
-                );
-                return displayVariant?.stock || q;
-              }
-              return q + 1;
-            })
-          }
-          className="px-3 py-2 text-gray-500 text-sm hover:text-black"
-        >
-          +
-        </button>
-      </div>
+  {/* PLUS BUTTON */}
+  <button
+    type="button"
+    onClick={() =>
+      setQuantity((q) => {
+        if (q + 1 > displayVariant?.stock) {
+          setToastMessage(`Stock limit crossed! Only ${displayVariant?.stock} left`);
+          return displayVariant?.stock || q;
+        }
+        return q + 1;
+      })
+    }
+    className="w-10 h-full flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+  >
+    <span className="text-lg font-light leading-none">+</span>
+  </button>
+</div>
 
       {/* Add to Cart / Go to Cart */}
-      {!isAddedIntoCart ? (
-        <button
-          type="button"
-          disabled={isOutOfStock}
-          onClick={handleAddtoCart}
-          className={`w-full md:flex-1 font-semibold uppercase text-sm py-3 transition-colors duration-200 ${
-            isOutOfStock
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-black text-white hover:bg-white hover:text-black border border-black"
-          }`}
-        >
-          {isOutOfStock ? "Out of Stock" : "Add to Bag"}
-        </button>
-      ) : (
-        <Link href={WEBSITE_CART} className="w-full md:flex-1">
-          <button className="w-full bg-blue-600 text-white font-bold uppercase text-sm py-3 hover:bg-blue-700 transition-colors duration-200">
-            Go to Cart
-          </button>
-        </Link>
-      )}
+     {!isAddedIntoCart ? (
+  <button
+    type="button"
+    disabled={isOutOfStock}
+    onClick={handleAddtoCart}
+    className={`w-full flex items-center justify-center gap-2 font-bold uppercase text-[13px] tracking-widest py-2.5 transition-all duration-300 border ${
+      isOutOfStock
+        ? "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
+        : "bg-[#222222] text-white border-[#222222] hover:bg-white hover:text-black"
+    }`}
+  >
+    {!isOutOfStock && <ShoppingCart size={18} strokeWidth={2.5} />}
+    {isOutOfStock ? "Out of Stock" : "Add To Cart"}
+  </button>
+) : (
+  <Link href={WEBSITE_CART} className="w-full">
+    <button className="w-full flex items-center justify-center gap-2 bg-white text-black border-2 border-black font-bold uppercase text-[13px] tracking-widest py-4 hover:bg-black hover:text-white transition-all duration-300">
+      <ShoppingCart size={18} strokeWidth={2.5} />
+      View In Bag
+    </button>
+  </Link>
+)}
     </div>
 
     {/* Buy Now */}
     <button
-      type="button"
-      disabled={isOutOfStock}
-      onClick={() => {
-        const added = handleAddtoCart();
-        if (added) window.location.href = WEBSITE_CART;
-      }}
-      className={`w-full md:flex-1 font-semibold uppercase text-sm py-3 transition-colors duration-200 ${
-        isOutOfStock
-          ? "bg-gray-50 text-gray-300 cursor-not-allowed"
-          : "bg-emerald-600 text-white hover:bg-black"
-      }`}
-    >
-      Buy Now
-    </button>
+  type="button"
+  disabled={isOutOfStock}
+  onClick={() => {
+    const added = handleAddtoCart();
+    if (added) window.location.href = WEBSITE_CART;
+  }}
+  className={`w-full flex items-center justify-center font-bold uppercase text-[13px] tracking-widest py-3  transition-all duration-300 border ${
+    isOutOfStock
+      ? "bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed"
+      : "bg-[#222222] text-white border-[#222222] hover:bg-white hover:text-black shadow-sm"
+  }`}
+>
+  {isOutOfStock ? "Out of Stock" : "Buy It Now"}
+</button>
   </div>
 </div>
 
@@ -464,9 +474,11 @@ const ProductDetails = ({
 
 {similarProducts && similarProducts.length > 0 && (
   <section className="px-1 md:px-30 lg:px-40 pb-4">
-    <h2 className="text-md lg:text-xl font-semibold uppercase mb-2 lg:mb-4 px-1">
-      You May Also Like
-    </h2>
+    <div className="flex justify-center items-center px-2 text-center mb-2 lg:mb-4">
+  <h1 className="text-xl md:text-2xl font-semibold">
+     You May Also Like
+  </h1>
+</div>
 
     <DetailsSlider products={similarProducts} />
   </section>

@@ -90,6 +90,13 @@ export async function GET(request) {
       .populate("media")
       .populate("category", "name slug")
       .populate("subcategory", "name slug")
+      .populate({
+  path: "variants",
+  populate: {
+    path: "media",
+    select: "secure_url"
+  }
+})
       .lean();
 
     if (limit > 0) q = q.limit(limit);

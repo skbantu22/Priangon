@@ -4,7 +4,9 @@ import dynamic from "next/dynamic";
 
 import MenProducts from "@/components/ui/Application/website/men";
 import ShowCategoryList from "@/components/ui/Application/website/ShowCategoryList";
+import BottomCategoryList from "@/components/ui/Application/website/bottomcategory";
 
+import Mobilefooter from "@/components/ui/Application/website/mobilefooter";
 
 // ✅ Lazy load heavy sections
 const Featuredproducts = dynamic(
@@ -34,9 +36,13 @@ const Home = () => {
    
 
       <Featuredproducts />
+ 
+
+   <BottomCategoryList />
     
     
       <MenProducts />
+    
     
     </div>
   );

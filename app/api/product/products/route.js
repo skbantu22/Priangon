@@ -6,6 +6,7 @@ import CategoryModel from "@/models/category.model";
 import SubCategoryModel from "@/models/subcategory.model";
 import MediaModel from "@/models/Media.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
+
 export async function GET(request) {
   try {
 
@@ -58,6 +59,13 @@ export async function GET(request) {
         .populate("category", "name slug")
         .populate("subcategory", "name slug")
         .populate("media", "secure_url") 
+        .populate({
+  path: "variants",
+  populate: {
+    path: "media",
+    select: "secure_url"
+  }
+})
          .lean(),
       ProductModel.countDocuments(filter),
     ]);

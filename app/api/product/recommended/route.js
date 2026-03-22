@@ -26,7 +26,7 @@ export async function GET(req) {
       _id: { $ne: exclude },
       deletedAt: null,
     })
-      .limit(8)
+      .limit(100)
       .sort({ createdAt: -1 })
       .populate("media", "_id secure_url") // ✅ populate media with secure_url
       .populate("subcategory", "name")     // optional, if you want subcategory info

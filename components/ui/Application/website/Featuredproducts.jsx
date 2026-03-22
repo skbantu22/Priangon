@@ -2,6 +2,7 @@ import Link from "next/link";
 import React from "react";
 import { IoIosArrowRoundForward } from "react-icons/io";
 import ProductBox from "./ProductBox";
+import HomeSlider from "./Homeslider";
 
 const MenProducts = async () => {
   let productData = null;
@@ -16,8 +17,9 @@ const MenProducts = async () => {
     );
 
     productData = await res.json();
+    console.log("FeaturedProducts Data:", productData); // ✅ debug
   } catch (error) {
-    console.log("Men API Error:", error.message);
+    console.log("Featured Products API Error:", error.message);
     return null; // ✅ prevents crash
   }
 
@@ -26,32 +28,22 @@ const MenProducts = async () => {
   return (
     <div>
       <section className="px-1 lg:px-3">
-        <div className="flex justify-between px-3">
-          <h1 className="text-xl md:text-2xl font-semibold">
-            New
-          </h1>
+  <div className="flex justify-center items-center px-2 text-center">
+  <h1 className="text-xl md:text-2xl font-semibold">
+    New Arrivals
+  </h1>
+</div>
 
-          <Link
-            href="/shop"
-            className="flex items-center hover:text-primary gap-2"
-          >
-            View All
-            <IoIosArrowRoundForward />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2  px-2">
-          {!productData?.success ? (
-            <div className="text-center py-5 col-span-full">
-              Data not found
-            </div>
-          ) : (
-            productData?.data?.map((product) => (
-              <ProductBox key={product._id} product={product} />
-            ))
-          )}
-        </div>
-      </section>
+  <div className="px-2">
+    {!productData?.success ? (
+      <div className="text-center py-5">
+        Data not found
+      </div>
+    ) : (
+      <HomeSlider products={productData?.data} />
+    )}
+  </div>
+</section>
     </div>
   );
 };

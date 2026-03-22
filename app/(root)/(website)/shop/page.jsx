@@ -92,7 +92,7 @@ function ShopPageInner() {
     const next = params.toString();
     if (current === next) return;
 
-    const url = next ? `/shop?${next}` : "/shop";
+    const url = next ? `/testh?${next}` : "/shop";
     if (mode === "replace") router.replace(url);
     else router.push(url);
   };
@@ -368,7 +368,7 @@ const products = useMemo(() => {
 
           <button
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden px-4 py-2  font-extrabold text-sm border border-gray-200 bg-white hover:bg-gray-50 shadow-sm text-gray-950"
+            className="lg:hidden px-4 py-2  font-extrabold text-sm border border-black bg-white hover:bg-gray-50 shadow-sm text-gray-950"
           >
             Filters
           </button>
@@ -433,14 +433,22 @@ const products = useMemo(() => {
 </aside>
 
           {mobileOpen && (
+
+            
+
+            
             <div className="lg:hidden fixed inset-0 z-50">
+
+              
               <div
                 className="absolute inset-0 bg-black/40"
                 onClick={() => setMobileOpen(false)}
               />
               <div className="absolute left-0 top-0 h-full w-[360px] max-w-[90vw] bg-white p-4 overflow-auto">
+
+                
                 <div className="flex items-center justify-between mb-3">
-                  <div className="font-extrabold text-gray-950">Filters</div>
+                  <div className=" text-gray-950">Filter</div>
                   <button
                     className="text-sm font-extrabold underline decoration-2 underline-offset-4 text-gray-950"
                     onClick={() => setMobileOpen(false)}
@@ -457,6 +465,7 @@ const products = useMemo(() => {
             
             
     {/* Search */}
+
     <div className="space-y-2">
     
     <SearchBox
@@ -471,6 +480,7 @@ const products = useMemo(() => {
 />
      
     </div>
+
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap mt-2">
               
               <div className="flex flex-wrap gap-2">

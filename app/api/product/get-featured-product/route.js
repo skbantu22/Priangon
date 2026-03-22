@@ -2,6 +2,8 @@ import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import ProductModel from "@/models/Product.model";
 import MediaModel from "@/models/Media.model";
+import ProductVariantModel from "@/models/ProductVariant.model ";
+
 
 export async function GET() {
   try {
@@ -9,7 +11,14 @@ export async function GET() {
 
     const getProduct = await ProductModel.find({ deletedAt: null })
       .populate("media")
-      .limit(4)
+      .populate({
+  path: "variants",
+  populate: {
+    path: "media",
+    select: "secure_url"
+  }
+})
+      .limit(20)
       .lean();
 
     if (!getProduct) {
