@@ -1,18 +1,5 @@
 "use client"
 import { useState, useEffect } from "react"
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener("resize", check)
-    return () => window.removeEventListener("resize", check)
-  }, [])
-
-  return isMobile
-}
 import {
   Accordion,
   AccordionContent,
@@ -22,139 +9,111 @@ import {
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { decode } from "entities"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+import { Plus, Minus } from "lucide-react"
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
+  return isMobile
+}
+
+/**
+ * Updated StyledTrigger:
+ * Smaller min-height and padding on mobile (min-h-[44px])
+ * Full size on desktop (sm:min-h-[56px])
+ */
+const StyledTrigger = ({ title }) => (
+  <div className="flex w-full items-stretch min-h-[44px] sm:min-h-[56px] bg-[#F7F7F7] mb-1 group">
+    <div className="flex-1 flex items-center px-3 sm:px-5 py-2 sm:py-3 transition-colors group-data-[state=open]:text-red-600 group-aria-expanded:text-red-600">
+      <span className="text-[13px] sm:text-[15px] font-medium uppercase tracking-tight text-left">
+        {title}
+      </span>
+    </div>
+    <div className="w-10 sm:w-14 bg-[#222222] flex items-center justify-center text-white shrink-0">
+      <Plus size={16} className="sm:size-[20px] group-data-[state=open]:hidden group-aria-expanded:hidden" strokeWidth={2.5} />
+      <Minus size={16} className="sm:size-[20px] hidden group-data-[state=open]:block group-aria-expanded:block" strokeWidth={2.5} />
+    </div>
+  </div>
+)
 
 export function AccordionBasic({ product, initialVariant }) {
   const isMobile = useIsMobile()
 
-
   return (
-    <Accordion type="single" collapsible className="max-w-lg">
-      {/* Product Code */}
-      <div className="flex justify-between items-center py-4 border-b text-sm">
-        <span className="font-medium text-gray-700">Product Code</span>
-        <span className="text-gray-900 font-medium">{initialVariant?.sku || "N/A"}</span>
-      </div>
+    <Accordion type="single" collapsible className="w-full max-w-lg space-y-1 sm:space-y-2">
+     
 
       {/* Product Description */}
-      {isMobile ? (
-
-         <AccordionItem value="descriptionDesktop">
-          <AccordionTrigger>Product Description</AccordionTrigger>
-          <AccordionContent>
-            <h1 className="">Description</h1>
-            <div
-              className="text-sm text-gray-600 leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: decode(product?.description || "No description available."),
-              }}
-            />
-          </AccordionContent>
-        </AccordionItem>
-        // Mobile: Sheet
-        
-      ) : (
-        // Desktop: normal accordion
-       
-<AccordionItem value="descriptionMobile">
-          <Sheet>
-            <SheetTitle>
-              <VisuallyHidden>Product Description</VisuallyHidden>
-
-
-            </SheetTitle>
+      <AccordionItem value="description" className="border-none">
+        {!isMobile ? (
+          <Sheet modal={false}>
+            <SheetTitle><VisuallyHidden>Description</VisuallyHidden></SheetTitle>
             <SheetTrigger asChild>
-              <AccordionTrigger>Product Description</AccordionTrigger>
+              <button className="w-full focus:outline-none group">
+                <StyledTrigger title="Product Description" />
+              </button>
             </SheetTrigger>
-            <SheetContent 
-  className=" w-full  overflow-y-auto" >
-             
-
-  <div className="flex flex-start w-full bg-gray-100  border-b text-center py-4 px-2">
-  <h2 className="text-xs font-semibold tracking-widest uppercase">
-   Product Description
-  </h2>
-</div>
-
-              <div
-                className="text-sm text-gray-600 leading-relaxed p-4 "
-                dangerouslySetInnerHTML={{
-                  __html: decode(product?.description || "No description available."),
-                }}
-              />
+            <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 overflow-y-auto">
+              <div className="sticky top-0 bg-[#F7F7F7] border-b py-5 px-6 font-bold uppercase tracking-widest text-xs">
+                Product Description
+              </div>
+              <div className="p-6 text-sm text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: decode(product?.description || "") }} />
             </SheetContent>
           </Sheet>
-        </AccordionItem>
-      )}
+        ) : (
+          <>
+            <AccordionTrigger className="p-0 hover:no-underline group">
+              <StyledTrigger title="Product Description" />
+            </AccordionTrigger>
+            <AccordionContent className="px-4 py-3 bg-white border-x border-b border-gray-100 text-xs text-gray-600">
+              <div dangerouslySetInnerHTML={{ __html: decode(product?.description || "") }} />
+            </AccordionContent>
+          </>
+        )}
+      </AccordionItem>
 
- {/* Product Size Card */}
-      {isMobile ? (
-
-         <AccordionItem value="descriptionDesktop">
-          <AccordionTrigger>Product Size Card</AccordionTrigger>
-          <AccordionContent>
-            <h1 className="">Size Card</h1>
-            <div
-              className="text-sm text-gray-600 leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: decode(product?.description || "No description available."),
-              }}
-            />
-          </AccordionContent>
-        </AccordionItem>
-        // Mobile: Sheet
-        
-      ) : (
-        // Desktop: normal accordion
-       
-<AccordionItem value="descriptionMobile">
-          <Sheet>
-            <SheetTitle>
-              <VisuallyHidden>Product Description</VisuallyHidden>
-
-
-            </SheetTitle>
+      {/* Product Size Card */}
+      <AccordionItem value="size-card" className="border-none">
+        {!isMobile ? (
+          <Sheet modal={false}>
+            <SheetTitle><VisuallyHidden>Size Card</VisuallyHidden></SheetTitle>
             <SheetTrigger asChild>
-              <AccordionTrigger>Size Card</AccordionTrigger>
+              <button className="w-full focus:outline-none group">
+                <StyledTrigger title="Size Chart and Description" />
+              </button>
             </SheetTrigger>
-            <SheetContent 
-  className=" w-full  overflow-y-auto" >
-              
-
-              <div className="flex flex-start w-full bg-gray-100  border-b text-center py-4 px-2">
-  <h2 className="text-xs font-semibold tracking-widest uppercase">
-    Size Guide
-  </h2>
-</div>
-              <div
-                className="text-sm text-gray-600 leading-relaxed p-4 "
-                dangerouslySetInnerHTML={{
-                  __html: decode(product?.description || "No description available."),
-                }}
-              />
+            <SheetContent side="right" className="w-[400px] sm:w-[540px] p-0 overflow-y-auto">
+              <div className="sticky top-0 bg-[#F7F7F7] border-b py-5 px-6 font-bold uppercase tracking-widest text-xs">Size Guide</div>
+              <div className="p-6 text-sm text-gray-600">Size chart content for PC.</div>
             </SheetContent>
           </Sheet>
-        </AccordionItem>
-      )}
-
-
-
-
-      
-
-      
+        ) : (
+          <>
+            <AccordionTrigger className="p-0 hover:no-underline group">
+              <StyledTrigger title="Size Chart and Description" />
+            </AccordionTrigger>
+            <AccordionContent className="px-4 py-3 bg-white border-x border-b border-gray-100  ">
+              Size chart details for mobile.
+            </AccordionContent>
+          </>
+        )}
+      </AccordionItem>
 
       {/* Return Policy */}
-      <AccordionItem value="returns">
-        <AccordionTrigger>Return Policy</AccordionTrigger>
-        <AccordionContent>
-          Returns are accepted within 7 days if the product is unused and in original packaging.
+      <AccordionItem value="returns" className="border-none">
+        <AccordionTrigger className="p-0 hover:no-underline group">
+          <StyledTrigger title="Return Policy" />
+        </AccordionTrigger>
+        <AccordionContent className="px-4 py-3 bg-white border-x border-b border-gray-100  text-black">
+          Returns are accepted within 7 days.
         </AccordionContent>
       </AccordionItem>
+
     </Accordion>
-
-
-
-
   )
 }
