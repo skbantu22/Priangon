@@ -183,3 +183,16 @@
 [data-state=open] > .group {
   text-decoration: none !important;
 }
+
+@layer utilities {
+  @keyframes click-pop {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+    100% { transform: translateY(0); }
+  }
+
+  /* This class will be triggered on hover/active */
+  .animate-pop {
+    animation: click-pop 0.5s ease-out;
+  }
+}

@@ -7,6 +7,7 @@ import ShowCategoryList from "@/components/ui/Application/website/ShowCategoryLi
 import BottomCategoryList from "@/components/ui/Application/website/bottomcategory";
 
 import Mobilefooter from "@/components/ui/Application/website/mobilefooter";
+import TrustSection from "@/components/ui/Application/website/TrustSection";
 
 // ✅ Lazy load heavy sections
 const Featuredproducts = dynamic(
@@ -42,6 +43,7 @@ const Home = () => {
     
     
       <MenProducts />
+      <TrustSection />
     
     
     </div>
