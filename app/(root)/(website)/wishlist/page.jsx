@@ -11,8 +11,8 @@ import { addIntoCart } from "@/store/reducer/cartReducer";
 
 const Wishlist = () => {
   const user = useSelector((store) => store.authStore.auth);
-  const userId = user?.data?.user?.id;
-
+  const userId =
+    user?.id || user?._id || user?.data?.user?.id || user?.data?.user?._id;
   const dispatch = useDispatch();
   const router = useRouter();
 
@@ -95,7 +95,7 @@ const Wishlist = () => {
         <Heart className="w-12 h-12 text-gray-300 mb-4" />
         <p className="text-gray-600 mb-4">Please login to see your wishlist</p>
         <button
-          onClick={() => router.push("/login")}
+          onClick={() => router.push("/auth/login")}
           className="bg-black text-white px-6 py-2 rounded-full"
         >
           Login Now
