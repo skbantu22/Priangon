@@ -19,13 +19,11 @@ export async function PUT(request) {
     }
 
     const update =
-      deleteType === "SD"
-        ? { deletedAt: new Date() }
-        : { deletedAt: null };
+      deleteType === "SD" ? { deletedAt: new Date() } : { deletedAt: null };
 
     const result = await ProductModel.updateMany(
       { _id: { $in: ids } },
-      { $set: update }
+      { $set: update },
     );
 
     return response(true, 200, "Category updated successfully", {
@@ -56,6 +54,7 @@ export async function DELETE(request) {
     const result = await ProductModel.deleteMany({
       _id: { $in: ids },
     });
+    await WishlistModel.deleteMany({ productId: { $in: ids } });
 
     return response(true, 200, "Category deleted permanently", {
       deletedCount: result.deletedCount,

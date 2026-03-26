@@ -21,11 +21,7 @@ import {
 import { DT_PRODUCT_COLUMN } from "@/lib/column";
 import { columnConfig } from "@/lib/helperfunction";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
 import { FiPlus } from "react-icons/fi";
@@ -42,30 +38,24 @@ const ShowProduct = () => {
   }, []);
 
   // ✅ row action menu
-  const action = useCallback(
-    (row, deleteType, handleDelete) => {
-      const actionMenu = [];
+  const action = useCallback((row, deleteType, handleDelete) => {
+    const actionMenu = [];
 
-      actionMenu.push(
-        <EditAction
-          key="edit"
-          href={ADMIN_PRODUCT_EDIT(row.original._id)}
-        />
-      );
+    actionMenu.push(
+      <EditAction key="edit" href={ADMIN_PRODUCT_EDIT(row.original._id)} />,
+    );
 
-      actionMenu.push(
-        <DeleteAction
-          key="delete"
-          row={row}
-          deleteType={deleteType}
-          handleDelete={handleDelete}
-        />
-      );
+    actionMenu.push(
+      <DeleteAction
+        key="delete"
+        row={row}
+        deleteType={deleteType}
+        handleDelete={handleDelete}
+      />,
+    );
 
-      return actionMenu;
-    },
-    []
-  );
+    return actionMenu;
+  }, []);
 
   return (
     <div>
@@ -96,7 +86,7 @@ const ShowProduct = () => {
             createAction={action}
           />
         </CardContent>
-      </Card> 
+      </Card>
     </div>
   );
 };

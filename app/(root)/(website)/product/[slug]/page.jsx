@@ -1,5 +1,5 @@
-import React from 'react';
-import ProductDetails from './ProductDetails';
+import React from "react";
+import ProductDetails from "./ProductDetails";
 
 const ProductPage = async ({ params }) => {
   const { slug } = await params;
@@ -15,15 +15,18 @@ const ProductPage = async ({ params }) => {
 
     if (!result.success || !result.data) {
       return (
-        <div className='flex justify-center items-center py-20'>
-          <h1 className='text-2xl font-semibold text-gray-500'>Product not found.</h1>
+        <div className="flex justify-center items-center py-20">
+          <h1 className="text-2xl font-semibold text-gray-500">
+            Product not found.
+          </h1>
         </div>
       );
     }
 
-    const { product, variant, colors, sizes, allVariants, similarProducts } = result.data;
+    const { product, variant, colors, sizes, allVariants, similarProducts } =
+      result.data;
 
-    console.log("Similar products:", similarProducts);
+    console.log(product.sizeChart);
 
     return (
       <main>

@@ -1,69 +1,73 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import slugify from "slugify";
 import Image from "next/image";
+import { useQueryClient } from "@tanstack/react-query";
+import { X, ImageIcon, Ruler, LayoutGrid, UploadCloud } from "lucide-react";
 
 // UI Components
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
-import { 
-  Form, 
-  FormField, 
-  FormLabel, 
-  FormItem, 
-  FormControl, 
-  FormMessage 
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
 } from "@/components/ui/form";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 import Select from "@/components/ui/Select";
 import Editor from "@/components/ui/Application/Admin/Editor";
 import MediaModal from "@/components/ui/Application/Admin/MediaModel";
+import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 
 // Utilities & Config
-import { 
-  ADMIN_CATEGORY_EDIT, 
-  ADMIN_CATEGORY_SHOW, 
-  ADMIN_DASHBOARD 
-} from "@/Route/Adminpannelroute";
+import { ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
 import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
-import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
-import {  useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_CATEGORY_SHOW, label: "category" },
-  { href: ADMIN_CATEGORY_EDIT, label: "Add product" },
+  { href: ADMIN_CATEGORY_SHOW, label: "Products" },
+  { href: "#", label: "New Product" },
 ];
 
 const AddProduct = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState([]);
+  const [sizeChartMedia, setSizeChartMedia] = useState(null);
   const [categoryOption, setCategoryOption] = useState([]);
   const [subCategoryOption, setSubCategoryOption] = useState([]);
+  const [resetKey, setResetKey] = useState(0);
 
-  // 1. Setup Form Schema
-  const formSchema = zSchema.pick({
-    name: true,
-    slug: true,
-    category: true,
-    subcategory: true,
-    mrp: true,
-    sellingPrice: true,
-    discountPercentage: true,
-    description: true,
-    media: true,
-    offers: true,
-    freeDelivery: true,
-  });
+  // Schema with explicit sizeChart field
+  const formSchema = zSchema
+    .pick({
+      name: true,
+      slug: true,
+      category: true,
+      subcategory: true,
+      mrp: true,
+      sellingPrice: true,
+      discountPercentage: true,
+      description: true,
+      media: true,
+      freeDelivery: true,
+    })
+    .extend({
+      sizeChart: z.string().optional().or(z.literal("")),
+    });
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -77,326 +81,422 @@ const AddProduct = () => {
       discountPercentage: "",
       description: "",
       media: [],
-      offers: [],
+      sizeChart: "",
       freeDelivery: false,
     },
   });
 
-  // 2. Fetch Categories
-  const { data: getCategory } = useFetch("/api/category?deleteType=SD&size=10000");
+  const { data: getCategory } = useFetch(
+    "/api/category?deleteType=SD&size=10000",
+  );
+  const watchedCategoryId = form.watch("category");
 
-// 2. Fetch Categories
-  const { data: getsubCategory } = useFetch("/api/subcategory?deleteType=SD&size=10000");
-
+  const subUrl = useMemo(
+    () =>
+      watchedCategoryId
+        ? `/api/subcategory?category=${watchedCategoryId}&deleteType=SD`
+        : null,
+    [watchedCategoryId],
+  );
+  const { data: getSubCategory } = useFetch(subUrl);
 
   useEffect(() => {
     if (getCategory?.success) {
       setCategoryOption(
-        getCategory.data.map((cat) => ({ label: cat.name, value: cat._id }))
+        getCategory.data.map((cat) => ({ label: cat.name, value: cat._id })),
       );
     }
   }, [getCategory]);
 
-  // 3. Watchers
-  const watchedCategoryId = form.watch("category");
-  const watchedName = form.watch("name");
-  const watchedMrp = form.watch("mrp");
-  const watchedSellingPrice = form.watch("sellingPrice");
-
-  // 4. Fetch Subcategories based on category selection
-  const subUrl = useMemo(() => {
-    if (!watchedCategoryId) return null;
-    return `/api/subcategory?category=${watchedCategoryId}&deleteType=SD&size=10`;
-  }, [watchedCategoryId]);
-
-  const { data: getSubCategory } = useFetch(subUrl);
-  
-  console.log("Active Category ID:", watchedCategoryId);
-console.log("Subcategory API Data:", getSubCategory);
   useEffect(() => {
     if (getSubCategory?.success) {
       setSubCategoryOption(
-        getSubCategory.data.map((sub) => ({ label: sub.name, value: sub._id }))
+        getSubCategory.data.map((sub) => ({ label: sub.name, value: sub._id })),
       );
     } else {
       setSubCategoryOption([]);
     }
-    // Clear subcategory when parent category changes
-    form.setValue("subcategory", "");
-  }, [getSubCategory, watchedCategoryId, form]);
+  }, [getSubCategory]);
 
-  // 5. Sync Media Selection with Form State (for Zod validation)
+  // Sync sizeChartMedia ID to form state whenever it changes
   useEffect(() => {
-    const mediaIds = selectedMedia.map((m) => m._id);
-    form.setValue("media", mediaIds, { shouldValidate: true });
+    form.setValue("sizeChart", sizeChartMedia?._id || "", {
+      shouldValidate: true,
+    });
+  }, [sizeChartMedia, form]);
+
+  // Sync Gallery media
+  useEffect(() => {
+    form.setValue(
+      "media",
+      selectedMedia.map((m) => m._id),
+      { shouldValidate: true },
+    );
   }, [selectedMedia, form]);
 
-  // 6. Auto-Slug & Auto-Discount
+  const watchedName = form.watch("name");
   useEffect(() => {
     if (watchedName) {
-      form.setValue("slug", slugify(watchedName, { lower: true, strict: true }));
+      const baseSlug = slugify(watchedName, { lower: true, strict: true });
+      const uniqueId = Date.now().toString(36).slice(-4);
+      form.setValue("slug", `${baseSlug}-${uniqueId}`, {
+        shouldValidate: true,
+      });
     }
   }, [watchedName, form]);
 
+  const watchedMrp = form.watch("mrp");
+  const watchedSellingPrice = form.watch("sellingPrice");
   useEffect(() => {
-    const mrp = Number(watchedMrp) || 0;
-    const selling = Number(watchedSellingPrice) || 0;
+    const mrp = Number(watchedMrp);
+    const selling = Number(watchedSellingPrice);
     if (mrp > 0 && selling > 0) {
       const discount = ((mrp - selling) / mrp) * 100;
-      form.setValue("discountPercentage", discount.toFixed(0));
+      form.setValue(
+        "discountPercentage",
+        Math.max(0, Math.round(discount)).toString(),
+      );
     }
   }, [watchedMrp, watchedSellingPrice, form]);
 
-  // 7. Handlers
-  // const handleEditorChange = (event, editorInstance) => {
-  //   const data = editorInstance.getData();
-  //   form.setValue("description", data, { shouldValidate: true });
-  // };
-const editor = (event, editor) => {
-  const data = editor.getData()
-  form.setValue('description', data)
-}
   const onSubmit = async (values) => {
+    const cleanText = values.description.replace(/<[^>]*>/g, "").trim();
+    if (!cleanText) {
+      showToast("error", "Product description cannot be empty!");
+      return;
+    }
+
     setLoading(true);
     try {
-      // Final payload check
-      const { data: response } = await axios.post("/api/product/create", values);
-
+      const { data: response } = await axios.post(
+        "/api/product/create",
+        values,
+      );
       if (response?.success) {
-        showToast("success", response.message || "Product added!");
+        showToast("success", "Listing Published!");
         form.reset();
         setSelectedMedia([]);
-      } else {
-        throw new Error(response?.message || "Submit failed");
+        setSizeChartMedia(null);
+        setResetKey((p) => p + 1);
       }
     } catch (error) {
-      showToast("error", error?.response?.data?.message || error?.message);
+      showToast("error", "Check required fields or connection");
     } finally {
       setLoading(false);
     }
   };
 
-  const onInvalid = (errors) => {
-    console.error("Validation Failed:", errors);
-    showToast("error", "Please check required fields.");
-  };
-
   return (
-    <div className="space-y-6">
-      <BreadCrumb breadcrumbData={breadcrumbData} />
-
-      <Card className="shadow-sm border-none">
-        <CardHeader className="border-b bg-gray-50/30">
-          <h1 className="text-2xl font-bold text-center">Add Product</h1>
-        </CardHeader>
-
-        <CardContent className="pt-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="grid md:grid-cols-2 grid-cols-1 grid-cols-1 gap-6">
-              
-              {/* Name */}
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Product Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+    <div className="bg-[#f1f1f1] min-h-screen pb-20 lg:pb-10 font-sans">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <BreadCrumb breadcrumbData={breadcrumbData} />
+                <h1 className="text-2xl font-black text-black tracking-tight uppercase">
+                  New Product
+                </h1>
+              </div>
+              <ButtonLoading
+                type="submit"
+                loading={loading}
+                text="PUBLISH PRODUCT"
+                className="bg-black text-white px-10 rounded-none h-12 shadow-xl tracking-widest"
               />
+            </div>
 
-              {/* Slug */}
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Slug</FormLabel>
-                    <FormControl>
-                      <Input placeholder="product-slug" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* LEFT COLUMN */}
+              <div className="lg:col-span-8 space-y-6">
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase tracking-[0.2em]">
+                      Product Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Product Name
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ex: Classic Fit Sweatshirt"
+                              className="h-11 border-black rounded-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Description *
+                          </FormLabel>
+                          <FormControl>
+                            <div className="border-2 border-black overflow-hidden bg-white">
+                              <Editor
+                                key={resetKey}
+                                initialData={field.value}
+                                onChange={(event, editor) =>
+                                  field.onChange(editor.getData())
+                                }
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
 
-              {/* Category - Fix: Extract string value */}
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Select
-                        options={categoryOption}
-                        selected={field.value}
-                        setSelected={(val) => {
-                          const id = typeof val === "string" ? val : val?.value;
-                          field.onChange(id);
-                        }}
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" /> Gallery
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+                      {selectedMedia.map((m) => (
+                        <div
+                          key={m._id}
+                          className="relative aspect-[3/4] border-2 border-black bg-zinc-50"
+                        >
+                          <Image
+                            src={m.url || m.secure_url}
+                            fill
+                            alt="Gallery"
+                            className="object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedMedia((p) =>
+                                p.filter((x) => x._id !== m._id),
+                              )
+                            }
+                            className="absolute top-1 right-1 bg-black text-white p-1"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setOpen(true)}
+                        className="aspect-[3/4] border-2 border-dashed border-black flex flex-col items-center justify-center gap-2"
+                      >
+                        <LayoutGrid className="w-6 h-6" />
+                        <span className="text-[10px] font-black uppercase">
+                          + ADD
+                        </span>
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-black/10">
+                      <p className="text-[10px] font-black uppercase opacity-50">
+                        Cloud Upload:
+                      </p>
+                      <UploadMedia
+                        isMultiple={true}
+                        queryClient={queryClient}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-              {/* Subcategory - Fix: Extract string value */}
-              <FormField
-                control={form.control}
-                name="subcategory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sub Category</FormLabel>
-                    <FormControl>
-                      <Select
-                        options={subCategoryOption}
-                        selected={field.value}
-                        setSelected={(val) => {
-                          const id = typeof val === "string" ? val : val?.value;
-                          field.onChange(id);
-                        }}
-                        disabled={!watchedCategoryId}
+              {/* RIGHT COLUMN */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase">
+                      Pricing & Category
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-5 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="mrp"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase">
+                              MRP
+                            </FormLabel>
+                            <Input
+                              className="h-10 border-black rounded-none"
+                              type="number"
+                              {...field}
+                            />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormField
+                        control={form.control}
+                        name="sellingPrice"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase">
+                              Sale Price
+                            </FormLabel>
+                            <Input
+                              className="h-10 border-black rounded-none font-bold text-blue-600"
+                              type="number"
+                              {...field}
+                            />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="bg-zinc-100 border-2 border-black p-3 text-center uppercase font-black text-xs italic">
+                      Discount: {form.watch("discountPercentage") || 0}% OFF
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="category"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Category
+                          </FormLabel>
+                          <Select
+                            options={categoryOption}
+                            selected={field.value}
+                            setSelected={(val) =>
+                              field.onChange(
+                                typeof val === "string" ? val : val?.value,
+                              )
+                            }
+                          />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="subcategory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Sub-Category
+                          </FormLabel>
+                          <Select
+                            options={subCategoryOption}
+                            selected={field.value}
+                            setSelected={(val) =>
+                              field.onChange(
+                                typeof val === "string" ? val : val?.value,
+                              )
+                            }
+                            disabled={!watchedCategoryId}
+                          />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
 
-       {/* Pricing Grid */}
-<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:col-span-2">
-                <FormField
-                  control={form.control}
-                  name="mrp"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>MRP</FormLabel>
-                      <Input type="number" {...field} />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="sellingPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Selling Price</FormLabel>
-                      <Input type="number" {...field} />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="discountPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Discount %</FormLabel>
-                      <Input type="number" disabled className="bg-muted" {...field} />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* FIXED SIZE CHART FIELD */}
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                      <Ruler className="w-4 h-4" /> Size Chart
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-5 space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="sizeChart" // NOW EXPLICITLY DEFINED
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            {sizeChartMedia ? (
+                              <div className="relative aspect-square border-2 border-black bg-zinc-50">
+                                <Image
+                                  src={
+                                    sizeChartMedia.url ||
+                                    sizeChartMedia.secure_url
+                                  }
+                                  fill
+                                  alt="Size Chart"
+                                  className="object-contain"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSizeChartMedia(null);
+                                    field.onChange(""); // Clears value in form state
+                                  }}
+                                  className="absolute top-1 right-1 bg-black text-white p-1"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => setSizeChartOpen(true)}
+                                className="w-full h-32 border-2 border-dashed border-black flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-zinc-50 transition-colors"
+                              >
+                                <LayoutGrid className="w-5 h-5 opacity-40" />
+                                <span className="text-[10px] font-black uppercase">
+                                  Select Size Chart
+                                </span>
+                              </div>
+                            )}
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Quick Upload Option */}
+                    <div className="pt-4 border-t border-black/10">
+                      <p className="text-[9px] font-black uppercase opacity-40 mb-2 flex items-center gap-1">
+                        <UploadCloud className="w-3 h-3" /> Quick Upload New
+                        Chart
+                      </p>
+                      <UploadMedia
+                        isMultiple={false}
+                        queryClient={queryClient}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+            </div>
+          </form>
+        </Form>
+      </div>
 
-              {/* Description */}
-              {/* <div className="md:col-span-2">
-                <FormLabel className="mb-2 block">Description *</FormLabel>
-
-                <Editor onChange={handleEditorChange} />
-                {form.formState.errors.description && (
-                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.description.message}</p>
-                )}
-              </div> */}
-
-
-              <div className="">
-  <FormField
-    control={form.control}
-    name="description"
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel>
-          Description <span className="text-red-500">*</span>
-        </FormLabel>
-        <FormControl>
-          <Editor onChange={editor} initialData={field.value} />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )}
-  />
-</div>
-
-   
-                        {/* Media */}
-              <div className="md:col-span-2 border border-dashed rounded p-5 gap-2 text-center space-y-6">
-
-          <div   >
-            <UploadMedia isMultiple={true} queryClient={queryClient} className="bg-white" /></div>
-            
-
-                <MediaModal
-                  open={open}
-                  setOpen={setOpen}
-                  selectedMedia={selectedMedia}
-                  setSelectedMedia={setSelectedMedia}
-                  isMultiple={true}
-                />
-
-                {selectedMedia.length > 0 && (
-                  <div className="flex justify-center items-center flex-wrap mb-3 gap-2">
-                    {selectedMedia.map((media) => (
-                      <div key={media._id} className="h-24 w-24 border">
-                        <Image
-                          src={media.url}
-                          height={100}
-                          width={100}
-                          alt=""
-                          className="size-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div
-                  onClick={() => setOpen(true)}
-                  className="bg-gray-50 dark:bg-card border w-[200px] mx-auto p-5 cursor-pointer"
-                >
-                  <span className="font-semibold">Select Media</span>
-                </div>
-              </div>
-              
-              
-
-              {/* Submit Button */}
-              <div className="md:col-span-2 pt-4 flex justify-center">
-                <ButtonLoading
-                  type="submit"
-                  loading={loading}
-                  text="Submit Product"
-                  className="h-10 px-8 rounded"
-                />
-              </div>
-
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-
-     
+      <MediaModal
+        open={open}
+        setOpen={setOpen}
+        selectedMedia={selectedMedia}
+        setSelectedMedia={setSelectedMedia}
+        isMultiple={true}
+      />
+      <MediaModal
+        open={sizeChartOpen}
+        setOpen={setSizeChartOpen}
+        selectedMedia={sizeChartMedia ? [sizeChartMedia] : []}
+        setSelectedMedia={(items) =>
+          setSizeChartMedia(items.length > 0 ? items[items.length - 1] : null)
+        }
+        isMultiple={false}
+      />
     </div>
   );
 };
 
 export default AddProduct;
-
-

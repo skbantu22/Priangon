@@ -15,14 +15,15 @@ export async function POST(request) {
       name: true,
       slug: true,
       category: true,
-      subcategory: true,       // ✅ FIX
+      subcategory: true, // ✅ FIX
       mrp: true,
       sellingPrice: true,
       discountPercentage: true,
       description: true,
       media: true,
-      offers: true,            // ✅ optional (if your zSchema has it)
-      freeDelivery: true,      // ✅ optional (if your zSchema has it)
+      offers: true, // ✅ optional (if your zSchema has it)
+      freeDelivery: true, // ✅ optional (if your zSchema has it)
+      sizeChart: true, // ✅ ADD THIS
     });
 
     const validate = schema.safeParse(payload);
@@ -43,7 +44,10 @@ export async function POST(request) {
       discountPercentage: productData.discountPercentage,
       description: encode(productData.description),
       media: productData.media,
-      offers: productData.offers || [],          // ✅ safe
+      sizeChart:
+        productData.sizeChart && productData.sizeChart !== ""
+          ? productData.sizeChart
+          : null,
       freeDelivery: productData.freeDelivery || false, // ✅ safe
     });
 

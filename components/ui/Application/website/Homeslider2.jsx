@@ -93,7 +93,7 @@ const HomeSlider = ({ products = [] }) => {
       </div>
 
       {/* PAGINATION DOTS */}
-      <div className="flex justify-center items-center space-x-2 mt-2 md:hidden">
+      <div className="flex justify-center items-center space-x-2 mt-2 md:hidden mb-2">
         {scrollSnaps.map((_, index) => (
           <button
             key={index}

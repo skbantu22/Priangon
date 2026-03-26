@@ -2,6 +2,9 @@ import ProductModel from "@/models/Product.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
+import MediaModel from "@/models/Media.model";
+import CategoryModel from "@/models/category.model";
+import SubCategoryModel from "@/models/subcategory.model";
 
 export async function GET(request, { params }) {
   try {
@@ -19,17 +22,32 @@ export async function GET(request, { params }) {
       .populate("media", "secure_url")
       .populate("category", "name slug")
       .populate("subcategory", "name slug")
+      .populate("sizeChart", "secure_url")
+
       .lean();
 
     if (!getProduct) return response(false, 404, "Product not found");
 
     // 2️⃣ Fetch all variants for the product
-    const rawVariants = await ProductVariantModel.find({ product: getProduct._id })
+    const rawVariants = await ProductVariantModel.find({
+      product: getProduct._id,
+    })
       .populate("media", "secure_url")
       .lean();
 
     // 3️⃣ Sort variants by size
-    const sizeOrder = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "2XL", "3XL", "4XL"];
+    const sizeOrder = [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "XXL",
+      "XXXL",
+      "2XL",
+      "3XL",
+      "4XL",
+    ];
     const sortSizes = (a, b) => {
       const isNumA = !isNaN(Number(a));
       const isNumB = !isNaN(Number(b));
@@ -48,12 +66,15 @@ export async function GET(request, { params }) {
     };
 
     const allVariants = rawVariants.sort((a, b) => sortSizes(a.size, b.size));
-    const sortedSizes = [...new Set(allVariants.map((v) => v.size))].filter(Boolean);
+    const sortedSizes = [...new Set(allVariants.map((v) => v.size))].filter(
+      Boolean,
+    );
     const getColor = [...new Set(allVariants.map((v) => v.color))];
 
     const activeVariant =
       allVariants.find(
-        (v) => (color ? v.color === color : true) && (size ? v.size === size : true)
+        (v) =>
+          (color ? v.color === color : true) && (size ? v.size === size : true),
       ) || allVariants[0];
 
     // 4️⃣ Fetch similar products (same category, excluding current product)
@@ -79,7 +100,7 @@ export async function GET(request, { params }) {
 
     const similarProductsWithVariants = similarProducts.map((p) => {
       const variants = similarVariants.filter(
-        (v) => v.product.toString() === p._id.toString()
+        (v) => v.product.toString() === p._id.toString(),
       );
       const colors = [...new Set(variants.map((v) => v.color))];
       const sizes = [...new Set(variants.map((v) => v.size))];
@@ -103,6 +124,8 @@ export async function GET(request, { params }) {
 
     return response(true, 200, "Product data found.", productData);
   } catch (error) {
+    console.error("API ERROR:", error); // 👈 ADD THIS
+
     return catchError(error);
   }
 }

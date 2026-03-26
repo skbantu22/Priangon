@@ -22,7 +22,11 @@ export async function GET(request) {
 
     // also allow single: ?subcategory=jewellery
     const subSingle = (searchParams.get("subcategory") || "").trim();
-    const subList = subRawList.length ? subRawList : (subSingle ? [subSingle] : []);
+    const subList = subRawList.length
+      ? subRawList
+      : subSingle
+        ? [subSingle]
+        : [];
 
     const limitRaw = searchParams.get("limit");
     const includeEmpty =
@@ -33,7 +37,11 @@ export async function GET(request) {
       : 0;
 
     if (!catSlugOrName) {
-      return response(false, 400, "Category slug is required. Example: ?category=men");
+      return response(
+        false,
+        400,
+        "Category slug is required. Example: ?category=women",
+      );
     }
 
     // ✅ Find category by slug OR by name (case-insensitive)
@@ -64,7 +72,11 @@ export async function GET(request) {
         categoryId: cat._id, // ✅ ensures subcats belong to this category
         $or: [
           { slug: { $in: subList.map((s) => s.toLowerCase()) } },
-          { name: { $in: subList.map((s) => new RegExp(`^${escapeRegex(s)}$`, "i")) } },
+          {
+            name: {
+              $in: subList.map((s) => new RegExp(`^${escapeRegex(s)}$`, "i")),
+            },
+          },
         ],
       })
         .select("_id")
@@ -80,7 +92,10 @@ export async function GET(request) {
       // ✅ support subcategory field name: subcategory OR subcategoryId
       baseFilter.$and = [
         {
-          $or: [{ subcategory: { $in: subIds } }, { subcategoryId: { $in: subIds } }],
+          $or: [
+            { subcategory: { $in: subIds } },
+            { subcategoryId: { $in: subIds } },
+          ],
         },
       ];
     }
@@ -91,12 +106,12 @@ export async function GET(request) {
       .populate("category", "name slug")
       .populate("subcategory", "name slug")
       .populate({
-  path: "variants",
-  populate: {
-    path: "media",
-    select: "secure_url"
-  }
-})
+        path: "variants",
+        populate: {
+          path: "media",
+          select: "secure_url",
+        },
+      })
       .lean();
 
     if (limit > 0) q = q.limit(limit);
@@ -110,7 +125,6 @@ export async function GET(request) {
 
     return response(true, 200, "Products found.", products);
   } catch (error) {
-    console.log("BY-CATEGORY ERROR:", error);
     return catchError(error);
   }
 }

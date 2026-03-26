@@ -1,231 +1,163 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/databaseconnection";
 import OrderModel from "@/models/Order.model";
+import ProductModel from "@/models/Product.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import CouponModel from "@/models/Coupon.model";
+import MediaModel from "@/models/Media.model";
+import mongoose from "mongoose";
 
-const shippingMap = {
-  dhaka: 70,
-  other: 120,
-};
+const shippingMap = { dhaka: 70, other: 120 };
 
 export async function POST(req) {
   try {
     await connectDB();
-
     const body = await req.json().catch(() => ({}));
-
-    const customer = body?.customer || {};
-    const items = Array.isArray(body?.items) ? body.items : [];
-    const coupon = body?.coupon || null;
+    const { customer, items, coupon, userId } = body;
 
     if (!customer?.name || !customer?.phone) {
       return NextResponse.json(
-        { success: false, message: "Customer information missing" },
-        { status: 400 }
+        { success: false, message: "Missing customer info" },
+        { status: 400 },
       );
     }
 
-    if (!items.length) {
-      return NextResponse.json(
-        { success: false, message: "Cart items missing" },
-        { status: 400 }
-      );
-    }
+    // --- 1. Map IDs & Fetch Data ---
+    const lookupIds = items
+      .map((i) => i.variantId || i.productId)
+      .filter(Boolean);
 
-    // --------------------------------
-    // Fetch product variants
-    // --------------------------------
-    const variantIds = items.map((i) => i?.variantId).filter(Boolean);
-
-    const dbVariants = await ProductVariantModel.find({
-      _id: { $in: variantIds },
-    })
-      .populate("product", "name slug")
-      .populate("media", "secure_url")
-      .lean();
+    // 🛠️ POPULATE BOTH: We need secure_url from the Media model for both variants and products
+    const [dbVariants, dbProducts] = await Promise.all([
+      ProductVariantModel.find({ _id: { $in: lookupIds } })
+        .populate("product")
+        .populate("media", "secure_url")
+        .lean(),
+      ProductModel.find({ _id: { $in: lookupIds } })
+        .populate("media", "secure_url")
+        .lean(),
+    ]);
 
     const variantMap = new Map(dbVariants.map((v) => [String(v._id), v]));
-    const clean = [];
+    const productMap = new Map(dbProducts.map((p) => [String(p._id), p]));
 
-    for (const it of items) {
-      const v = variantMap.get(String(it?.variantId || ""));
-      if (!v || !v.product) continue;
+    const clean = items
+      .map((it) => {
+        const id = String(it.variantId || it.productId);
+        const v = variantMap.get(id);
+        const p = productMap.get(id);
+        const target = v || p;
 
-      const qty = Math.max(1, Number(it?.quantity || 1));
+        if (!target) return null;
 
-      if (typeof v.stock === "number" && v.stock < qty) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `${v.product.name} (${v.color}/${v.size}) is out of stock`,
-          },
-          { status: 400 }
-        );
-      }
+        // 🛠️ EXTRACTOR: Handles cases where media is populated or just a string
+        const getMediaUrl = (obj) => {
+          if (!obj?.media || obj.media.length === 0) return "";
+          const first = obj.media[0];
+          // If populated, it's an object: { secure_url: "..." }
+          // If not populated, it's a string: "https://..."
+          return first?.secure_url || (typeof first === "string" ? first : "");
+        };
 
-      clean.push({
-        productId: v.product._id,
-        variantId: v._id,
-        name: v.product.name,
-        slug: v.product.slug,
-        color: v.color || "",
-        size: v.size || "",
-        mrp: Number(v.mrp || 0),
-        sellingPrice: Number(v.sellingPrice || 0),
-        discount: Number(v.discountPercentage || 0),
-        media: v.media?.[0]?.secure_url || "",
-        quantity: qty,
-      });
-    }
+        const itemMedia = v ? getMediaUrl(v) : getMediaUrl(p);
 
-    if (!clean.length) {
-      return NextResponse.json(
-        { success: false, message: "No valid items found" },
-        { status: 400 }
-      );
-    }
+        return {
+          productId: v ? v.product?._id : target._id,
+          variantId: v ? v._id : null,
+          name: v ? v.product?.name : target.name,
+          slug: v ? v.product?.slug : target.slug,
+          color: v?.color || "",
+          size: v?.size || it.size || "",
+          mrp: Number(v?.mrp || target.mrp || 0),
+          sellingPrice: Number(v?.sellingPrice || target.sellingPrice || 0),
+          discount: Number(
+            v?.discountPercentage || target.discountPercentage || 0,
+          ),
+          media: itemMedia, // 🚀 Now this will be the https URL
+          quantity: Math.max(1, Number(it.quantity || 1)),
+        };
+      })
+      .filter(Boolean);
 
-    // --------------------------------
-    // Subtotal
-    // --------------------------------
-    const subtotal = clean.reduce(
-      (sum, item) => sum + item.sellingPrice * item.quantity,
-      0
-    );
-
-    const city = String(customer?.cityId || "other").toLowerCase();
+    // --- 2. Totals & Coupon ---
+    const subtotal = clean.reduce((s, i) => s + i.sellingPrice * i.quantity, 0);
+    const city = String(customer.cityId || "other").toLowerCase();
     const shippingFee = shippingMap[city] ?? 120;
 
-    // --------------------------------
-    // Coupon validation
-    // --------------------------------
     let discount = 0;
-    let appliedCouponData = { code: "", discountPercentage: 0 };
-
+    let couponData = { code: "", discountPercentage: 0 };
     if (coupon?.code) {
-      const inputCode = String(coupon.code).trim();
-
-      const couponDoc = await CouponModel.findOne({
-        code: { $regex: new RegExp(`^${inputCode}$`, "i") },
+      const doc = await CouponModel.findOne({
+        code: { $regex: new RegExp(`^${coupon.code.trim()}$`, "i") },
         deletedAt: null,
       }).lean();
 
-      if (!couponDoc) {
-        return NextResponse.json(
-          { success: false, message: "Invalid coupon code" },
-          { status: 400 }
-        );
+      if (doc && subtotal >= (doc.minShoppingAmount || 0)) {
+        discount = Math.round((subtotal * (doc.discountPercentage || 0)) / 100);
+        couponData = {
+          code: doc.code,
+          discountPercentage: doc.discountPercentage,
+        };
       }
-
-      if (couponDoc.validity && new Date() > new Date(couponDoc.validity)) {
-        return NextResponse.json(
-          { success: false, message: "Coupon has expired" },
-          { status: 400 }
-        );
-      }
-
-      if (subtotal < Number(couponDoc.minShoppingAmount || 0)) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Minimum shopping amount is ৳${couponDoc.minShoppingAmount}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      discount = Math.round(
-        (subtotal * Number(couponDoc.discountPercentage || 0)) / 100
-      );
-
-      appliedCouponData = {
-        code: couponDoc.code,
-        discountPercentage: couponDoc.discountPercentage,
-      };
     }
 
-    // --------------------------------
-    // Final total
-    // --------------------------------
     const total = Math.max(subtotal + shippingFee - discount, 0);
 
-    const paymentAttempt = {
-      method: "cod",
-      status: "unpaid",
-      merchantInvoiceNumber: "",
-      paymentId: "",
-      trxId: "",
-      valId: "",
-      amount: total,
-      currency: "BDT",
-      rawResponse: {},
-      initiatedAt: new Date(),
-    };
+    const tempId = new mongoose.Types.ObjectId();
+    const manualOrderNumber = `ORD-${tempId.toString().toUpperCase().slice(-6)}`;
 
-    // --------------------------------
-    // Create order
-    // --------------------------------
-    const order = await OrderModel.create({
-      userId: body?.userId || null,
-      customer: { ...customer, cityId: city },
-      items: clean,
-      subtotal,
-      shippingFee,
-      discount,
-      total,
-      coupon: appliedCouponData,
-      currency: "BDT",
-      status: "pending",
-      paymentMethodSelected: "cod",
-      payments: [paymentAttempt],
-      activePaymentIndex: 0,
-    });
-
-    // --------------------------------
-    // Reduce stock (safe update)
-    // --------------------------------
-    await ProductVariantModel.bulkWrite(
-      clean.map((item) => ({
-        updateOne: {
-          filter: {
-            _id: item.variantId,
-            stock: { $gte: item.quantity },
-          },
-          update: { $inc: { stock: -item.quantity } },
+    // --- 4. Save Order ---
+    const orderDocs = await OrderModel.create(
+      [
+        {
+          orderNumber: manualOrderNumber,
+          userId: userId || null,
+          customer: { ...customer, cityId: city },
+          items: clean,
+          subtotal,
+          shippingFee,
+          discount,
+          total,
+          coupon: couponData,
+          status: "pending",
+          paymentMethodSelected: "cod",
+          payments: [
+            {
+              method: "cod",
+              status: "unpaid",
+              amount: total,
+              merchantInvoiceNumber: manualOrderNumber,
+              initiatedAt: new Date(),
+            },
+          ],
         },
-      }))
+      ],
+      { validateBeforeSave: false },
     );
 
-    // --------------------------------
-    // Generate invoice
-    // --------------------------------
-    const invoice = order.orderNumber || `ORD-${order._id.toString()}`;
+    const order = orderDocs[0];
 
-    await OrderModel.findByIdAndUpdate(order._id, {
-      $set: { "payments.0.merchantInvoiceNumber": invoice },
-    });
+    // --- 5. Stock Update ---
+    await Promise.all(
+      clean.map((i) => {
+        const Model = i.variantId ? ProductVariantModel : ProductModel;
+        return Model.updateOne(
+          { _id: i.variantId || i.productId, stock: { $gte: i.quantity } },
+          { $inc: { stock: -i.quantity } },
+        );
+      }),
+    );
 
     return NextResponse.json({
       success: true,
-      method: "cod",
-      orderId: order._id,
-      orderNumber: invoice,
-      status: "Placed",
-      paymentStatus: "UNPAID",
-      subtotal,
-      shippingFee,
-      discount,
-      total,
-      coupon: appliedCouponData,
-      message: "Order placed successfully",
+      orderId: order._id.toString(),
+      orderNumber: manualOrderNumber,
     });
   } catch (err) {
-    console.error("POST /api/checkout error:", err);
-
+    console.error("CRITICAL CHECKOUT ERROR:", err);
     return NextResponse.json(
-      { success: false, message: err?.message || "Server error" },
-      { status: 500 }
+      { success: false, message: err.message },
+      { status: 500 },
     );
   }
 }

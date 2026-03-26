@@ -4,11 +4,11 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion"
+} from "@/components/ui/accordion";
 
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -16,7 +16,7 @@ import {
   QueryClientProvider,
   useInfiniteQuery,
   useQuery,
-  useQueryClient
+  useQueryClient,
 } from "@tanstack/react-query";
 import Link from "next/link";
 import Image from "next/image";
@@ -48,7 +48,6 @@ async function fetchAllSubcats() {
 
 async function fetchProducts(searchParamsString) {
   const params = new URLSearchParams(searchParamsString);
-
 
   if (!params.get("size")) params.set("size", "12");
 
@@ -92,7 +91,7 @@ function ShopPageInner() {
     const next = params.toString();
     if (current === next) return;
 
-    const url = next ? `/testh?${next}` : "/shop";
+    const url = next ? `/shop?${next}` : "/shop";
     if (mode === "replace") router.replace(url);
     else router.push(url);
   };
@@ -104,7 +103,6 @@ function ShopPageInner() {
     else params.delete("category");
 
     params.delete("subcategory");
-    
 
     pushParams(params, "push");
     setMobileOpen(false);
@@ -135,14 +133,13 @@ function ShopPageInner() {
       params.set("subcategory", value);
     }
 
-    
     pushParams(params, "push");
   };
 
   const clearSubcategories = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("subcategory");
-  
+
     pushParams(params, "push");
   };
 
@@ -175,17 +172,13 @@ function ShopPageInner() {
       if (text) params.set("q", text);
       else params.delete("q");
 
-  
       pushParams(params, "replace");
     }, 300);
 
     return () => clearTimeout(t);
   }, [searchText, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
   const loadMoreRef = React.useRef(null);
-
-  
 
   // =====================================================
   // Queries
@@ -208,15 +201,14 @@ function ShopPageInner() {
 
   const spString = searchParams.toString();
 
-
-const {
+  const {
     data,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading,
     isFetching,
-    error: prodErrObj
+    error: prodErrObj,
   } = useInfiniteQuery({
     queryKey: ["products", spString],
     queryFn: ({ pageParam = 0 }) => {
@@ -226,8 +218,13 @@ const {
     },
     getNextPageParam: (lastPage) => {
       // Fully safe check to prevent length errors
-      if (!lastPage || !Array.isArray(lastPage.items) || lastPage.items.length === 0) return undefined;
-  
+      if (
+        !lastPage ||
+        !Array.isArray(lastPage.items) ||
+        lastPage.items.length === 0
+      )
+        return undefined;
+
       const nextStart = (lastPage.start || 0) + (lastPage.size || 12);
       return nextStart < (lastPage.total || 0) ? nextStart : undefined;
     },
@@ -236,57 +233,58 @@ const {
     retry: 1,
   });
 
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
 
-useEffect(() => {
-  if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
-      }
-    },
-    { rootMargin: "200px" }
-  );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
-  observer.observe(loadMoreRef.current);
-  return () => observer.disconnect();
-}, [hasNextPage, fetchNextPage, isFetchingNextPage]);
-
-const products = useMemo(() => {
-  if (!data?.pages) return [];
-  return data.pages.flatMap(p => Array.isArray(p?.items) ? p.items : []);
-}, [data]);
-
-
+  const products = useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flatMap((p) => (Array.isArray(p?.items) ? p.items : []));
+  }, [data]);
 
   const error = prodErrObj?.message || null;
 
   // ---------------- Derived ----------------
   const activeCategoryLabel = useMemo(() => {
     if (!category) return "All";
-    const found = categories.find((c) => c.slug === category || c._id === category);
+    const found = categories.find(
+      (c) => c.slug === category || c._id === category,
+    );
     return found?.name || category;
   }, [category, categories]);
 
   const subcatsByCategory = useMemo(() => {
-  const map = new Map();
-  for (const s of allSubcats) {
-    if (!s) continue; // skip null/undefined
-    const catId =
-      (typeof s?.category === "string" ? s.category : s?.category?._id) ||
-      s?.categoryId ||
-      "";
-    if (!catId) continue;
+    const map = new Map();
+    for (const s of allSubcats) {
+      if (!s) continue; // skip null/undefined
+      const catId =
+        (typeof s?.category === "string" ? s.category : s?.category?._id) ||
+        s?.categoryId ||
+        "";
+      if (!catId) continue;
 
-    if (!map.has(catId)) map.set(catId, []);
-    map.get(catId).push(s);
-  }
-  return map;
-}, [allSubcats]);
+      if (!map.has(catId)) map.set(catId, []);
+      map.get(catId).push(s);
+    }
+    return map;
+  }, [allSubcats]);
 
   const activeCategoryId = useMemo(() => {
-    const found = categories.find((c) => c.slug === category || c._id === category);
+    const found = categories.find(
+      (c) => c.slug === category || c._id === category,
+    );
     return found?._id || "";
   }, [category, categories]);
 
@@ -297,75 +295,79 @@ const products = useMemo(() => {
 
   // ---------------- UI ----------------
   const Sidebar = (
-  <div className="w-96 rounded-xl border bg-background p-4 space-y-6">
-  {/* Header */}
-  <div className="flex items-center justify-between">
-    <h3 className="font-semibold text-base">Filters</h3>
+    <div className="w-96 rounded-xl border bg-background p-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-base">Filters</h3>
 
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={clearAll}
-      className="text-red-500 hover:text-red-600"
-    >
-      Clear
-    </Button>
-  </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearAll}
+          className="text-red-500 hover:text-red-600"
+        >
+          Clear
+        </Button>
+      </div>
 
-  {/* Categories */}
-  <div>
-    <Accordion type="single" collapsible className="w-full">
-      {categories.map((c) => {
-        const catSubcats = subcatsByCategory.get(c._id) || [];
-        const active = category === c.slug || category === c._id;
+      {/* Categories */}
+      <div>
+        <Accordion type="single" collapsible className="w-full">
+          {categories.map((c) => {
+            const catSubcats = subcatsByCategory.get(c._id) || [];
+            const active = category === c.slug || category === c._id;
 
-        return (
-         <AccordionItem key={c._id} value={c.slug}>
-                       <AccordionTrigger
-                         onClick={() => setCategory(c.slug)}
-                         className={`text-lg ${active ? "text-primary font-semibold" : ""}`}
-                       >
-                         {c.name}
-                       </AccordionTrigger>
-                       {catSubcats.length > 0 && (
-                         <AccordionContent>
-                           <div className="flex flex-col gap-1 pl-2">
-                             {catSubcats.map((s) => (
-                               <Button
-                                 key={s._id}
-                                 variant={subcategory === s.slug ? "secondary" : "ghost"}
-                                 size="sm"
-                                 className="justify-start text-base"
-                                 onClick={() => active ? toggleSubcategory(s.slug) : setCategoryWithSubcategory(c.slug, s.slug)}
-                               >
-                                 {s.name}
-                               </Button>
-                             ))}
-                           </div>
-                         </AccordionContent>
-                       )}
-                     </AccordionItem>
-        );
-      })}
-    </Accordion>
+            return (
+              <AccordionItem key={c._id} value={c.slug}>
+                <AccordionTrigger
+                  onClick={() => setCategory(c.slug)}
+                  className={`text-lg ${active ? "text-primary font-semibold" : ""}`}
+                >
+                  {c.name}
+                </AccordionTrigger>
+                {catSubcats.length > 0 && (
+                  <AccordionContent>
+                    <div className="flex flex-col gap-1 pl-2">
+                      {catSubcats.map((s) => (
+                        <Button
+                          key={s._id}
+                          variant={
+                            subcategory === s.slug ? "secondary" : "ghost"
+                          }
+                          size="sm"
+                          className="justify-start text-base"
+                          onClick={() =>
+                            active
+                              ? toggleSubcategory(s.slug)
+                              : setCategoryWithSubcategory(c.slug, s.slug)
+                          }
+                        >
+                          {s.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                )}
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
 
-    {/* All Category */}
-    <Button
-      variant={!category ? "default" : "outline"}
-      className="w-full mt-4"
-      onClick={() => setCategory("")}
-    >
-      All Category
-    </Button>
-  </div>
-</div>
-)
+        {/* All Category */}
+        <Button
+          variant={!category ? "default" : "outline"}
+          className="w-full mt-4"
+          onClick={() => setCategory("")}
+        >
+          All Category
+        </Button>
+      </div>
+    </div>
+  );
   return (
     <div className="min-h-screen ">
       <div className="max-w-8xl mx-auto p-8">
         <div className="lg:hidden mb-5 flex items-center justify-between gap-3">
-         
-
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden px-4 py-2  font-extrabold text-sm border border-black bg-white hover:bg-gray-50 shadow-sm text-gray-950"
@@ -428,25 +430,15 @@ const products = useMemo(() => {
         </div>
 
         <div className="flex gap-6">
-          <aside className="hidden lg:block sticky top-4 ">
-  {Sidebar}
-</aside>
+          <aside className="hidden lg:block sticky top-4 ">{Sidebar}</aside>
 
           {mobileOpen && (
-
-            
-
-            
             <div className="lg:hidden fixed inset-0 z-50">
-
-              
               <div
                 className="absolute inset-0 bg-black/40"
                 onClick={() => setMobileOpen(false)}
               />
               <div className="absolute left-0 top-0 h-full w-[360px] max-w-[90vw] bg-white p-4 overflow-auto">
-
-                
                 <div className="flex items-center justify-between mb-3">
                   <div className=" text-gray-950">Filter</div>
                   <button
@@ -462,30 +454,23 @@ const products = useMemo(() => {
           )}
 
           <main className="flex-1">
-            
-            
-    {/* Search */}
+            {/* Search */}
 
-    <div className="space-y-2">
-    
-    <SearchBox
-  value={searchText}
-  onChange={setSearchText}
-  onSubmit={() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (searchText) params.set("q", searchText);
-    else params.delete("q");
-    pushParams(params, "replace");
-  }}
-/>
-     
-    </div>
+            <div className="space-y-2">
+              <SearchBox
+                value={searchText}
+                onChange={setSearchText}
+                onSubmit={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  if (searchText) params.set("q", searchText);
+                  else params.delete("q");
+                  pushParams(params, "replace");
+                }}
+              />
+            </div>
 
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap mt-2">
-              
               <div className="flex flex-wrap gap-2">
-
-                
                 <span className="px-3 py-1 rounded-full bg-yellow-100 border border-yellow-300 text-sm font-extrabold text-gray-950">
                   Category: {activeCategoryLabel}
                 </span>
@@ -521,8 +506,7 @@ const products = useMemo(() => {
               </button>
             </div>
 
-             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
               {(isLoading || isFetching) &&
                 Array.from({ length: 8 }).map((_, i) => (
                   <div
@@ -535,33 +519,43 @@ const products = useMemo(() => {
                   </div>
                 ))}
 
-            {!isLoading &&
-  products.map((p) => {
-    console.log("Product:", p.name, "Variants:", p.allVariants || p.variants);
-    return (
-      <ProductBox
-        key={p._id}
-        product={p}
-        userId={null} // pass your userId if available
-        allVariants={p.allVariants || p.variants || []} // ✅ pass variants
-        refreshWishlist={() => queryClient.invalidateQueries(["wishlistStatus"])}
-      />
-    );
-  })
-}
+              {!isLoading &&
+                products.map((p) => {
+                  console.log(
+                    "Product:",
+                    p.name,
+                    "Variants:",
+                    p.allVariants || p.variants,
+                  );
+                  return (
+                    <ProductBox
+                      key={p._id}
+                      product={p}
+                      userId={null} // pass your userId if available
+                      allVariants={p.allVariants || p.variants || []} // ✅ pass variants
+                      refreshWishlist={() =>
+                        queryClient.invalidateQueries(["wishlistStatus"])
+                      }
+                    />
+                  );
+                })}
               {!isLoading && products.length === 0 ? (
-  <div className="col-span-2 lg:col-span-4 text-gray-900 font-extrabold">
-    No products found.
-  </div>
-) : null}
+                <div className="col-span-2 lg:col-span-4 text-gray-900 font-extrabold">
+                  No products found.
+                </div>
+              ) : null}
 
-<div ref={loadMoreRef} className="col-span-2 lg:col-span-4 flex justify-center items-center py-4">
-  {isFetchingNextPage && (
-    <span className="text-sm text-gray-400">Loading more products...</span>
-  )}
-</div>
+              <div
+                ref={loadMoreRef}
+                className="col-span-2 lg:col-span-4 flex justify-center items-center py-4"
+              >
+                {isFetchingNextPage && (
+                  <span className="text-sm text-gray-400">
+                    Loading more products...
+                  </span>
+                )}
+              </div>
             </div>
-             
           </main>
         </div>
       </div>
@@ -581,7 +575,7 @@ export default function Page() {
             refetchOnWindowFocus: false,
           },
         },
-      })
+      }),
   );
 
   return (

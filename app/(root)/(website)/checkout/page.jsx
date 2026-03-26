@@ -44,7 +44,7 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const cartStore = useSelector((store) => store.cartStore);
-const authStore = useSelector(store => store.authStore)
+  const authStore = useSelector((store) => store.authStore);
 
   const products = Array.isArray(cartStore?.products) ? cartStore.products : [];
   const liveProducts = Array.isArray(cartStore?.products)
@@ -81,6 +81,56 @@ const authStore = useSelector(store => store.authStore)
     return Math.max(subtotal - couponDiscountAmount + shipping, 0);
   }, [subtotal, couponDiscountAmount, shipping]);
 
+  // --- META TRACKING HELPER ---
+  const getCookie = (name) => {
+    if (typeof document === "undefined") return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return null;
+  };
+  // 1. InitiateCheckout Tracking (Runs once when products are ready)
+  useEffect(() => {
+    // Only run if cart is verified and has items
+    if (verifiedOnce && liveProducts.length > 0) {
+      const eventId = `ic_${Date.now()}`;
+
+      // Prepare shared data
+      const productIds = liveProducts.map((p) => String(p.productId));
+      const trackingData = {
+        content_ids: productIds,
+        content_type: "product",
+        value: subtotal,
+        currency: "BDT",
+        num_items: liveProducts.length,
+      };
+
+      // A. Browser Pixel (Client-Side)
+      if (typeof window !== "undefined" && window.fbq) {
+        window.fbq("track", "InitiateCheckout", trackingData, {
+          eventID: eventId,
+        });
+      }
+
+      // B. Server CAPI (Conversion API)
+      axios
+        .post("/api/meta/capi", {
+          event_name: "InitiateCheckout",
+          event_id: eventId,
+          url: window.location.href,
+          phone: authStore?.auth?.phone || "",
+          full_name: authStore?.auth?.name || "",
+          address: authStore?.auth?.address || "",
+          district: authStore?.auth?.city || "",
+          user_agent: window.navigator.userAgent,
+          fbp: getCookie("_fbp"),
+          fbc: getCookie("_fbc"),
+          custom_data: trackingData,
+        })
+        .catch((err) => console.error("CAPI Error:", err));
+    }
+  }, [verifiedOnce, liveProducts.length]); // Dependencies are correct
+
   const couponFormSchema = zSchema.pick({
     code: true,
     minShoppingAmount: true,
@@ -106,37 +156,31 @@ const authStore = useSelector(store => store.authStore)
     });
 
   const orderForm = useForm({
-  resolver: zodResolver(orderFormSchema),
-  defaultValues: {
-    name: authStore?.auth?.name || "",
-    phone: authStore?.auth?.phone || "",
-    address: authStore?.auth?.address || "",
-        city: authStore?.auth?.city || "", // <-- Add default value here
+    resolver: zodResolver(orderFormSchema),
+    defaultValues: {
+      name: authStore?.auth?.name || "",
+      phone: authStore?.auth?.phone || "",
+      address: authStore?.auth?.address || "",
+      city: authStore?.auth?.city || "", // <-- Add default value here
 
-    userId: authStore?.auth?._id || "",
-  },
-});
+      userId: authStore?.auth?._id || "",
+    },
+  });
 
-
-
-console.log("Auth Store:", authStore);
   useEffect(() => {
-  const auth = authStore?.auth;
-  if (auth) {
-    orderForm.setValue("userId", auth._id || "");
-    orderForm.setValue("name", auth.name || "");
-    orderForm.setValue("phone", auth.phone || "");
-    orderForm.setValue("address", auth.address || "");
-        orderForm.setValue("city", auth.city || ""); // <-- Add this line
-
-  }
-}, [authStore, orderForm]);
+    const auth = authStore?.auth;
+    if (auth) {
+      orderForm.setValue("userId", auth._id || "");
+      orderForm.setValue("name", auth.name || "");
+      orderForm.setValue("phone", auth.phone || "");
+      orderForm.setValue("address", auth.address || "");
+      orderForm.setValue("city", auth.city || ""); // <-- Add this line
+    }
+  }, [authStore, orderForm]);
 
   useEffect(() => {
     couponForm.setValue("minShoppingAmount", subtotal);
   }, [subtotal, couponForm]);
-
-
 
   const verifyBody = useMemo(() => ({ products }), [products]);
   const shouldVerify = products.length > 0 && !verifiedOnce;
@@ -144,7 +188,7 @@ console.log("Auth Store:", authStore);
   const { data: getVerifiedCartData } = useFetch(
     shouldVerify ? "/api/cart-verification" : null,
     "POST",
-    verifyBody
+    verifyBody,
   );
 
   useEffect(() => {
@@ -155,8 +199,6 @@ console.log("Auth Store:", authStore);
         ? getVerifiedCartData.data
         : [];
 
-   
-
       // prevent overwriting cart with empty array accidentally
       if (cartData.length > 0) {
         dispatch(setCart(cartData));
@@ -165,7 +207,9 @@ console.log("Auth Store:", authStore);
       setVerifiedOnce(true);
       setVerifyError("");
     } else if (getVerifiedCartData?.success === false) {
-      setVerifyError(getVerifiedCartData?.message || "Cart verification failed");
+      setVerifyError(
+        getVerifiedCartData?.message || "Cart verification failed",
+      );
       setVerifiedOnce(true);
     }
   }, [getVerifiedCartData, verifiedOnce, dispatch]);
@@ -174,7 +218,9 @@ console.log("Auth Store:", authStore);
     setCouponLoading(true);
 
     try {
-      const code = String(values.code || "").trim().toUpperCase();
+      const code = String(values.code || "")
+        .trim()
+        .toUpperCase();
 
       const payload = {
         code,
@@ -185,14 +231,12 @@ console.log("Auth Store:", authStore);
 
       const { data: response } = await axios.post("/api/coupon/apply", payload);
 
-
-
       if (!response?.success) {
         throw new Error(response?.message || "Failed to apply coupon");
       }
 
       const discountPercentage = Number(
-        response?.data?.discountPercentage || 0
+        response?.data?.discountPercentage || 0,
       );
       const discountAmount = (subtotal * discountPercentage) / 100;
 
@@ -218,7 +262,7 @@ console.log("Auth Store:", authStore);
         "error",
         error?.response?.data?.message ||
           error?.message ||
-          "Coupon apply failed"
+          "Coupon apply failed",
       );
     } finally {
       setCouponLoading(false);
@@ -240,11 +284,11 @@ console.log("Auth Store:", authStore);
 
   const placeOrder = async (formData) => {
     setPlacingOrder(true);
+    const eventId = `pur_${Date.now()}`; // Unique ID for deduplication
 
     try {
       const payload = {
         method: payment,
-
         userId: authStore?.auth?._id || null,
         customer: {
           name: formData.name,
@@ -253,57 +297,74 @@ console.log("Auth Store:", authStore);
           cityId: shippingMethod === "inside_dhaka" ? "dhaka" : "other",
         },
         items: liveProducts.map((item) => ({
-          variantId: item?.variantId,
-          quantity: Number(item?.quantity || 1),
+          productId: item?.productId,
+          variantId: item.variantId || item.productId || item._id, // ✅ Backend needs this!          quantity: Number(item?.quantity || 1),
+          price: Number(item?.sellingPrice || 0),
         })),
-        coupon:
-          isCouponApplied && appliedCoupon?.code
-            ? {
-                code: String(appliedCoupon.code).trim().toUpperCase(),
-              }
-            : null,
+        coupon: isCouponApplied ? { code: appliedCoupon.code } : null,
       };
 
-    
-
       const { data: response } = await axios.post("/api/checkout", payload);
-
       console.log("Checkout API response:", response);
 
-      if (!response?.success) {
-        throw new Error(response?.message || "Order place failed");
+      if (!response?.success) throw new Error(response?.message);
+
+      // --- META PURCHASE TRACKING ---
+      // Browser
+      if (window.fbq) {
+        window.fbq(
+          "track",
+          "Purchase",
+          {
+            value: total,
+            currency: "BDT",
+            content_ids: liveProducts.map((p) => p.productId),
+            content_type: "product",
+          },
+          { eventID: eventId },
+        );
       }
 
-      showToast("success", response?.message || "Order placed successfully");
+      // Server (CAPI)
+      axios
+        .post("/api/meta/capi", {
+          event_name: "Purchase",
+          event_id: eventId,
+          url: window.location.href,
+          phone: formData.phone,
+          full_name: formData.name,
+          address: formData.address,
+          district: formData.city,
+          user_agent: window.navigator.userAgent,
+          fbp: getCookie("_fbp"),
+          fbc: getCookie("_fbc"),
+          custom_data: {
+            value: total,
+            currency: "BDT",
+            content_ids: liveProducts.map((p) => p.productId),
+            num_items: liveProducts.length,
+            order_id: response.orderId,
+          },
+        })
+        .catch(() => {});
 
+      showToast("success", "Order placed successfully");
       dispatch(setCart([]));
-      orderForm.reset();
-
-      setAppliedCoupon(null);
-      setIsCouponApplied(false);
-      setCouponDiscountAmount(0);
-
       router.push(`/order/success?id=${response.orderId}`);
     } catch (error) {
-      console.log("Checkout error:", error?.response?.data || error);
-
-      showToast(
-        "error",
-        error?.response?.data?.message ||
-          error?.message ||
-          "Order place failed"
-      );
+      showToast("error", error.message || "Failed");
     } finally {
       setPlacingOrder(false);
     }
   };
-
   if (!liveProducts.length) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4">
         <div className="text-center">
           <h2 className="text-3xl font-semibold">Your cart is empty</h2>
-          <p className="mt-2 text-neutral-500">Add some products to checkout.</p>
+          <p className="mt-2 text-neutral-500">
+            Add some products to checkout.
+          </p>
           <Button asChild className="mt-6 rounded-full">
             <Link href={WEBSITE_SHOP}>Go to Shop</Link>
           </Button>

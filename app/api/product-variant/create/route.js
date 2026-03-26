@@ -20,14 +20,18 @@ export async function POST(request) {
       return response(
         false,
         400,
-        "এই কালার এবং সাইজের ভ্যারিয়েন্ট ইতিমধ্যে যোগ করা হয়েছে।"
+        "এই কালার এবং সাইজের ভ্যারিয়েন্ট ইতিমধ্যে যোগ করা হয়েছে।",
       );
     }
 
     // ২. SKU ইউনিক চেক (SKU সবসময় ইউনিক হতে হবে)
     const existingSku = await ProductVariantModel.findOne({ sku: payload.sku });
     if (existingSku) {
-      return response(false, 400, "এই SKU টি অন্য একটি ভ্যারিয়েন্টে ব্যবহার করা হয়েছে।");
+      return response(
+        false,
+        400,
+        "এই SKU টি অন্য একটি ভ্যারিয়েন্টে ব্যবহার করা হয়েছে।",
+      );
     }
 
     // ৩. Zod validation

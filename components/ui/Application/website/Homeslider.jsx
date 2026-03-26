@@ -6,11 +6,11 @@ import ProductBox from "./ProductBox";
 
 const HomeSlider = ({ products = [] }) => {
   // Limit to 10 products so the dots don't get too crowded
-  const displayProducts = products.slice(0, 10); 
+  const displayProducts = products.slice(0, 50);
 
   const [scrollAmount, setScrollAmount] = useState(2);
 
- useEffect(() => {
+  useEffect(() => {
     const handleResize = () => {
       // lg breakpoint (1024px): scroll 5 | Mobile: scroll 2
       setScrollAmount(window.innerWidth >= 1024 ? 5 : 2);
@@ -23,7 +23,7 @@ const HomeSlider = ({ products = [] }) => {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     align: "start",
-    slidesToScroll: scrollAmount, 
+    slidesToScroll: scrollAmount,
     duration: 30,
     friction: 0.75,
   });
@@ -45,9 +45,18 @@ const HomeSlider = ({ products = [] }) => {
     emblaApi.on("reInit", onSelect);
   }, [emblaApi, onSelect]);
 
-  const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi && emblaApi.scrollNext(), [emblaApi]);
-  const scrollTo = useCallback((index) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
+  const scrollPrev = useCallback(
+    () => emblaApi && emblaApi.scrollPrev(),
+    [emblaApi],
+  );
+  const scrollNext = useCallback(
+    () => emblaApi && emblaApi.scrollNext(),
+    [emblaApi],
+  );
+  const scrollTo = useCallback(
+    (index) => emblaApi && emblaApi.scrollTo(index),
+    [emblaApi],
+  );
 
   if (!displayProducts.length) return null;
 
@@ -57,12 +66,12 @@ const HomeSlider = ({ products = [] }) => {
     hover:bg-red-600 z-30
   `;
 
-  const visibilityClass = isTouched 
-    ? "opacity-100" 
+  const visibilityClass = isTouched
+    ? "opacity-100"
     : "opacity-0 group-hover/slider:opacity-100 lg:opacity-100";
 
   return (
-    <div 
+    <div
       className="relative w-full max-w-[1500px] mx-auto group/slider"
       onTouchStart={() => setIsTouched(true)}
     >
@@ -84,11 +93,21 @@ const HomeSlider = ({ products = [] }) => {
 
       {/* NAVIGATION */}
       <div className="absolute top-[27%] md:top-[35%] left-0 right-0 flex justify-between items-center pointer-events-none px-0">
-        <button onClick={scrollPrev} className={`${arrowBaseStyle} ${visibilityClass}`}>
-          <span className="text-2xl md:text-3xl font-thin scale-y-120 mb-1">‹</span>
+        <button
+          onClick={scrollPrev}
+          className={`${arrowBaseStyle} ${visibilityClass}`}
+        >
+          <span className="text-2xl md:text-3xl font-thin scale-y-120 mb-1">
+            ‹
+          </span>
         </button>
-        <button onClick={scrollNext} className={`${arrowBaseStyle} ${visibilityClass}`}>
-          <span className="text-2xl md:text-3xl font-thin scale-y-120 mb-1">›</span>
+        <button
+          onClick={scrollNext}
+          className={`${arrowBaseStyle} ${visibilityClass}`}
+        >
+          <span className="text-2xl md:text-3xl font-thin scale-y-120 mb-1">
+            ›
+          </span>
         </button>
       </div>
 
@@ -99,9 +118,7 @@ const HomeSlider = ({ products = [] }) => {
             key={index}
             onClick={() => scrollTo(index)}
             className={`transition-all duration-300 h-1.5 rounded-sm ${
-              index === selectedIndex 
-                ? "w-8 bg-[#212121]" 
-                : "w-2 bg-gray-400"
+              index === selectedIndex ? "w-8 bg-[#212121]" : "w-2 bg-gray-400"
             }`}
           />
         ))}

@@ -4,7 +4,6 @@ import ProductModel from "@/models/Product.model";
 import MediaModel from "@/models/Media.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 
-
 export async function GET() {
   try {
     await connectDB();
@@ -12,13 +11,14 @@ export async function GET() {
     const getProduct = await ProductModel.find({ deletedAt: null })
       .populate("media")
       .populate({
-  path: "variants",
-  populate: {
-    path: "media",
-    select: "secure_url"
-  }
-})
-      .limit(20)
+        path: "variants",
+        populate: {
+          path: "media",
+          select: "secure_url",
+        },
+      })
+
+      .sort({ createdAt: -1 }) // Added sorting to show newest first
       .lean();
 
     if (!getProduct) {
@@ -26,7 +26,6 @@ export async function GET() {
     }
 
     return response(true, 200, "Product found.", getProduct);
-
   } catch (error) {
     return catchError(error);
   }

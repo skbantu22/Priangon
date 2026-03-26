@@ -1,4 +1,5 @@
 import { connectDB } from "@/lib/databaseconnection";
+import MediaModel from "@/models/Media.model";
 import Product from "@/models/Product.model";
 
 export async function GET(req) {
@@ -11,14 +12,17 @@ export async function GET(req) {
 
   // Product search using 'name'
   const products = await Product.find({
-    name: { $regex: q, $options: "i" } // <-- এখানে 'name' ব্যবহার করুন
-  }).limit(10);
+    name: { $regex: q, $options: "i" }, // <-- এখানে 'name' ব্যবহার করুন
+  })
+    .populate("media")
+    .limit(10)
+    .lean();
 
   // Category search (populate categories if needed)
   const categories = await Product.aggregate([
     { $match: { category: { $regex: q, $options: "i" } } },
     { $group: { _id: "$category", count: { $sum: 1 } } },
-    { $limit: 5 }
+    { $limit: 5 },
   ]);
 
   return Response.json({ products, categories });

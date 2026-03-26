@@ -12,13 +12,20 @@ import { useDispatch } from "react-redux";
 import { addIntoCart } from "@/store/reducer/cartReducer";
 import { showToast } from "@/lib/showToast";
 import { useRouter } from "next/navigation";
+import { trackMetaEvent } from "@/lib/meta/metaTrack"; // 👈 ইমপোর্ট যোগ করা হয়েছে
 
-const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
+const SimilarProductBox = ({
+  product,
+  userId,
+  refreshWishlist,
+  allVariants = [],
+}) => {
   const dispatch = useDispatch();
   const router = useRouter();
 
   // Prefer allVariants if product.variants is empty
-  const variants = product?.variants?.length > 0 ? product.variants : allVariants;
+  const variants =
+    product?.variants?.length > 0 ? product.variants : allVariants;
 
   // Smart initial image: variant → product → null
   const [activeImage, setActiveImage] = useState(() => {
@@ -26,7 +33,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
       variants?.[0]?.media?.[0]?.secure_url ||
       product?.media?.[0]?.secure_url ||
       null;
-   
+
     return img;
   });
 
@@ -41,19 +48,39 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
       variantId: selectedVariant?._id || null,
       name: product.name,
       slug: product.slug,
-     media:
-  selectedVariant?.media?.[0]?.secure_url ||
-  product?.media?.[0]?.secure_url ||
-  "/placeholder.png",
+      media:
+        selectedVariant?.media?.[0]?.secure_url ||
+        product?.media?.[0]?.secure_url ||
+        "/placeholder.png",
       mrp: selectedVariant?.mrp || product?.mrp,
       sellingPrice: selectedVariant?.sellingPrice || product?.sellingPrice,
       quantity: 1,
     };
 
     console.log("Adding to cart:", cartProduct);
+
+    // ১. রিডাক্স আপডেট
     dispatch(addIntoCart(cartProduct));
+
+    // ২. 🔥 মেটা পিক্সেল ট্র্যাকিং (AddToCart)
+    // এটি থাকলে আপনি ফেসবুক অ্যাড ম্যানেজার থেকে নির্দিষ্ট এই প্রোডাক্টটি বুস্ট করতে পারবেন
+    trackMetaEvent("AddToCart", {
+      content_ids: [String(product._id)], // ইউনিক আইডি বুস্ট করার জন্য জরুরি
+      content_type: "product",
+      value: Number(cartProduct.sellingPrice),
+      currency: "BDT",
+      content_name: product.name,
+      contents: [
+        {
+          id: String(product._id),
+          quantity: 1,
+          item_price: Number(cartProduct.sellingPrice),
+        },
+      ],
+    });
+
     showToast("Added to cart 🛒");
-    router.push("/cart"); 
+    router.push("/cart");
   };
 
   const formatTk = (amount = 0) =>
@@ -76,7 +103,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
   if (!product) return null;
 
   return (
-    <div className="group bg-white w-full py-2 ">
+    <div className="group bg-white w-full py-2">
       {/* IMAGE */}
       <div className="relative overflow-hidden">
         <Link href={href} className="block relative w-full aspect-[2/3]">
@@ -95,7 +122,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
         </Link>
 
         {/* Wishlist */}
-        <div className="absolute top-3 right-3 z-10">
+        <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           {wishlistLoading ? (
             <div className="w-4 h-8 bg-gray-200 rounded-full animate-pulse" />
           ) : (
@@ -105,7 +132,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
               refreshWishlist={refreshWishlist}
               isWishlisted={isWishlisted}
             >
-              <div className="bg-white p-2 rounded-full shadow hover:scale-110 transition">
+              <div className="bg-white p-2 rounded-full shadow hover:scale-110 transition cursor-pointer">
                 <Heart
                   className={`w-4 h-4 ${
                     isWishlisted ? "text-red-500" : "text-gray-600"
@@ -119,7 +146,7 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
         {/* ADD TO CART (Desktop Hover) */}
         <div
           onClick={handleAddToCart}
-          className="hidden md:block absolute bottom-0 left-0 w-full bg-black text-white text-center py-3 text-sm opacity-0 group-hover:opacity-100 transition duration-300 cursor-pointer"
+          className="hidden md:block absolute bottom-0 left-0 w-full bg-black text-white text-center py-3 text-sm opacity-0 group-hover:opacity-100 transition duration-300 cursor-pointer font-bold"
         >
           Add to cart
         </div>
@@ -136,30 +163,38 @@ const SimilarProductBox = ({ product, userId, refreshWishlist, allVariants = [] 
       {/* INFO */}
       <div className="pt-3 text-center">
         <Link href={href}>
-          <h3 className="text-sm md:text-md text-black hover:underline">
+          <h3 className="text-sm md:text-md text-black hover:underline px-2 line-clamp-1">
             {product?.name}
           </h3>
         </Link>
 
-        <p className="text-sm mt-1 font-medium">
-          {formatTk(selectedVariant?.sellingPrice || product?.sellingPrice || product?.mrp)}
+        <p className="text-sm mt-1 font-bold text-[#f26522]">
+          {formatTk(
+            selectedVariant?.sellingPrice ||
+              product?.sellingPrice ||
+              product?.mrp,
+          )}
         </p>
 
         {/* VARIANT THUMBNAILS */}
-        <div className="flex justify-center gap-2 mt-4">
+        <div className="flex justify-center gap-2 mt-3 pb-2">
           {variants?.map((variant, i) => {
-            const img = variant?.media?.[0]?.secure_url || product?.media?.[0]?.secure_url;
+            const img =
+              variant?.media?.[0]?.secure_url ||
+              product?.media?.[0]?.secure_url;
             if (!img) return null;
-            console.log("Thumbnail image:", i, img);
 
             return (
               <button
                 key={variant._id || i}
-                onClick={() => setActiveImage(img)}
+                onClick={() => {
+                  setActiveImage(img);
+                  // ঐচ্ছিক: ভ্যারিয়েন্ট দেখার ইভেন্টও ট্র্যাক করতে পারেন
+                }}
                 onMouseEnter={() => setActiveImage(img)}
-                className={`h-6 w-6 flex items-center justify-center border overflow-hidden transition-transform hover:scale-105 ${
+                className={`h-6 w-6 flex items-center justify-center border overflow-hidden transition-all ${
                   activeImage === img
-                    ? "opacity-100 border-2 border-black"
+                    ? "opacity-100 border-2 border-[#f26522]"
                     : "opacity-60 hover:opacity-100 border border-gray-300"
                 }`}
               >

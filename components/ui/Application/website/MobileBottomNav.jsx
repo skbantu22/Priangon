@@ -39,8 +39,10 @@ export default function MobileBottomNav() {
     };
   }, []);
 
-  const isActive = (href) => pathname === href || pathname.startsWith(href + "/");
-  const navItem = "flex flex-col items-center justify-center text-[11px] gap-[2px] transition";
+  const isActive = (href) =>
+    pathname === href || pathname.startsWith(href + "/");
+  const navItem =
+    "flex flex-col items-center justify-center text-[11px] gap-[2px] transition";
 
   return (
     <>
@@ -62,7 +64,6 @@ export default function MobileBottomNav() {
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
         <div className="pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around items-center h-14">
-            
             {/* Home */}
             <Link
               href="/"

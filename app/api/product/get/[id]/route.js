@@ -6,10 +6,9 @@ import ProductModel from "@/models/Product.model";
 import SubCategoryModel from "@/models/subcategory.model";
 import MediaModel from "@/models/Media.model";
 
-
-
 export async function GET(request, context) {
-  try {    const auth = await isAuthenticated("admin");
+  try {
+    const auth = await isAuthenticated("admin");
     if (!auth?.isAuth) return response(false, 403, "Unauthorized.");
 
     await connectDB();
@@ -24,18 +23,17 @@ export async function GET(request, context) {
       return response(false, 400, "Invalid object id.");
     }
 
-    const data = await ProductModel.findOne({ _id: id, deletedAt: null }).
-           populate("media", "_id secure_url")
-          .populate("subcategory", "name") 
-          .lean();
+    const data = await ProductModel.findOne({ _id: id, deletedAt: null })
+      .populate("media", "_id secure_url")
+      .populate("subcategory", "name")
+      .lean();
 
     if (!data) return response(false, 404, "Category not found.");
 
     return response(true, 200, "Category found.", data);
   } catch (error) {
-
-      console.error("PRODUCT GET ERROR:");
-  console.error(error);
+    console.error("PRODUCT GET ERROR:");
+    console.error(error);
     return catchError(error);
   }
 }

@@ -18,7 +18,8 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
   const router = useRouter();
 
   // Prefer allVariants if product.variants is empty
-  const variants = product?.variants?.length > 0 ? product.variants : allVariants;
+  const variants =
+    product?.variants?.length > 0 ? product.variants : allVariants;
 
   // Smart initial image: variant → product → null
   const [activeImage, setActiveImage] = useState(() => {
@@ -41,10 +42,10 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
       variantId: selectedVariant?._id || null,
       name: product.name,
       slug: product.slug,
-     media:
-  selectedVariant?.media?.[0]?.secure_url ||
-  product?.media?.[0]?.secure_url ||
-  "/placeholder.png",
+      media:
+        selectedVariant?.media?.[0]?.secure_url ||
+        product?.media?.[0]?.secure_url ||
+        "/placeholder.png",
       mrp: selectedVariant?.mrp || product?.mrp,
       sellingPrice: selectedVariant?.sellingPrice || product?.sellingPrice,
       quantity: 1,
@@ -53,7 +54,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
     console.log("Adding to cart:", cartProduct);
     dispatch(addIntoCart(cartProduct));
     showToast("Added to cart 🛒");
-    router.push("/cart"); 
+    router.push("/cart");
   };
 
   const formatTk = (amount = 0) =>
@@ -76,7 +77,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
   if (!product) return null;
 
   return (
-    <div className="group bg-white w-full py-2 ">
+    <div className="group bg-white w-full py-2  relative">
       {/* IMAGE */}
       <div className="relative overflow-hidden">
         <Link href={href} className="block relative  aspect-[3/4] w-full">
@@ -95,7 +96,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
         </Link>
 
         {/* Wishlist */}
-        <div className="absolute top-3 right-3 z-10">
+        <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           {wishlistLoading ? (
             <div className="w-4 h-4 md:w-8 md:h-8 bg-gray-200 rounded-full animate-pulse" />
           ) : (
@@ -119,7 +120,22 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
         {/* ADD TO CART (Desktop Hover) */}
         <div
           onClick={handleAddToCart}
-          className="hidden md:block absolute bottom-0 left-0 w-full bg-black text-white text-center py-3 text-sm opacity-0 group-hover:opacity-100 transition duration-300 cursor-pointer"
+          className="
+    hidden md:flex items-center justify-center
+    absolute bottom-0 left-0 w-full h-10
+    
+    bg-olive-800 hover:bg-black text-white 
+    font-bold text-xs  uppercase tracking-wider
+    
+    opacity-0 group-hover:opacity-100       
+    translate-y-full group-hover:translate-y-0 
+    
+    active:scale-95 active:bg-gray-900
+    
+    transition-all duration-300 ease-out
+    cursor-pointer select-none
+           
+           "
         >
           Add to cart
         </div>
@@ -142,13 +158,19 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
         </Link>
 
         <p className="text-sm mt-1 font-medium">
-          {formatTk(selectedVariant?.sellingPrice || product?.sellingPrice || product?.mrp)}
+          {formatTk(
+            selectedVariant?.sellingPrice ||
+              product?.sellingPrice ||
+              product?.mrp,
+          )}
         </p>
 
         {/* VARIANT THUMBNAILS */}
         <div className="flex justify-center gap-2 mt-4">
           {variants?.map((variant, i) => {
-            const img = variant?.media?.[0]?.secure_url || product?.media?.[0]?.secure_url;
+            const img =
+              variant?.media?.[0]?.secure_url ||
+              product?.media?.[0]?.secure_url;
             if (!img) return null;
             console.log("Thumbnail image:", i, img);
 

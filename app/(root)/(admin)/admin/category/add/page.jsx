@@ -1,150 +1,183 @@
+"use client";
 
-"use client"
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import slugify from "slugify";
+import axios from "axios";
+import { Layers, Link2 } from "lucide-react";
 
-import BreadCrumb from '@/components/ui/Application/Admin/Breadcrubm';
-import { ADMIN_CATEGORY_EDIT, ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from '@/Route/Adminpannelroute';
-import React, { useEffect, useState } from 'react'
-import { Form } from "@/components/ui/form"
-import { useForm } from "react-hook-form"
-
-import { FormField,FormLabel,FormItem ,FormControl,FormMessage} from "@/components/ui/form"
+import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import ButtonLoading from '@/components/ui/Application/ButtonLoading';
-import { zSchema } from '@/lib/zodschema';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Input } from "@/components/ui/input";
-import { showToast } from '@/lib/showToast';
-import slugify from 'slugify';
-import axios from 'axios';
+  ADMIN_CATEGORY_EDIT,
+  ADMIN_CATEGORY_SHOW,
+  ADMIN_DASHBOARD,
+} from "@/Route/Adminpannelroute";
 
+import {
+  Form,
+  FormField,
+  FormLabel,
+  FormItem,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { Input } from "@/components/ui/input";
+import ButtonLoading from "@/components/ui/Application/ButtonLoading";
+import { zSchema } from "@/lib/zodschema";
+import { showToast } from "@/lib/showToast";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-{ href: ADMIN_CATEGORY_SHOW, label: "category" },
-{ href: ADMIN_CATEGORY_EDIT, label: "Add category" },
+  { href: ADMIN_CATEGORY_SHOW, label: "Categories" },
+  { href: "#", label: "Add New" },
 ];
+
 const AddCategory = () => {
-const formSchema = zSchema.pick({
-  name: true,
-  slug: true,
-})
- const [loading,setloading]=useState(false)
+  const [loading, setloading] = useState(false);
 
+  const formSchema = zSchema.pick({
+    name: true,
+    slug: true,
+  });
 
-const form = useForm({
-  resolver: zodResolver(formSchema),
-  defaultValues: {
-    name: "",
-    slug: "",
-  },
-})
-useEffect(() => {
-  const name = form.getValues('name')
-  if (name) {
-    form.setValue('slug', slugify(name).toLowerCase())
-  }
-}, [form.watch('name')])
+  const form = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      slug: "",
+    },
+  });
 
+  // Watch name to auto-generate slug
+  const watchedName = form.watch("name");
 
-
-const onSubmit = async (values) => {
-  setloading(true)
-  try {
-    const { data: response } = await axios.post('/api/category/create', values)
-
-    if (!response.success) {
-      throw new Error(response.message)
+  useEffect(() => {
+    if (watchedName) {
+      form.setValue(
+        "slug",
+        slugify(watchedName, { lower: true, strict: true }),
+      );
     }
+  }, [watchedName, form]);
 
-    showToast('success', response.message)
-  } catch (error) {
-    showToast('error', error.message)
-  } finally {
-    setloading(false)
-  }
-}
+  const onSubmit = async (values) => {
+    setloading(true);
+    try {
+      const { data: response } = await axios.post(
+        "/api/category/create",
+        values,
+      );
 
-   
+      if (!response.success) {
+        throw new Error(response.message);
+      }
+
+      showToast("success", response.message);
+      form.reset();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || error.message);
+    } finally {
+      setloading(false);
+    }
+  };
+
   return (
-    <div>
+    <div className="bg-[#f1f1f1] min-h-screen pb-20 font-sans">
+      <div className="max-w-[800px] mx-auto px-4 md:px-6 py-4 space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <BreadCrumb breadcrumbData={breadcrumbData} />
+                <h1 className="text-2xl font-black text-black tracking-tight uppercase">
+                  Create Category
+                </h1>
+              </div>
+              <ButtonLoading
+                type="submit"
+                loading={loading}
+                text="SAVE CATEGORY"
+                className="bg-black hover:bg-zinc-800 text-white font-black px-10 rounded-none h-12 shadow-xl tracking-widest uppercase text-xs"
+              />
+            </div>
 
-        <BreadCrumb breadcrumbData={breadcrumbData} /> 
+            {/* Main Form Card */}
+            <Card className="border-2 border-black rounded-none shadow-none bg-white">
+              <CardHeader className="bg-black py-3 rounded-none">
+                <CardTitle className="text-xs font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Layers className="w-4 h-4" /> Category Identity
+                </CardTitle>
+              </CardHeader>
 
-        <Card className="p-0 rounded shadow-sm">
-                <CardHeader>
-                    <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Add Category</h1>
-            
-          </div>
-        
-        
-        
-                </CardHeader>
-        
-                <CardContent className="pb-5">
-                    <div className="mb-5">
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} >
-                        <div>
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input type="text" placeholder="Entire Category Name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+              <CardContent className="p-8 space-y-8">
+                {/* Category Name */}
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                        Category Name
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Summer Collection"
+                          {...field}
+                          className="h-14 border-2 border-black rounded-none focus-visible:ring-0 text-lg font-bold placeholder:text-zinc-300"
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[10px] uppercase font-bold" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Category Slug */}
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link2 className="w-3 h-3 text-zinc-400" />
+                        <FormLabel className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                          URL Slug (Auto-generated)
+                        </FormLabel>
                       </div>
-                            <div className="mb-5">
-                                         <FormField
-                                           control={form.control}
-                                           name="slug"
-                                           render={({ field }) => (
-                                             <FormItem>
-                                               <FormLabel>Slug</FormLabel>
-                                               <FormControl>
-                                                 <Input placeholder="m@example.com" {...field} />
-                                               </FormControl>
-                                               <FormMessage />
-                                             </FormItem>
-                                           )}
-                                         />
-                                        </div>
-                     
-        
-                    
-                        
-                       <div className='mb-3'>
+                      <FormControl>
+                        <Input
+                          placeholder="summer-collection"
+                          {...field}
+                          className="h-11 border-2 border-zinc-200 bg-zinc-50 rounded-none focus-visible:ring-0 font-mono text-sm"
+                        />
+                      </FormControl>
+                      <p className="text-[9px] text-zinc-400 italic">
+                        The slug is used for SEO-friendly URLs. It updates
+                        automatically as you type the name.
+                      </p>
+                      <FormMessage className="text-[10px] uppercase font-bold" />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-                     <ButtonLoading type="submit"
-                        className=""
-                         loading={loading}
-                     text=  "Submit"  />
-                       </div>
-                      
-        
-                     
-                    </form>
-                  </Form>
-                  </div>
-                </CardContent>
-              </Card>
-      
+            {/* Info Tip */}
+            <div className="bg-white border-l-4 border-black p-4 shadow-sm">
+              <p className="text-[11px] font-medium text-zinc-600 leading-relaxed uppercase tracking-tight">
+                Tip: Use broad category names for better product grouping. You
+                can add specific attributes in the product variants later.
+              </p>
+            </div>
+          </form>
+        </Form>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default AddCategory
+export default AddCategory;

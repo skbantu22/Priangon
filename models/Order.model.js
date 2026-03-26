@@ -1,10 +1,22 @@
 import mongoose from "mongoose";
 import crypto from "crypto";
+// This forces Mongoose to clear the cached "Order" model
+// and re-read your new Order.model.js file.
 
 const OrderItemSchema = new mongoose.Schema(
   {
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
-    variantId: { type: mongoose.Schema.Types.ObjectId, ref: "ProductVariant", required: true },
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProductVariant",
+
+      required: false,
+      default: null,
+    },
     name: { type: String, default: "" },
     slug: { type: String, default: "" },
     color: { type: String, default: "" },
@@ -15,7 +27,7 @@ const OrderItemSchema = new mongoose.Schema(
     media: { type: String, default: "" },
     quantity: { type: Number, default: 1 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const PaymentSchema = new mongoose.Schema(
@@ -25,10 +37,7 @@ const PaymentSchema = new mongoose.Schema(
       enum: ["cod"],
       required: true,
     },
-  
-  
 
-    
     merchantInvoiceNumber: { type: String, default: "", index: true },
     paymentId: { type: String, default: "" },
     trxId: { type: String, default: "" },
@@ -39,12 +48,16 @@ const PaymentSchema = new mongoose.Schema(
     initiatedAt: { type: Date, default: Date.now },
     paidAt: { type: Date, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const OrderSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     orderNumber: { type: String, unique: true, index: true },
 
     customer: {
@@ -69,19 +82,19 @@ const OrderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-   enum: [
-  "initiated",
-  "pending",
-  "unpaid",
-  "success",
-  "failed",
-  "cancelled",
-  "processing",
-  "shipped",
-  "delivered",
-  "unverified"
-],
-default: "pending",
+      enum: [
+        "initiated",
+        "pending",
+        "unpaid",
+        "success",
+        "failed",
+        "cancelled",
+        "processing",
+        "shipped",
+        "delivered",
+        "unverified",
+      ],
+      default: "pending",
       index: true,
     },
 
@@ -95,7 +108,7 @@ default: "pending",
     payments: { type: [PaymentSchema], default: [] },
     activePaymentIndex: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 OrderSchema.pre("validate", function () {

@@ -9,11 +9,11 @@ const MenProducts = async () => {
 
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/product/by-category?category=men&limit=100`,
-     
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/product/by-category?category=women&limit=100`,
+
       {
         cache: "no-store", // 🔥 prevents build-time fetch
-      }
+      },
     );
 
     productData = await res.json();
@@ -28,22 +28,18 @@ const MenProducts = async () => {
   return (
     <div>
       <section className="px-1 lg:px-3">
-  <div className="flex justify-center items-center px-2 text-center">
-  <h1 className="text-xl md:text-2xl font-semibold">
-    Top Picks 
-  </h1>
-</div>
+        <div className="flex justify-center items-center px-2 text-center">
+          <h1 className="text-xl md:text-2xl font-semibold">Top Picks</h1>
+        </div>
 
-  <div className="px-2">
-    {!productData?.success ? (
-      <div className="text-center py-5">
-        Data not found
-      </div>
-    ) : (
-      <HomeSlider2 products={productData?.data} />
-    )}
-  </div>
-</section>
+        <div className="px-2">
+          {!productData?.success ? (
+            <div className="text-center py-5">Data not found</div>
+          ) : (
+            <HomeSlider2 products={productData?.data} />
+          )}
+        </div>
+      </section>
     </div>
   );
 };

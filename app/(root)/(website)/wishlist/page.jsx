@@ -1,17 +1,18 @@
-'use client'
+"use client";
 
 import { useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
 import { useSelector, useDispatch } from "react-redux";
-import { Trash2 } from "lucide-react";
+import { Trash2, ShoppingCart, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showToast } from "@/lib/showToast";
 import { addIntoCart } from "@/store/reducer/cartReducer";
 
 const Wishlist = () => {
   const user = useSelector((store) => store.authStore.auth);
-  const userId = user?._id;
+  const userId = user?.data?.user?.id;
+
   const dispatch = useDispatch();
   const router = useRouter();
 
@@ -19,7 +20,6 @@ const Wishlist = () => {
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState(null);
 
-  // Fetch wishlist
   const fetchWishlist = async () => {
     if (!userId) {
       setLoading(false);
@@ -38,28 +38,25 @@ const Wishlist = () => {
     }
   };
 
-  // Remove wishlist item
   const removeWishlist = async (productId) => {
     if (!userId) return;
     try {
       setRemovingId(productId);
       const res = await axios.post("/api/wishlist", { userId, productId });
       setWishlist((prev) =>
-        prev.filter((item) => item.productId?._id !== productId)
+        prev.filter((item) => item.productId?._id !== productId),
       );
       showToast(
         "success",
-        res?.data?.removed ? "Removed from wishlist" : "Added to wishlist"
+        res?.data?.removed ? "Removed from wishlist" : "Added to wishlist",
       );
     } catch (err) {
-      console.error("Remove Wishlist Error:", err);
       showToast("error", "Action failed");
     } finally {
       setRemovingId(null);
     }
   };
 
-  // Add to Cart
   const handleAddToCart = (product) => {
     const cartProduct = {
       productId: product?._id,
@@ -84,36 +81,42 @@ const Wishlist = () => {
     else setLoading(false);
   }, [userId]);
 
-  // Loading State
   if (loading)
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin"></div>
-        <p className="text-gray-600 text-sm">Loading your wishlist...</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-medium">Loading wishlist...</p>
       </div>
     );
 
-  // Not logged in
   if (!userId)
     return (
-      <div className="flex justify-center items-center min-h-screen text-gray-500">
-        Please login to see your wishlist
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <Heart className="w-12 h-12 text-gray-300 mb-4" />
+        <p className="text-gray-600 mb-4">Please login to see your wishlist</p>
+        <button
+          onClick={() => router.push("/login")}
+          className="bg-black text-white px-6 py-2 rounded-full"
+        >
+          Login Now
+        </button>
       </div>
     );
 
-  // Empty state
   if (!wishlist?.length)
     return (
-      <div className="flex justify-center items-center min-h-screen text-gray-500">
-        Your wishlist is empty
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <Heart className="w-12 h-12 text-gray-300 mb-4" />
+        <p className="text-gray-500">Your wishlist is empty</p>
       </div>
     );
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h2 className="text-2xl font-semibold mb-6">My Wishlist</h2>
+    <div className="max-w-6xl mx-auto p-4 md:p-6">
+      <h2 className="text-xl md:text-2xl font-semibold mb-6">My Wishlist</h2>
 
-      <div className="overflow-x-auto border rounded-lg shadow-sm">
+      {/* ✅ Desktop Table */}
+      <div className="hidden md:block overflow-x-auto border rounded-lg shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-100">
             <tr className="text-sm text-gray-600">
@@ -126,14 +129,11 @@ const Wishlist = () => {
           <tbody>
             {wishlist.map((item) => {
               const product = item.productId;
-              const imageUrl = product?.media?.[0]?.secure_url || "/placeholder.png";
+              const imageUrl =
+                product?.media?.[0]?.secure_url || "/placeholder.png";
 
               return (
-                <tr
-                  key={item._id}
-                  className="border-t hover:bg-gray-50 transition"
-                >
-                  {/* Product Info */}
+                <tr key={item._id} className="border-t hover:bg-gray-50">
                   <td
                     onClick={() =>
                       router.push(`/product/${product?.slug || product?._id}`)
@@ -148,30 +148,27 @@ const Wishlist = () => {
                         height={60}
                         className="rounded object-cover"
                       />
-                      <span className="font-medium text-gray-800 hover:underline">
+                      <span className="font-medium hover:underline">
                         {product?.name}
                       </span>
                     </div>
                   </td>
 
-                  {/* Price */}
                   <td className="p-4 font-semibold text-green-600">
                     ৳{product?.sellingPrice?.toLocaleString("en-BD")}
                   </td>
 
-                  {/* Actions */}
                   <td className="p-4 text-right flex justify-end gap-2">
                     <button
                       onClick={() => handleAddToCart(product)}
-                      className="bg-black text-white px-3 py-1 text-xs rounded hover:bg-gray-800"
+                      className="bg-black text-white px-3 py-1 text-xs rounded"
                     >
                       Add to Cart
                     </button>
 
                     <button
                       onClick={() => removeWishlist(product?._id)}
-                      disabled={removingId === product?._id}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -181,6 +178,62 @@ const Wishlist = () => {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* ✅ Mobile Cards */}
+      <div className="md:hidden flex flex-col gap-4">
+        {wishlist.map((item) => {
+          const product = item.productId;
+          const imageUrl =
+            product?.media?.[0]?.secure_url || "/placeholder.png";
+
+          return (
+            <div
+              key={item._id}
+              className="border rounded-lg p-3 flex gap-3 shadow-sm"
+            >
+              <Image
+                src={imageUrl}
+                alt={product?.name}
+                width={80}
+                height={80}
+                className="rounded object-cover"
+              />
+
+              <div className="flex-1 flex flex-col justify-between">
+                <div
+                  onClick={() =>
+                    router.push(`/product/${product?.slug || product?._id}`)
+                  }
+                  className="cursor-pointer"
+                >
+                  <p className="font-medium text-sm line-clamp-2">
+                    {product?.name}
+                  </p>
+                  <p className="text-green-600 font-semibold mt-1">
+                    ৳{product?.sellingPrice?.toLocaleString("en-BD")}
+                  </p>
+                </div>
+
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => handleAddToCart(product)}
+                    className="flex-1 bg-black text-white py-1 text-xs rounded"
+                  >
+                    Add to Cart
+                  </button>
+
+                  <button
+                    onClick={() => removeWishlist(product?._id)}
+                    className="text-red-500 px-2"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

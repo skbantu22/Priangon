@@ -5,6 +5,7 @@ import Image from "next/image";
 import axios from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { X, ImageIcon, LayoutGrid, Layers } from "lucide-react";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
@@ -18,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
@@ -33,22 +34,20 @@ import { sizes } from "@/lib/utils";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_CATEGORY_SHOW, label: "Category" },
-  { href: "#", label: "Add product variant" },
+  { href: ADMIN_CATEGORY_SHOW, label: "Products" },
+  { href: "#", label: "Add Variant" },
 ];
 
 const AddProductVariant = () => {
   const [loading, setLoading] = useState(false);
   const [productOption, setProductOption] = useState([]);
-
-  // media modal state
   const [open, setOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState([]);
 
-  // fetch products
-  const { data: getProduct } = useFetch("/api/product?deleteType=SD&&size=10000");
+  const { data: getProduct } = useFetch(
+    "/api/product?deleteType=SD&&size=10000",
+  );
 
-  // ✅ schema (NO discountPercentage)
   const formSchema = zSchema.pick({
     product: true,
     sku: true,
@@ -59,7 +58,7 @@ const AddProductVariant = () => {
     stock: true,
     description: true,
     media: true,
-    isActive: true, // 👈 Add this line
+    isActive: true,
   });
 
   const form = useForm({
@@ -72,34 +71,25 @@ const AddProductVariant = () => {
       mrp: 0,
       sellingPrice: 0,
       stock: 0,
-      isActive: true, // 👈 Add this line
+      isActive: true,
       description: "",
       media: [],
     },
   });
 
-  // ✅ Sync selectedMedia with form
   useEffect(() => {
-    if (selectedMedia.length > 0) {
-      const mediaIds = selectedMedia.map((m) => m._id);
-      form.setValue("media", mediaIds, { shouldValidate: true });
-    } else {
-      form.setValue("media", [], { shouldValidate: true });
-    }
+    const mediaIds = selectedMedia.map((m) => m._id);
+    form.setValue("media", mediaIds, { shouldValidate: true });
   }, [selectedMedia, form]);
 
-  // ✅ Map products to select options
   useEffect(() => {
     if (getProduct?.success) {
-      const options = getProduct.data.map((product) => ({
-        label: product.name,
-        value: product._id,
-      }));
-      setProductOption(options);
+      setProductOption(
+        getProduct.data.map((p) => ({ label: p.name, value: p._id })),
+      );
     }
   }, [getProduct]);
 
-  // ✅ Discount preview (showcase only)
   const mrp = Number(form.watch("mrp")) || 0;
   const selling = Number(form.watch("sellingPrice")) || 0;
 
@@ -111,40 +101,19 @@ const AddProductVariant = () => {
     return 0;
   }, [mrp, selling]);
 
-  // ✅ Editor Handler
-  const handleEditorChange = (event, editor) => {
-    const data = editor.getData();
-    form.setValue("description", data, { shouldValidate: true });
-  };
-
-  // ✅ Submit Handler
   const onSubmit = async (values) => {
     setLoading(true);
     try {
       const payload = {
         ...values,
-        mrp: Number(values.mrp) || 0,
-        sellingPrice: Number(values.sellingPrice) || 0,
-        stock: Number(values.stock) || 0,
+        mrp: Number(values.mrp),
+        sellingPrice: Number(values.sellingPrice),
+        stock: Number(values.stock),
       };
-
       const { data } = await axios.post("/api/product-variant/create", payload);
       if (!data.success) throw new Error(data.message);
-
-      showToast("success", data.message);
-      form.reset({
-        product: "",
-        sku: "",
-        color: "",
-        size: "",
-        mrp: 0,
-        sellingPrice: 0,
-          isActive: true,   // ✅ add this
-
-        stock: 0,
-        description: "",
-        media: [],
-      });
+      showToast("success", "Variant Added!");
+      form.reset();
       setSelectedMedia([]);
     } catch (error) {
       showToast("error", error.response?.data?.message || error.message);
@@ -154,254 +123,287 @@ const AddProductVariant = () => {
   };
 
   return (
-    <div>
-      <BreadCrumb breadcrumbData={breadcrumbData} />
+    <div className="bg-[#f1f1f1] min-h-screen pb-20 font-sans">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <BreadCrumb breadcrumbData={breadcrumbData} />
+                <h1 className="text-2xl font-black text-black tracking-tight uppercase">
+                  Add Product Variant
+                </h1>
+              </div>
+              <ButtonLoading
+                type="submit"
+                loading={loading}
+                text="SAVE VARIANT"
+                className="bg-black hover:bg-zinc-800 text-white font-black px-10 rounded-none h-12 shadow-xl tracking-widest uppercase text-xs"
+              />
+            </div>
 
-      <Card className="p-0 rounded shadow-sm">
-        <CardHeader>
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Add Product Variant</h1>
-          </div>
-        </CardHeader>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* LEFT COLUMN: Main Info */}
+              <div className="lg:col-span-8 space-y-6">
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Layers className="w-4 h-4" /> Variant Configuration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="product"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Parent Product
+                          </FormLabel>
+                          <Select
+                            options={productOption}
+                            selected={field.value}
+                            setSelected={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-        <CardContent className="pb-5">
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit, (err) => {
-                console.log("❌ Validation Failed:", err);
-                showToast("error", "Please fill all required fields correctly.");
-              })}
-              className="grid md:grid-cols-2 grid-cols-1 gap-5"
-            >
-              {/* Product Select */}
-              <FormField
-                control={form.control}
-                name="product"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product</FormLabel>
-                    <FormControl>
-                      <Select
-                        options={productOption}
-                        selected={field.value}
-                        setSelected={field.onChange}
-                        isMulti={false}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="sku"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase">
+                              SKU Code
+                            </FormLabel>
+                            <Input
+                              className="h-11 border-black rounded-none"
+                              {...field}
+                              placeholder="EX: TSHIRT-RED-L"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* SKU */}
-              <FormField
-                control={form.control}
-                name="sku"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>SKU</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter SKU" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Color */}
-              <FormField
-                control={form.control}
-                name="color"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Color</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter color" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Size */}
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                    <FormControl>
-                      <Select
-                        options={sizes}
-                        selected={field.value}
-                        setSelected={field.onChange}
-                        isMulti={false}
+                      <FormField
+                        control={form.control}
+                        name="stock"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-black uppercase">
+                              Inventory Stock
+                            </FormLabel>
+                            <Input
+                              type="number"
+                              className="h-11 border-black rounded-none"
+                              {...field}
+                            />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </div>
 
-              {/* MRP */}
-              <FormField
-                control={form.control}
-                name="mrp"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>MRP</FormLabel>
-                    <FormControl>
-                      <Input
-  type="number"
-  min={0}
-  value={field.value === 0 ? "" : field.value ?? ""}
-  onChange={(e) => {
-    const v = e.target.value;
-    field.onChange(v === "" ? "" : Number(v));
-  }}
-  placeholder="Enter selling price"
-/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Variant Description
+                          </FormLabel>
+                          <div className="border-2 border-black overflow-hidden bg-white">
+                            <Editor
+                              onChange={(e, ed) => field.onChange(ed.getData())}
+                            />
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
 
-              {/* Selling Price */}
-              <FormField
-                control={form.control}
-                name="sellingPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Selling Price</FormLabel>
-                    <FormControl>
-                      <Input
-  type="number"
-  min={0}
-  value={field.value === 0 ? "" : field.value ?? ""}
-  onChange={(e) => {
-    const v = e.target.value;
-    field.onChange(v === "" ? "" : Number(v));
-  }}
-  placeholder="Enter selling price"
-/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Stock */}
-              <FormField
-                control={form.control}
-                name="stock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Stock</FormLabel>
-                    <FormControl>
-                     <Input
-  type="number"
-  min={0}
-  value={field.value === 0 ? "" : field.value ?? ""}
-  onChange={(e) => {
-    const v = e.target.value;
-    field.onChange(v === "" ? "" : Number(v));
-  }}
-  placeholder="Enter selling price"
-/>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-  control={form.control}
-  name="isActive"
-  render={({ field }) => (
-    <FormItem className="flex items-center space-x-3">
-      <FormControl>
-        <input
-          type="checkbox"
-          checked={field.value ?? true}
-          onChange={(e) => field.onChange(e.target.checked)}
-          className="h-4 w-4"
-        />
-      </FormControl>
-      <FormLabel className="mb-0">
-        Active Variant
-      </FormLabel>
-    </FormItem>
-  )}
-/>
-
-
-              {/* ✅ Discount Preview (Showcase only) */}
-              <div className="md:col-span-2">
-                <p className="text-sm font-medium mb-1">Discount (Preview)</p>
-                <div className="bg-gray-100 border rounded px-3 py-2 text-sm">
-                  {discountPreview}%
-                  <span className="text-xs text-gray-500 ml-2">
-                  </span>
-                </div>
+                {/* Media Section */}
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" /> Variant Images
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                      {selectedMedia.map((m) => (
+                        <div
+                          key={m._id}
+                          className="relative aspect-[3/4] border-2 border-black"
+                        >
+                          <Image
+                            src={m.secure_url || m.url}
+                            fill
+                            alt="preview"
+                            className="object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedMedia((p) =>
+                                p.filter((x) => x._id !== m._id),
+                              )
+                            }
+                            className="absolute top-1 right-1 bg-black text-white p-1"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setOpen(true)}
+                        className="aspect-[3/4] border-2 border-dashed border-black flex flex-col items-center justify-center gap-2 hover:bg-zinc-50 transition-colors"
+                      >
+                        <LayoutGrid className="w-6 h-6" />
+                        <span className="text-[10px] font-black uppercase">
+                          + ADD MEDIA
+                        </span>
+                      </button>
+                    </div>
+                    {form.formState.errors.media && (
+                      <p className="text-red-600 text-[10px] font-bold mt-2 uppercase">
+                        {form.formState.errors.media.message}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
 
-              {/* Description Editor */}
-              <div className="mb-5 md:col-span-2">
-                <FormLabel className="mb-2 block">
-                  Description <span className="text-red-500">*</span>
-                </FormLabel>
-                <Editor onChange={handleEditorChange} />
-                <FormMessage>
-                  {form.formState.errors.description?.message}
-                </FormMessage>
+              {/* RIGHT COLUMN: Attributes & Pricing */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase tracking-widest">
+                      Attributes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-5 space-y-5">
+                    <FormField
+                      control={form.control}
+                      name="color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Color
+                          </FormLabel>
+                          <Input
+                            className="h-10 border-black rounded-none"
+                            {...field}
+                            placeholder="Red, Blue, etc."
+                          />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="size"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Size
+                          </FormLabel>
+                          <Select
+                            options={sizes}
+                            selected={field.value}
+                            setSelected={field.onChange}
+                          />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="pt-2">
+                      <FormField
+                        control={form.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <label className="flex items-center gap-3 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={(e) => field.onChange(e.target.checked)}
+                              className="w-5 h-5 accent-black border-2 border-black rounded-none"
+                            />
+                            <span className="text-xs font-black uppercase group-hover:underline">
+                              Active Variant
+                            </span>
+                          </label>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-black rounded-none shadow-none bg-white">
+                  <CardHeader className="bg-black py-3 rounded-none">
+                    <CardTitle className="text-xs font-bold text-white uppercase tracking-widest">
+                      Pricing
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-5 space-y-5">
+                    <FormField
+                      control={form.control}
+                      name="mrp"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            MRP
+                          </FormLabel>
+                          <Input
+                            type="number"
+                            className="h-10 border-black rounded-none"
+                            {...field}
+                          />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sellingPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Selling Price
+                          </FormLabel>
+                          <Input
+                            type="number"
+                            className="h-10 border-black rounded-none font-bold text-blue-600"
+                            {...field}
+                          />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="bg-zinc-100 border-2 border-black p-3 text-center uppercase font-black text-xs italic">
+                      Discount: {discountPreview}% OFF
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+            </div>
+          </form>
+        </Form>
+      </div>
 
-              {/* Media Selection */}
-              <div className="md:col-span-2 border border-dashed rounded p-5">
-                <MediaModal
-                  open={open}
-                  setOpen={setOpen}
-                  selectedMedia={selectedMedia}
-                  setSelectedMedia={setSelectedMedia}
-                  isMultiple
-                />
-
-                {selectedMedia.length > 0 && (
-                  <div className="flex flex-wrap gap-2 justify-center mb-3">
-                    {selectedMedia.map((media) => (
-                      <div key={media._id} className="h-24 w-24 border relative">
-                        <Image
-                          src={media.secure_url || media.url}
-                          fill
-                          alt="preview"
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div
-                  onClick={() => setOpen(true)}
-                  className="bg-primary/10 border-primary border border-dashed w-[200px] mx-auto p-4 cursor-pointer text-center rounded"
-                >
-                  <span className="font-semibold">Select Media</span>
-                </div>
-
-                {form.formState.errors.media && (
-                  <p className="text-red-500 text-sm mt-2 text-center">
-                    {form.formState.errors.media.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="md:col-span-2">
-                <ButtonLoading type="submit" loading={loading} text="Add Variant" />
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+      <MediaModal
+        open={open}
+        setOpen={setOpen}
+        selectedMedia={selectedMedia}
+        setSelectedMedia={setSelectedMedia}
+        isMultiple={true}
+      />
     </div>
   );
 };
