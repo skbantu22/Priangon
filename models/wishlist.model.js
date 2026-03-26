@@ -7,18 +7,26 @@ const wishlistSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-
     productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
       required: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// prevent duplicate wishlist
+// ✅ prevent duplicate
 wishlistSchema.index({ userId: 1, productId: 1 }, { unique: true });
+
+// 🔥 normalize id (optional but recommended)
+wishlistSchema.set("toJSON", {
+  transform: (doc, ret) => {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+  },
+});
 
 export default mongoose.models.Wishlist ||
   mongoose.model("Wishlist", wishlistSchema);
