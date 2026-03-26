@@ -14,6 +14,14 @@ import { connectDB } from "@/lib/databaseconnection";
 // ✅ আপনার ইমপোর্ট করা মডেলের নাম অনুযায়ী এটি ব্যবহার করুন
 import FBTrackingSetting from "@/models/FbTrackingSetting.model";
 
+export const metadata = {
+  title: {
+    default: "Prianon | Premium Design",
+    template: "%s | Prianon",
+  },
+  description: "Premium fashion and modern design experience",
+};
+
 const jost = Jost({
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
