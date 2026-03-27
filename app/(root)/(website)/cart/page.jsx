@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useEffect, useRef } from "react"; // Added useEffect, useRef
+import React, { useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSelector, useDispatch } from "react-redux";
@@ -8,7 +8,7 @@ import { Trash2, Minus, Plus, ArrowLeft } from "lucide-react";
 
 import { WEBSITE_PRODUCT_DETAILS, WEBSITE_SHOP } from "@/Route/Websiteroute";
 import imgPlaceholder from "@/public/assets/img-placeholder.webp";
-import { trackMetaEvent } from "@/lib/meta/metaTrack"; // Import your tracker
+import { trackMetaEvent } from "@/lib/meta/metaTrack";
 
 import {
   increaseQuantity,
@@ -22,29 +22,31 @@ const formatCurrency = (amount) =>
 export default function Page() {
   const cart = useSelector((store) => store.cartStore);
   const dispatch = useDispatch();
-  const hasTrackedView = useRef(false); // To prevent double firing in Strict Mode
+  const hasTrackedView = useRef(false);
 
   const products = Array.isArray(cart?.products) ? cart.products : [];
 
-  const subtotal = useMemo(() => {
-    return products.reduce((acc, item) => {
-      const price = Number(item?.sellingPrice || 0);
-      const qty = Number(item?.quantity || 1);
-      return acc + price * qty;
-    }, 0);
+  // Calculate Subtotal and Total Savings based on MRP
+  const { subtotal, totalSavings } = useMemo(() => {
+    return products.reduce(
+      (acc, item) => {
+        const price = Number(item?.sellingPrice || 0);
+        const mrp = Number(item?.mrp || price); // Fallback to sellingPrice if MRP is missing
+        const qty = Number(item?.quantity || 1);
+
+        acc.subtotal += price * qty;
+        if (mrp > price) {
+          acc.totalSavings += (mrp - price) * qty;
+        }
+        return acc;
+      },
+      { subtotal: 0, totalSavings: 0 },
+    );
   }, [products]);
 
-  const MEMBER_DISCOUNT_RATE = 0.1;
-  const memberDiscount = useMemo(() => {
-    return subtotal > 0 ? subtotal * MEMBER_DISCOUNT_RATE : 0;
-  }, [subtotal]);
-
-  const shipping = 0;
-  const total = subtotal - memberDiscount + shipping;
+  const total = subtotal;
 
   // --- TRACKING LOGIC ---
-
-  // 1. ViewCart: Fire once when page loads
   useEffect(() => {
     if (products.length > 0 && !hasTrackedView.current) {
       trackMetaEvent("ViewCart", {
@@ -62,54 +64,29 @@ export default function Page() {
     dispatch(
       decreaseQuantity({ productId: p.productId, variantId: p.variantId }),
     );
-    // Track quantity decrease
-    trackMetaEvent("RemoveFromCart", {
-      content_ids: [String(p.productId)],
-      content_type: "product",
-      value: Number(p.sellingPrice),
-      currency: "BDT",
-      content_name: p.name,
-    });
   };
 
   const onInc = (p) => {
     dispatch(
       increaseQuantity({ productId: p.productId, variantId: p.variantId }),
     );
-    // Track quantity increase as AddToCart
-    trackMetaEvent("AddToCart", {
-      content_ids: [String(p.productId)],
-      content_type: "product",
-      value: Number(p.sellingPrice),
-      currency: "BDT",
-      content_name: p.name,
-    });
   };
 
   const onRemove = (p) => {
     dispatch(
       removeFromCart({ productId: p.productId, variantId: p.variantId }),
     );
-    trackMetaEvent("RemoveFromCart", {
-      content_ids: [String(p.productId)],
-      content_type: "product",
-      value: Number(p.sellingPrice * (p.quantity || 1)),
-      currency: "BDT",
-      content_name: p.name,
-    });
   };
 
   const handleCheckoutClick = () => {
     trackMetaEvent("InitiateCheckout", {
       content_ids: products.map((p) => String(p.productId)),
       content_type: "product",
-      value: Number(total), // Use the final estimated total here
+      value: Number(total),
       currency: "BDT",
       num_items: products.length,
     });
   };
-
-  // --- RENDER LOGIC ---
 
   if (!products.length) {
     return (
@@ -119,7 +96,7 @@ export default function Page() {
         </h4>
         <Link
           href={WEBSITE_SHOP}
-          className="bg-black text-white px-10 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all"
+          className="bg-black text-white px-10 py-4 text-xs font-bold uppercase tracking-[0.2em]"
         >
           Explore Collection
         </Link>
@@ -145,8 +122,9 @@ export default function Page() {
               {products.map((p) => {
                 const qty = Number(p?.quantity || 1);
                 const price = Number(p?.sellingPrice || 0);
+                const mrp = Number(p?.mrp || price);
                 const lineTotal = price * qty;
-                const img = p?.media || imgPlaceholder.src;
+                const savingsPerItem = mrp > price ? mrp - price : 0;
 
                 return (
                   <div
@@ -156,10 +134,10 @@ export default function Page() {
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="relative h-40 w-32 bg-neutral-50 overflow-hidden shrink-0 border border-neutral-100">
                         <Image
-                          src={img}
+                          src={p?.media || imgPlaceholder.src}
                           alt={p?.name}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                          className="object-cover"
                           unoptimized
                         />
                       </div>
@@ -169,7 +147,7 @@ export default function Page() {
                           <div className="flex justify-between items-start">
                             <Link
                               href={WEBSITE_PRODUCT_DETAILS(p?.slug)}
-                              className="text-lg font-bold uppercase tracking-tight text-black hover:text-neutral-600 transition-colors"
+                              className="text-lg font-bold uppercase tracking-tight text-black"
                             >
                               {p?.name}
                             </Link>
@@ -177,21 +155,28 @@ export default function Page() {
                               onClick={() => onRemove(p)}
                               className="text-neutral-400 hover:text-red-600 transition-colors"
                             >
-                              <Trash2 size={18} strokeWidth={1.5} />
+                              <Trash2 size={18} />
                             </button>
                           </div>
-
                           <div className="flex gap-4 mt-2 text-[10px] font-bold uppercase tracking-widest text-neutral-400">
                             {p?.color && <span>Color: {p.color}</span>}
                             {p?.size && <span>Size: {p.size}</span>}
                           </div>
+
+                          {/* Item Level Savings Display */}
+                          {savingsPerItem > 0 && (
+                            <p className="text-[9px] font-bold text-emerald-600 mt-2 uppercase tracking-tighter">
+                              You save {formatCurrency(savingsPerItem * qty)} on
+                              this item
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex flex-wrap items-end justify-between mt-6 gap-4">
                           <div className="flex items-center border border-gray-200">
                             <button
                               onClick={() => onDec(p)}
-                              className="h-7 w-7 flex items-center justify-center hover:bg-gray-50 disabled:opacity-30"
+                              className="h-7 w-7 flex items-center justify-center"
                               disabled={qty <= 1}
                             >
                               <Minus size={12} />
@@ -201,7 +186,7 @@ export default function Page() {
                             </span>
                             <button
                               onClick={() => onInc(p)}
-                              className={`h-7 w-7 flex items-center justify-center hover:bg-gray-50 ${p.stock !== undefined && qty >= p.stock ? "opacity-30 cursor-not-allowed" : ""}`}
+                              className="h-7 w-7 flex items-center justify-center"
                               disabled={p.stock !== undefined && qty >= p.stock}
                             >
                               <Plus size={12} />
@@ -211,9 +196,16 @@ export default function Page() {
                             <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">
                               Total
                             </p>
-                            <p className="text-lg font-light text-black">
-                              {formatCurrency(lineTotal)}
-                            </p>
+                            <div className="flex flex-col items-end">
+                              {mrp > price && (
+                                <span className="text-[10px] text-neutral-400 line-through">
+                                  {formatCurrency(mrp * qty)}
+                                </span>
+                              )}
+                              <p className="text-lg font-light text-black">
+                                {formatCurrency(lineTotal)}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -222,13 +214,6 @@ export default function Page() {
                 );
               })}
             </div>
-
-            <Link
-              href={WEBSITE_SHOP}
-              className="inline-flex items-center gap-2 mt-12 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-400 hover:text-black transition-all"
-            >
-              <ArrowLeft size={14} /> Continue Shopping
-            </Link>
           </div>
 
           <div className="lg:col-span-4">
@@ -240,25 +225,22 @@ export default function Page() {
               <div className="space-y-4 text-[11px] font-bold uppercase tracking-widest">
                 <div className="flex justify-between">
                   <span className="text-neutral-400">Subtotal</span>
-                  <span className="text-black">{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-neutral-400">
-                    Member Discount (10%)
-                  </span>
-                  <span className="text-emerald-600">
-                    -{formatCurrency(memberDiscount)}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-neutral-200 pb-4">
-                  <span className="text-neutral-400">Shipping</span>
                   <span className="text-black">
-                    {shipping === 0
-                      ? "Complimentary"
-                      : formatCurrency(shipping)}
+                    {formatCurrency(subtotal + totalSavings)}
                   </span>
                 </div>
-                <div className="flex justify-between text-base pt-4">
+
+                {/* The "MRP Discount" row */}
+                {totalSavings > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Discount (MRP)</span>
+                    <span className="text-emerald-600">
+                      -{formatCurrency(totalSavings)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-base pt-4 border-t border-neutral-200">
                   <span className="text-black tracking-tighter">
                     Estimated Total
                   </span>
@@ -271,16 +253,18 @@ export default function Page() {
               <Link
                 href="/checkout"
                 onClick={handleCheckoutClick}
-                className="w-full mt-10 bg-black text-white py-5 text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-neutral-800 transition-all active:scale-[0.98] flex items-center justify-center"
+                className="w-full mt-10 bg-black text-white py-5 text-[11px] font-bold uppercase tracking-[0.3em] flex items-center justify-center"
               >
                 Proceed to Checkout
               </Link>
 
-              <p className="text-[9px] text-neutral-400 uppercase tracking-widest mt-6 text-center leading-relaxed">
-                Taxes and duties calculated at checkout.
-                <br />
-                Secure encrypted payment.
-              </p>
+              {totalSavings > 0 && (
+                <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 text-center">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">
+                    You are saving {formatCurrency(totalSavings)} on this order!
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
