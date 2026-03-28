@@ -81,10 +81,8 @@ const EmblaSlider = () => {
             className="flex-none w-full pl-4 min-w-0"
             key={banner._id || index}
           >
-            <div className="relative w-full overflow-hidden rounded-xl">
+            <div className="relative w-full overflow-hidden ">
               {" "}
-              {/* Added rounded for style */}
-              {/* Skeleton */}
               {!loadedImages[index] && (
                 <div className="absolute inset-0 animate-pulse bg-gray-200 z-10" />
               )}
