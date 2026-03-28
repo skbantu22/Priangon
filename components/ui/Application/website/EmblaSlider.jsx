@@ -43,7 +43,10 @@ const EmblaSlider = () => {
   // Embla controls
   const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
-  const scrollTo = useCallback((index) => emblaApi?.scrollTo(index), [emblaApi]);
+  const scrollTo = useCallback(
+    (index) => emblaApi?.scrollTo(index),
+    [emblaApi],
+  );
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -65,81 +68,56 @@ const EmblaSlider = () => {
   }, [emblaApi, isHovered]);
 
   return (
-    <div
-      className="relative w-full overflow-hidden"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex px-2 py-1 ">
-          {displayBanners.map((banner, index) => (
-            <div className="flex-shrink-0 w-full" key={banner._id || index}>
-              <div className="relative w-full">
-
-                {/* ✅ Skeleton / progressive loading */}
-                {!loadedImages[index] && (
-                  <div className="absolute inset-0 animate-pulse bg-gray-300 z-10" />
-                )}
-
-                {/* Mobile */}
-                <div className="block md:hidden relative w-full aspect-[16/9] p-2">
-                  <Image
-                    src={banner?.mobileImage?.secure_url || DEFAULT_IMAGE}
-                    alt={banner.name || "Banner"}
-                    fill
-                    className="object-cover"
-                    priority={index === 0} // only first image gets priority
-                    onLoad={() =>
-                      setLoadedImages((prev) => ({ ...prev, [index]: true }))
-                    }
-                  />
-                </div>
-
-                {/* Desktop */}
-                <div className="hidden md:block relative w-full h-[250px] md:h-[400px] lg:h-[500px]">
-                  <Image
-                    src={banner?.pcImage?.secure_url || DEFAULT_IMAGE}
-                    alt={banner.name || "Banner"}
-                    fill
-                    className="object-cover"
-                    priority={index === 0} // only first image gets priority
-                    onLoad={() =>
-                      setLoadedImages((prev) => ({ ...prev, [index]: true }))
-                    }
-                  />
-                </div>
-
+    // ... inside the return ...
+    <div className="overflow-hidden" ref={emblaRef}>
+      {/* Add 'flex' and 'touch-pan-y' for better mobile feel */}
+      <div className="flex touch-pan-y ml-[-1rem]">
+        {displayBanners.map((banner, index) => (
+          /* Change: flex-none (flex: 0 0 100%) ensures the slide stays full width.
+         Change: Added padding-left (pl-4) to create a gap between slides 
+         without breaking the carousel offset math.
+      */
+          <div
+            className="flex-none w-full pl-4 min-w-0"
+            key={banner._id || index}
+          >
+            <div className="relative w-full overflow-hidden rounded-xl">
+              {" "}
+              {/* Added rounded for style */}
+              {/* Skeleton */}
+              {!loadedImages[index] && (
+                <div className="absolute inset-0 animate-pulse bg-gray-200 z-10" />
+              )}
+              {/* Mobile Image Container */}
+              <div className="block md:hidden relative aspect-[16/9]">
+                <Image
+                  src={banner?.mobileImage?.secure_url || DEFAULT_IMAGE}
+                  alt={banner.name || "Banner"}
+                  fill
+                  className="object-cover transition-opacity duration-500"
+                  style={{ opacity: loadedImages[index] ? 1 : 0 }}
+                  priority={index === 0}
+                  onLoad={() =>
+                    setLoadedImages((prev) => ({ ...prev, [index]: true }))
+                  }
+                />
+              </div>
+              {/* Desktop Image Container */}
+              <div className="hidden md:block relative h-[250px] md:h-[400px] lg:h-[500px]">
+                <Image
+                  src={banner?.pcImage?.secure_url || DEFAULT_IMAGE}
+                  alt={banner.name || "Banner"}
+                  fill
+                  className="object-cover transition-opacity duration-500"
+                  style={{ opacity: loadedImages[index] ? 1 : 0 }}
+                  priority={index === 0}
+                  onLoad={() =>
+                    setLoadedImages((prev) => ({ ...prev, [index]: true }))
+                  }
+                />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Arrows */}
-      <button
-        onClick={scrollPrev}
-        className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white rounded-full p-2 shadow z-20"
-      >
-        ◀
-      </button>
-
-      <button
-        onClick={scrollNext}
-        className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white rounded-full p-2 shadow z-20"
-      >
-        ▶
-      </button>
-
-      {/* Dots */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-sm z-20">
-        {displayBanners.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => scrollTo(index)}
-            className={`transition-all duration-300 rounded-full ${
-              selectedIndex === index ? "w-6 h-2 bg-white" : "w-2 h-2 bg-white/60"
-            }`}
-          />
+          </div>
         ))}
       </div>
     </div>
