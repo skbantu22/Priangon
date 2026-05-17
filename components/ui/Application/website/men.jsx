@@ -9,7 +9,7 @@ const MenProducts = async () => {
 
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/product/by-category?category=modest-cords-set&limit=100`,
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/product/by-category?category=women&limit=100`,
 
       {
         cache: "no-store", // 🔥 prevents build-time fetch

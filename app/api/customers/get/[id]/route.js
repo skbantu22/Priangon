@@ -4,7 +4,7 @@ import { isAuthenticated } from "@/lib/auth.server";
 import { isValidObjectId } from "mongoose";
 import ProductModel from "@/models/Product.model";
 
-import CouponModel from "@/models/Coupon.model";
+import UserModel from "@/models/User.model";
 
 export async function GET(request, context) {
   try {
@@ -21,11 +21,11 @@ export async function GET(request, context) {
       return response(false, 400, "Invalid object id.");
     }
 
-    const data = await CouponModel.findOne({ _id: id, deletedAt: null }).lean();
+    const data = await UserModel.findOne({ _id: id, deletedAt: null }).lean();
 
-    if (!data) return response(false, 404, "Category not found.");
+    if (!data) return response(false, 404, "Customer not found.");
 
-    return response(true, 200, "Category found.", data);
+    return response(true, 200, "Customer found.", data);
   } catch (error) {
     console.error("PRODUCT GET ERROR:");
     console.error(error);

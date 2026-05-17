@@ -57,7 +57,7 @@ const AddProduct = () => {
       name: true,
       slug: true,
       category: true,
-      subcategory: true,
+
       mrp: true,
       sellingPrice: true,
       discountPercentage: true,
@@ -66,6 +66,8 @@ const AddProduct = () => {
       freeDelivery: true,
     })
     .extend({
+      subcategory: z.string().optional().or(z.literal("")),
+
       sizeChart: z.string().optional().or(z.literal("")),
     });
 

@@ -9,29 +9,21 @@ import EditAction from "@/components/ui/Application/Admin/EditAction";
 import DeleteAction from "@/components/ui/Application/Admin/DeleteAction";
 
 import {
-
+  ADMIN_CUSTOMERS_EDIT,
   ADMIN_DASHBOARD,
-  
-
   ADMIN_TRASH,
- 
 } from "@/Route/Adminpannelroute";
 
-import {  DT_CUSTOMERS_COLUMN } from "@/lib/column";
+import { DT_CUSTOMERS_COLUMN } from "@/lib/column";
 import { columnConfig } from "@/lib/helperfunction";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
 
-
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: '', label: "Customer" },
+  { href: "", label: "Customer" },
 ];
 
 const ShowCustomers = () => {
@@ -41,25 +33,24 @@ const ShowCustomers = () => {
   }, []);
 
   // ✅ row action menu
-  const action = useCallback(
-    (row, deleteType, handleDelete) => {
-      const actionMenu = [];
+  const action = useCallback((row, deleteType, handleDelete) => {
+    const actionMenu = [];
 
-      
+    actionMenu.push(
+      <EditAction key="edit" href={ADMIN_CUSTOMERS_EDIT(row.original._id)} />,
+    );
 
-      actionMenu.push(
-        <DeleteAction
-          key="delete"
-          row={row}
-          deleteType={deleteType}
-          handleDelete={handleDelete}
-        />
-      );
+    actionMenu.push(
+      <DeleteAction
+        key="delete"
+        row={row}
+        deleteType={deleteType}
+        handleDelete={handleDelete}
+      />,
+    );
 
-      return actionMenu;
-    },
-    []
-  );
+    return actionMenu;
+  }, []);
 
   return (
     <div>
@@ -68,8 +59,6 @@ const ShowCustomers = () => {
       <Card className="py-0 rounded shadow-sm">
         <CardHeader className="pt-3 px-3 border-b flex flex-row items-center justify-between">
           <h4 className="text-xl font-semibold">Show Customers</h4>
-
-          
         </CardHeader>
 
         <CardContent className="pb-5">
@@ -85,7 +74,7 @@ const ShowCustomers = () => {
             createAction={action}
           />
         </CardContent>
-      </Card> 
+      </Card>
     </div>
   );
 };

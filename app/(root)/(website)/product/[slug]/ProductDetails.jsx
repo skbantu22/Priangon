@@ -1,6 +1,5 @@
 "use client";
 
-// ১. React থেকে useRef ইমপোর্ট করা হয়েছে
 import React, {
   useState,
   useMemo,
@@ -21,7 +20,7 @@ import DetailsSlider from "@/components/ui/Application/website/detailsslider";
 import { ShoppingCart } from "lucide-react";
 import ProductGallery from "@/components/ui/Application/website/productgalary";
 
-// ২. মেটা ট্র্যাকিং ফাংশন ইমপোর্ট
+// মেটা ট্র্যাকিং ফাংশন ইমপোর্ট
 import { trackMetaEvent } from "@/lib/meta/metaTrack";
 
 const ProductDetails = ({
@@ -34,8 +33,14 @@ const ProductDetails = ({
   const cartStore = useSelector((store) => store.cartStore);
   const dispatch = useDispatch();
 
-  // ট্র্যাকিং রেফারেন্স (যাতে ডুপ্লিকেট ইভেন্ট ফায়ার না হয়)
+  // ট্র্যাকিং রেফারেন্স (যাতে ডুপ্লিকেট ইভেন্ট ফায়ার না হয়)
   const hasTrackedView = useRef(false);
+
+  // স্লাইডারের একটিভ ইনডেক্স স্টেট (STEP 3)
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [isAddedIntoCart, setIsAddedIntoCart] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -46,12 +51,60 @@ const ProductDetails = ({
     { label: product?.name || "Product" },
   ];
 
-  // Selected color
-  const [selectedColor, setSelectedColor] = useState(
-    initialVariant?.color || colors?.[0] || allVariants?.[0]?.color || "",
-  );
+  // ==========================================
+  // STEP 1: Create Flat Gallery List
+  // ==========================================
+  const flatGallery = useMemo(() => {
+    if (!allVariants?.length) return [];
 
-  // Current sizes based on selected color
+    return allVariants.flatMap((v) =>
+      (v.media || []).map((m) => ({
+        image: m?.secure_url,
+        color: v.color,
+        size: v.size,
+        sku: v.sku,
+        variantId: v._id,
+        sellingPrice: v.sellingPrice,
+        mrp: v.mrp,
+        stock: v.stock || 0,
+      })),
+    );
+  }, [allVariants]);
+
+  // ==========================================
+  // STEP 4: Current Slide Data
+  // ==========================================
+  const currentSlide = flatGallery[activeIndex] || {};
+
+  // Selected Color & Size States (Synced with current slide)
+  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedSize, setSelectedSize] = useState("");
+
+  // স্লাইড চেঞ্জ হলে কালার এবং সাইজ অটোমেটিক সিঙ্ক করার জন্য ইফেক্ট
+  useEffect(() => {
+    if (currentSlide.color) setSelectedColor(currentSlide.color);
+    if (currentSlide.size) setSelectedSize(currentSlide.size);
+  }, [activeIndex, currentSlide.color, currentSlide.size]);
+
+  // কালার বা সাইজ বাটন ক্লিক করলে স্লাইডারের পজিশন চেঞ্জ করার লজিক
+  const handleVariantSelection = (color, size) => {
+    const targetColor = color || selectedColor;
+    const targetSize = size || selectedSize;
+
+    const targetIndex = flatGallery.findIndex(
+      (item) => item.color === targetColor && item.size === targetSize,
+    );
+
+    if (targetIndex !== -1) {
+      setActiveIndex(targetIndex);
+    } else if (color) {
+      // যদি নির্দিষ্ট সাইজ ম্যাচ না করে, তবে ওই কালারের প্রথম স্লাইডে নিয়ে যাবে
+      const colorIndex = flatGallery.findIndex((item) => item.color === color);
+      if (colorIndex !== -1) setActiveIndex(colorIndex);
+    }
+  };
+
+  // কালার ওয়াইজ ডাইনামিক সাইজ লিস্ট (স্টক চেক করার জন্য)
   const dynamicSizes = useMemo(() => {
     return allVariants
       .filter((v) => v.color === selectedColor)
@@ -62,45 +115,18 @@ const ProductDetails = ({
       }));
   }, [selectedColor, allVariants]);
 
-  // Selected size
-  const [selectedSize, setSelectedSize] = useState(
-    initialVariant?.size ||
-      (dynamicSizes.length > 0 ? dynamicSizes[0].size : ""),
-  );
-
-  const [activeThumb, setActiveThumb] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [isAddedIntoCart, setIsAddedIntoCart] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-
-  // Determine current variant
-  const currentVariant = useMemo(() => {
-    if (!Array.isArray(allVariants) || allVariants.length === 0)
-      return initialVariant || null;
-
-    const exactMatch = allVariants.find(
-      (v) => v.color === selectedColor && v.size === selectedSize,
-    );
-    if (exactMatch) return exactMatch;
-
-    const colorMatch = allVariants.find((v) => v.color === selectedColor);
-    if (colorMatch) return colorMatch;
-
-    return initialVariant || allVariants[0] || null;
-  }, [selectedColor, selectedSize, allVariants, initialVariant]);
-
-  const displayVariant =
-    currentVariant || initialVariant || allVariants?.[0] || null;
-
-  // ৩. এখানে প্রাইস ক্যালকুলেশন (ViewContent এর আগে থাকতে হবে)
+  // ==========================================
+  // STEP 5: Dynamic Price, SKU, Stock
+  // ==========================================
   const displaySellingPrice =
-    displayVariant?.sellingPrice ??
-    product?.sellingPrice ??
-    product?.price ??
-    0;
-  const displayMrp = displayVariant?.mrp ?? product?.mrp ?? displaySellingPrice;
+    currentSlide.sellingPrice ?? product?.sellingPrice ?? product?.price ?? 0;
+
+  const displayMrp = currentSlide.mrp ?? product?.mrp ?? displaySellingPrice;
+
+  const displaySku = currentSlide.sku || initialVariant?.sku || "N/A";
+
   const isOutOfStock =
-    displayVariant?.stock !== undefined ? displayVariant.stock <= 0 : false;
+    currentSlide.stock !== undefined ? currentSlide.stock <= 0 : false;
 
   // --- META VIEW CONTENT TRACKING ---
   useEffect(() => {
@@ -116,34 +142,23 @@ const ProductDetails = ({
     }
   }, [product, displaySellingPrice]);
 
-  // Gallery media
-  const galleryMedia = useMemo(() => {
-    const colorMatch = allVariants.find((v) => v.color === selectedColor);
-    const media =
-      colorMatch?.media?.length > 0
-        ? colorMatch.media
-        : displayVariant?.media?.length > 0
-          ? displayVariant.media
-          : product?.media || [];
-    return Array.isArray(media) ? media.slice(0, 6) : [];
-  }, [selectedColor, allVariants, product, displayVariant]);
+  // ==========================================
+  // STEP 6: Arrow Navigation Logic
+  // ==========================================
+  const handleNext = () => {
+    setActiveIndex((prev) => (prev + 1 >= flatGallery.length ? 0 : prev + 1));
+  };
 
-  useEffect(() => {
-    setActiveThumb(galleryMedia[0]?.secure_url || "");
-  }, [galleryMedia]);
-
-  // Reset size if color changes
-  useEffect(() => {
-    const isSizeAvailable = dynamicSizes.some((s) => s.size === selectedSize);
-    if (!isSizeAvailable) {
-      setSelectedSize(dynamicSizes.length > 0 ? dynamicSizes[0].size : "");
-    }
-  }, [dynamicSizes, selectedSize]);
+  const handlePrev = () => {
+    setActiveIndex((prev) =>
+      prev - 1 < 0 ? flatGallery.length - 1 : prev - 1,
+    );
+  };
 
   // Check if already in cart
   useEffect(() => {
     const pid = product?._id;
-    const vid = currentVariant?._id;
+    const vid = currentSlide?.variantId;
 
     if (!pid) {
       setIsAddedIntoCart(false);
@@ -155,7 +170,7 @@ const ProductDetails = ({
     );
 
     setIsAddedIntoCart(!!exists);
-  }, [cartStore?.products, product?._id, currentVariant?._id]);
+  }, [cartStore?.products, product?._id, currentSlide?.variantId]);
 
   // Handle Add to Cart
   const handleAddtoCart = () => {
@@ -170,20 +185,17 @@ const ProductDetails = ({
 
     const cartProduct = {
       productId: product._id,
-      variantId: displayVariant?._id || null,
+      variantId: currentSlide?.variantId || null,
       name: product.name,
       slug: product.slug,
-      size: displayVariant?.size || selectedSize || null,
-      color: displayVariant?.color || selectedColor || null,
+      size: selectedSize || null,
+      color: selectedColor || null,
       mrp: displayMrp,
       sellingPrice: displaySellingPrice,
-      media:
-        displayVariant?.media?.[0]?.secure_url ||
-        product?.media?.[0]?.secure_url ||
-        "",
+      media: currentSlide?.image || product?.media?.[0]?.secure_url || "",
       quantity: Number(quantity ?? 1),
-      discount: displayVariant?.discountPercentage || 0,
-      stock: displayVariant?.stock ?? null,
+      discount: product?.discountPercentage || 0,
+      stock: currentSlide?.stock ?? null,
     };
 
     // --- META ADD TO CART TRACKING ---
@@ -205,13 +217,11 @@ const ProductDetails = ({
 
   // Quantity check
   useEffect(() => {
-    if (quantity > displayVariant?.stock) {
-      setToastMessage(
-        `Stock limit crossed! Only ${displayVariant?.stock} left`,
-      );
-      setQuantity(displayVariant?.stock || 1);
+    if (currentSlide?.stock && quantity > currentSlide.stock) {
+      setToastMessage(`Stock limit crossed! Only ${currentSlide.stock} left`);
+      setQuantity(currentSlide.stock || 1);
     }
-  }, [quantity, displayVariant?.stock]);
+  }, [quantity, currentSlide?.stock]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -222,7 +232,6 @@ const ProductDetails = ({
 
   return (
     <div className="min-h-screen bg-white text-gray-900 antialiased">
-      {/* ... UI কোড যা আগে ছিল (বাকি অংশ একই থাকবে) ... */}
       <div className="max-w-7xl mx-auto px-2 md:px-6 py-2 md:py-6 flex items-center gap-2 text-[9px] uppercase text-gray-400">
         <Breadcums items={breadcrumbItems} />
       </div>
@@ -230,9 +239,13 @@ const ProductDetails = ({
       <main className="max-w-7xl mx-auto px-2 md:px-6 grid grid-cols-1 lg:grid-cols-12 gap-2 md:gap-10 pb-20">
         <div className="lg:col-span-7">
           <div className="relative">
+            {/* STEP 7: Connect ProductGallery */}
             <ProductGallery
-              galleryMedia={galleryMedia}
-              productName={product?.name}
+              galleryMedia={flatGallery.map((i) => i.image)}
+              activeIndex={activeIndex}
+              setActiveIndex={setActiveIndex}
+              onNext={handleNext}
+              onPrev={handlePrev}
             />
             {isOutOfStock && (
               <div className="absolute top-4 left-[110px] z-30 bg-black text-white px-3 py-1 text-[10px] font-bold tracking-tighter uppercase pointer-events-none">
@@ -243,7 +256,7 @@ const ProductDetails = ({
         </div>
 
         <div className="lg:col-span-5 flex flex-col">
-          <div className="w-full max-w-md mx-auto lg:mx-0 flex flex-col h-full">
+          <div className="w-full max-w-md mx-auto lg:mx-0 flex flex-col ">
             <div className="flex items-start justify-between gap-3 ">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-medium tracking-tight leading-snug text-gray-900 break-words">
                 {product?.name}
@@ -251,16 +264,14 @@ const ProductDetails = ({
               <div className="shrink-0 ">
                 <WishlistButton
                   productId={product?._id}
-                  variantId={displayVariant?._id}
+                  variantId={currentSlide?.variantId}
                 />
               </div>
             </div>
 
             <div className="text-[12px] md:text-sm tracking-wide text-gray-400">
               <span className="uppercase font-medium text-gray-400">SKU: </span>
-              <span className="uppercase font-semibold">
-                {initialVariant?.sku || "N/A"}
-              </span>
+              <span className="uppercase font-semibold">{displaySku}</span>
             </div>
 
             <div className="flex items-center gap-4 mb-4 md:mb-8 mt-2">
@@ -276,7 +287,7 @@ const ProductDetails = ({
 
             <div className="space-y-4 md:space-y-5 mb-3 md:mb-4 ">
               {colors?.length > 0 && (
-                <div className=" select-none">
+                <div className="select-none">
                   <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">
                     Color:
                     <span className="font-normal text-gray-600 ml-1">
@@ -290,12 +301,12 @@ const ProductDetails = ({
                         <button
                           key={color}
                           type="button"
-                          onClick={() => setSelectedColor(color)}
+                          onClick={() => handleVariantSelection(color, null)}
                           className={`
                             relative flex items-center gap-2
                             min-w-[30px] h-[25px] md:h-[40px] px-4
                             text-xs transition-all duration-200 
-                            rounded-full border transition-all duration-300
+                            rounded-full border
                             ${
                               isSelected
                                 ? "border-black bg-white text-black shadow-sm scale-105"
@@ -325,40 +336,43 @@ const ProductDetails = ({
                 </h3>
                 <div className="flex flex-wrap items-center gap-2 md:gap-3 ">
                   {dynamicSizes.length > 0 ? (
-                    dynamicSizes.map((item) => (
-                      <button
-                        key={item.size}
-                        type="button"
-                        disabled={item.stock === 0}
-                        onClick={() => setSelectedSize(item.size)}
-                        className={`
-                          relative flex items-center justify-center 
-                          min-w-[30px] h-[25px] md:h-[40px] px-4
-                          text-sm transition-all duration-200 
-                          ${
-                            selectedSize === item.size
-                              ? "border border-black rounded-full text-black shadow-[0_4px_12px_rgba(0,0,0,0.1)] scale-105"
-                              : "border border-gray-500 text-gray-500 rounded-full hover:text-black"
+                    dynamicSizes.map((item) => {
+                      const isSelected = selectedSize === item.size;
+                      return (
+                        <button
+                          key={item.size}
+                          type="button"
+                          disabled={item.stock === 0}
+                          onClick={() =>
+                            handleVariantSelection(null, item.size)
                           }
-                          ${item.stock === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
-                        `}
-                      >
-                        <span
-                          className={
-                            selectedSize === item.size
-                              ? "font-semibold"
-                              : "font-normal"
-                          }
+                          className={`
+                            relative flex items-center justify-center 
+                            min-w-[30px] h-[25px] md:h-[40px] px-4
+                            text-sm transition-all duration-200 
+                            ${
+                              isSelected
+                                ? "border border-black rounded-full text-black shadow-[0_4px_12px_rgba(0,0,0,0.1)] scale-105"
+                                : "border border-gray-500 text-gray-500 rounded-full hover:text-black"
+                            }
+                            ${item.stock === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
+                          `}
                         >
-                          {item.size}
-                        </span>
-                        {item.stock === 0 && (
-                          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <span className="w-full h-[1px] bg-gray-400"></span>
+                          <span
+                            className={
+                              isSelected ? "font-semibold" : "font-normal"
+                            }
+                          >
+                            {item.size}
                           </span>
-                        )}
-                      </button>
-                    ))
+                          {item.stock === 0 && (
+                            <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <span className="w-full h-[1px] bg-gray-400"></span>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
                   ) : (
                     <div className="flex flex-wrap items-center gap-6">
                       <button
@@ -397,7 +411,9 @@ const ProductDetails = ({
                       type="button"
                       onClick={() =>
                         setQuantity((q) =>
-                          q + 1 > displayVariant?.stock ? q : q + 1,
+                          currentSlide?.stock && q + 1 > currentSlide.stock
+                            ? q
+                            : q + 1,
                         )
                       }
                       className="w-10 h-full flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
@@ -450,7 +466,7 @@ const ProductDetails = ({
               </div>
             </div>
 
-            <div className="mt-auto flex flex-col gap-2 ">
+            <div className="flex flex-col gap-2">
               <AccordionBasic
                 product={product}
                 initialVariant={initialVariant}

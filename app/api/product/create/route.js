@@ -10,20 +10,20 @@ export async function POST(request) {
 
     const payload = await request.json();
 
-    // ✅ Add subcategory + offers + freeDelivery (optional but nice)
+    // ✅ Zod validation schema
     const schema = zSchema.pick({
       name: true,
       slug: true,
       category: true,
-      subcategory: true, // ✅ FIX
+      subcategory: true,
       mrp: true,
       sellingPrice: true,
       discountPercentage: true,
       description: true,
       media: true,
-      offers: true, // ✅ optional (if your zSchema has it)
-      freeDelivery: true, // ✅ optional (if your zSchema has it)
-      sizeChart: true, // ✅ ADD THIS
+      offers: true,
+      freeDelivery: true,
+      sizeChart: true,
     });
 
     const validate = schema.safeParse(payload);
@@ -32,29 +32,44 @@ export async function POST(request) {
       return response(false, 400, "Invalid or missing fields.", validate.error);
     }
 
-    const productData = validate.data;
+    let productData = validate.data;
 
+    // ✅ CLEAN subcategory (IMPORTANT FIX)
+    productData.subcategory =
+      productData.subcategory && productData.subcategory !== ""
+        ? productData.subcategory
+        : null;
+
+    // ✅ Create product
     const newProduct = new ProductModel({
       name: productData.name,
       slug: productData.slug,
       category: productData.category,
-      subcategory: productData.subcategory, // ✅ FIX
+
+      // ✅ SAFE OPTIONAL FIELD
+      subcategory: productData.subcategory,
+
       mrp: productData.mrp,
       sellingPrice: productData.sellingPrice,
       discountPercentage: productData.discountPercentage,
+
       description: encode(productData.description),
       media: productData.media,
+
       sizeChart:
         productData.sizeChart && productData.sizeChart !== ""
           ? productData.sizeChart
           : null,
-      freeDelivery: productData.freeDelivery || false, // ✅ safe
+
+      freeDelivery: productData.freeDelivery || false,
     });
 
     await newProduct.save();
 
     return response(true, 200, "Product added successfully.");
   } catch (error) {
+    console.log("PRODUCT CREATE ERROR:");
+    console.log(error);
     return catchError(error);
   }
 }

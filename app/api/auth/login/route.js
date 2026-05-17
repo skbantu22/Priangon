@@ -16,11 +16,10 @@ export async function POST(request) {
 
     const payload = await request.json();
 
-    const validationSchema = zSchema
-      .pick({ email: true })
-      .extend({
-        password: z.string().min(6, "Password must be at least 6 characters"),
-      });
+    // ---------------- VALIDATION ----------------
+    const validationSchema = zSchema.pick({ email: true }).extend({
+      password: z.string().min(6, "Password must be at least 6 characters"),
+    });
 
     const validatedData = validationSchema.safeParse(payload);
 
@@ -29,19 +28,22 @@ export async function POST(request) {
         false,
         401,
         "Invalid or missing input field.",
-        validatedData.error
+        validatedData.error,
       );
     }
 
     const { email, password } = validatedData.data;
 
-    // ✅ MUST select password
+    // ---------------- FIND USER ----------------
     const getUser = await UserModel.findOne({ email }).select("+password");
+
+    console.log("LOGIN USER FROM DB:", getUser);
 
     if (!getUser) {
       return response(false, 404, "Invalid login credentials.");
     }
 
+    // ---------------- EMAIL VERIFY ----------------
     if (!getUser.isEmailVerified) {
       if (!process.env.SECRET_KEY) {
         return response(false, 500, "SECRET_KEY is not set in env.");
@@ -56,61 +58,73 @@ export async function POST(request) {
         .sign(secret);
 
       const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/verify-email/${encodeURIComponent(
-        token
+        token,
       )}`;
 
       const html = emailVerificationLink(verifyUrl);
-
       sendMail("Email Verification - Prianka Fashion", email, html);
 
-      return response(false, 403, "Please verify your email. Verification link sent.");
+      return response(false, 403, "Please verify your email.");
     }
 
+    // ---------------- PASSWORD CHECK ----------------
     const isPasswordVerified = await getUser.comparePassword(password);
 
     if (!isPasswordVerified) {
       return response(false, 400, "Invalid login credentials.");
     }
-  
 
-    // 🔥 ADD THIS BLOCK
+    // ---------------- JWT TOKEN ----------------
+    if (!process.env.SECRET_KEY) {
+      return response(false, 500, "SECRET_KEY is not set in env.");
+    }
 
-if (!process.env.SECRET_KEY) {
-  return response(false, 500, "SECRET_KEY is not set in env.");
-}
+    const secret = new TextEncoder().encode(process.env.SECRET_KEY);
 
-const secret = new TextEncoder().encode(process.env.SECRET_KEY);
+    const accessToken = await new SignJWT({
+      id: getUser._id.toString(),
+      email: getUser.email,
+      role: getUser.role,
+      showroomId: getUser.showroomId,
 
-const accessToken = await new SignJWT({
-  id: getUser._id.toString(),
-  email: getUser.email,
-  role: getUser.role,
-})
-  .setProtectedHeader({ alg: "HS256" })
-  .setIssuedAt()
-  .setExpirationTime("7d")
-  .sign(secret);
+      phone: getUser.phone,
+      address: getUser.address,
+      city: getUser.city,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("7d")
+      .sign(secret);
 
-const cookieStore = await cookies();
+    // ---------------- COOKIE SET ----------------
+    const cookieStore = await cookies();
 
-cookieStore.set("access_token", accessToken, {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/",
-  maxAge: 60 * 60 * 24 * 7,
-});
+    cookieStore.set("access_token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
 
+    // ---------------- FINAL RESPONSE ----------------
+    const responseData = {
+      user: {
+        id: getUser._id,
+        name: getUser.name,
+        email: getUser.email,
+        role: getUser.role,
+        showroomId: getUser.showroomId,
+        phone: getUser.phone,
+        address: getUser.address,
+        city: getUser.city,
+        // ✅ IMPORTANT
+      },
+    };
 
+    console.log("FINAL RESPONSE DATA:", responseData);
 
-   return response(true, 200, "Login success.", {
-  user: {
-    id: getUser._id,
-    name: getUser.name,
-    email: getUser.email,
-    role: getUser.role,
-  },
-});
+    return response(true, 200, "Login success.", responseData);
   } catch (error) {
     return catchError(error);
   }

@@ -46,6 +46,7 @@ export async function POST(request) {
       description: true,
       media: true,
       isActive: true,
+      barcode: true,
     });
 
     const validate = schema.safeParse(payload);
@@ -76,6 +77,7 @@ export async function POST(request) {
       variantId: newProductVariant._id,
     });
   } catch (error) {
+    console.error("Error creating product variant:", error);
     return catchError(error, "ভ্যারিয়েন্ট অ্যাড করতে সমস্যা হয়েছে।");
   }
 }

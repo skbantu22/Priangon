@@ -6,7 +6,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
- --font-sans: var(--font-jost);
+  --font-sans: var(--font-jost);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -121,47 +121,46 @@
   }
   body {
     @apply bg-background text-foreground;
-      margin: 0;
+    margin: 0;
     padding: 0;
     overflow-x: hidden;
     width: 100%;
   }
 }
 
-
-
 .slick-dots {
-    bottom: 15px !important;
-    
+  bottom: 15px !important;
 }
 
 /* Make all buttons transparent and remove content */
 .slick-dots li button {
   background: transparent !important; /* remove default background */
-  border: none !important;            /* remove border */
+  border: none !important; /* remove border */
   width: 30px;
   height: 30px;
   padding: 0;
   margin: 0 5px;
   cursor: pointer;
-  overflow: hidden;                   /* prevent pseudo-element overflow */
+  overflow: hidden; /* prevent pseudo-element overflow */
 }
 
 /* Remove default Slick bullet */
 .slick-dots li button:before {
-  content: none !important;           /* completely remove default dot */
+  content: none !important; /* completely remove default dot */
 }
 
 /* Add your custom white circle with stroke using after pseudo */
 .slick-dots li button::after {
-  content: '';
+  content: "";
   display: block;
   width: 30px;
   height: 30px;
   border-radius: 50%;
   background-color: #ffffff; /* solid white dot */
   border: 3px solid #000000; /* stroke around dot */
-  transition: transform 0.3s, border-color 0.3s;
+  transition:
+    transform 0.3s,
+    border-color 0.3s;
   box-sizing: border-box;
 }
 
@@ -180,20 +179,73 @@
   text-decoration: none !important;
 }
 
-[data-state=open] > .group {
+[data-state="open"] > .group {
   text-decoration: none !important;
 }
 
-
 @layer utilities {
   @keyframes click-pop {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(-15px); }
-    100% { transform: translateY(0); }
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-15px);
+    }
+    100% {
+      transform: translateY(0);
+    }
   }
 
   /* This class will be triggered on hover/active */
   .animate-pop {
     animation: click-pop 0.5s ease-out;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #receipt,
+  #receipt * {
+    visibility: visible !important;
+  }
+
+  #receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+  }
+
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* 2-column print grid */
+  .print-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px;
+    padding: 10px;
+  }
+
+  .label-cell {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ddd;
+    padding: 8px;
   }
 }

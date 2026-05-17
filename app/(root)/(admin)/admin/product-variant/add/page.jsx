@@ -31,6 +31,7 @@ import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
 import { sizes } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -59,6 +60,7 @@ const AddProductVariant = () => {
     description: true,
     media: true,
     isActive: true,
+    barcode: true,
   });
 
   const form = useForm({
@@ -73,6 +75,7 @@ const AddProductVariant = () => {
       stock: 0,
       isActive: true,
       description: "",
+      barcode: "",
       media: [],
     },
   });
@@ -206,6 +209,27 @@ const AddProductVariant = () => {
                         )}
                       />
                     </div>
+                    <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase">
+                            Barcode
+                          </FormLabel>
+
+                          <div className="flex gap-2">
+                            <Input
+                              className="h-11 border-black rounded-none"
+                              {...field}
+                              placeholder="Enter barcode or auto generate"
+                            />
+                          </div>
+
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     <FormField
                       control={form.control}

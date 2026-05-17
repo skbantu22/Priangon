@@ -3,8 +3,7 @@ import { isAuthenticated } from "@/lib/auth.server";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
-
-
+import MediaModel from "@/models/Media.model";
 
 export async function GET(request) {
   try {
@@ -12,7 +11,7 @@ export async function GET(request) {
     if (!auth.isAuth) {
       return NextResponse.json(
         { success: false, message: "Unauthorized." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -33,86 +32,50 @@ export async function GET(request) {
 
     const deleteType = sp.get("deleteType");
 
-    // ✅ Base match (only fields that exist in Product)
     const baseMatch = {};
     if (deleteType === "SD") baseMatch.deletedAt = null;
     else if (deleteType === "PD") baseMatch.deletedAt = { $ne: null };
 
-    // ✅ Sort Query
     const sortQuery = {};
     sorting.forEach((s) => (sortQuery[s.id] = s.desc ? -1 : 1));
-    const finalSort = Object.keys(sortQuery).length ? sortQuery : { createdAt: -1 };
 
-    // ✅ Global filter match (AFTER lookup/unwind, because categoryData exists then)
-    const searchMatch =
-      globalFilter
-        ? {
-            $match: {
-              $or: [
-                { name: { $regex: globalFilter, $options: "i" } },
-                { slug: { $regex: globalFilter, $options: "i" } },
-                { "productData.name": { $regex: globalFilter, $options: "i" } },
+    const finalSort = Object.keys(sortQuery).length
+      ? sortQuery
+      : { createdAt: -1 };
 
-                // numeric field search (mrp) by converting to string
-                {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$mrp" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
+    const searchMatch = globalFilter
+      ? {
+          $match: {
+            $or: [
+              { sku: { $regex: globalFilter, $options: "i" } },
+              { color: { $regex: globalFilter, $options: "i" } },
+              { size: { $regex: globalFilter, $options: "i" } },
+              { "productData.name": { $regex: globalFilter, $options: "i" } },
+              {
+                $expr: {
+                  $regexMatch: {
+                    input: { $toString: "$sellingPrice" },
+                    regex: globalFilter,
+                    options: "i",
                   },
                 },
-                     {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$sellingPrice" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
-                  },
-                },
-                  {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$discountPercentage" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
-                  },
-                },
-
-
-
-
-              ],
-            },
-          }
-        : null;
-
-
-//         filters.forEach(filter => {
-//   if (filter.id === 'mrp' || filter.id === 'sellingPrice' || filter.id === 'discountPercentage') {
-//     matchQuery[filter.id] = Number(filter.value)
-//   } 
-//   else if (filter.id === 'product') {
-//     matchQuery["productData.name"] = { $regex: filter.value, $options: 'i' }
-//   }
-//   else {
-//     matchQuery[filter.id] = { $regex: filter.value, $options: 'i' }
-//   }
-// });
+              },
+            ],
+          },
+        }
+      : null;
 
     const pipeline = [
       { $match: baseMatch },
 
+      // PRODUCT LOOKUP
       {
-         $lookup: {
-    from: 'products',
-    localField: 'product',
-    foreignField: '_id',
-    as: 'productData'
-  }
+        $lookup: {
+          from: "products",
+          localField: "product",
+          foreignField: "_id",
+          as: "productData",
+        },
       },
       {
         $unwind: {
@@ -121,32 +84,60 @@ export async function GET(request) {
         },
       },
 
+      // MEDIA LOOKUP (🔥 FIX IMAGE ISSUE)
+      {
+        $lookup: {
+          from: "medias",
+          localField: "productData.media",
+          foreignField: "_id",
+          as: "mediaData",
+        },
+      },
+
       ...(searchMatch ? [searchMatch] : []),
 
-      // ✅ return both data + total count correctly
       {
         $facet: {
           data: [
             { $sort: finalSort },
             { $skip: start },
             { $limit: size },
+
             {
               $project: {
                 _id: 1,
-product: "$productData.name",
-color: 1,
-size: 1,
-sku: 1,
-mrp: 1,
-sellingPrice: 1,
+
+                product: {
+                  name: "$productData.name",
+
+                  // 🔥 FIRST IMAGE FROM MEDIA ARRAY
+                  image: {
+                    $arrayElemAt: [
+                      {
+                        $map: {
+                          input: "$mediaData",
+                          as: "m",
+                          in: "$$m.secure_url",
+                        },
+                      },
+                      0,
+                    ],
+                  },
+                },
+
+                sku: 1,
+                color: 1,
+                size: 1,
+                mrp: 1,
+                sellingPrice: 1,
                 discountPercentage: 1,
                 createdAt: 1,
                 updatedAt: 1,
                 deletedAt: 1,
-                category: "$categoryData.name",
               },
             },
           ],
+
           total: [{ $count: "count" }],
         },
       },
@@ -162,6 +153,7 @@ sellingPrice: 1,
       meta: { totalRowCount },
     });
   } catch (error) {
+    console.error("Error fetching product variants:", error);
     return catchError(error);
   }
 }

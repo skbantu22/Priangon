@@ -10,19 +10,15 @@ import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 
 // UI Components - Ensure these paths match your project structure
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { 
-  Form, 
-  FormField, 
-  FormLabel, 
-  FormItem, 
-  FormControl, 
-  FormMessage 
+import {
+  Form,
+  FormField,
+  FormLabel,
+  FormItem,
+  FormControl,
+  FormMessage,
 } from "@/components/ui/form";
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 
@@ -51,7 +47,7 @@ export const formSchema = zSchema
 
 export default function Login() {
   const dispatch = useDispatch();
-  const searchParams= useSearchParams()
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isTypePassword, setisTypepassword] = useState(true);
@@ -68,30 +64,29 @@ export default function Login() {
   const handleLoginSubmit = async (values) => {
     try {
       setLoading(true);
-      const { data: registerResponse } = await axios.post('/api/auth/login', values);
+      const { data: registerResponse } = await axios.post(
+        "/api/auth/login",
+        values,
+      );
 
       if (!registerResponse.success) {
         throw new Error(registerResponse.message);
       }
-      
+
       dispatch(login(registerResponse));
-if (searchParams.has('callback')) {
-  router.push(searchParams.get('callback'))
-} else {
-  registerResponse.data.role === 'admin'
-    ? router.push(ADMIN_DASHBOARD)
-    : router.push(WEBSITE_USER_DASHBOARD)
-}
-
-
-
+      if (searchParams.has("callback")) {
+        router.push(searchParams.get("callback"));
+      } else {
+        registerResponse.data.role === "admin"
+          ? router.push(ADMIN_DASHBOARD)
+          : router.push("/admin/pos");
+      }
 
       form.reset();
-      showToast('success', registerResponse.message);
-      // router.push("/dashboard"); 
-
+      showToast("success", registerResponse.message);
+      // router.push("/dashboard");
     } catch (error) {
-      showToast('error', error.message);
+      showToast("error", error.message);
       setServerMsg(error.message);
     } finally {
       setLoading(false);
@@ -99,7 +94,7 @@ if (searchParams.has('callback')) {
   };
 
   return (
-<div className=" w-full flex items-start justify-center bg-slate-50/50 p-4 ">
+    <div className=" w-full flex items-start justify-center bg-slate-50/50 p-4 ">
       <Card className="w-full max-w-[400px] shadow-lg border-slate-200">
         <CardHeader className="pt-8 pb-4">
           <div className="text-center space-y-1">
@@ -112,10 +107,15 @@ if (searchParams.has('callback')) {
 
         <CardContent className="pb-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleLoginSubmit)} className="space-y-4">
+            <form
+              onSubmit={form.handleSubmit(handleLoginSubmit)}
+              className="space-y-4"
+            >
               {serverMsg && (
                 <div className="bg-destructive/10 p-3 rounded-md border border-destructive/20">
-                  <p className="text-center text-xs font-medium text-destructive">{serverMsg}</p>
+                  <p className="text-center text-xs font-medium text-destructive">
+                    {serverMsg}
+                  </p>
                 </div>
               )}
 
@@ -128,10 +128,10 @@ if (searchParams.has('callback')) {
                       Email Address
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="name@company.com" 
-                        {...field} 
-                        className="h-11 focus-visible:ring-primary/20" 
+                      <Input
+                        placeholder="name@company.com"
+                        {...field}
+                        className="h-11 focus-visible:ring-primary/20"
                       />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
@@ -161,12 +161,20 @@ if (searchParams.has('callback')) {
                         onClick={() => setisTypepassword(!isTypePassword)}
                         type="button"
                       >
-                        {isTypePassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                        {isTypePassword ? (
+                          <Eye size={18} />
+                        ) : (
+                          <EyeOff size={18} />
+                        )}
                       </button>
                     </div>
                     <FormMessage className="text-[11px]" />
                     <div className="flex justify-end">
-                      <Link href="/auth/reset-password" name="password" className="text-xs font-medium text-primary hover:underline">
+                      <Link
+                        href="/auth/reset-password"
+                        name="password"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
                         Forgot password?
                       </Link>
                     </div>
@@ -186,14 +194,19 @@ if (searchParams.has('callback')) {
                   <span className="w-full border-t border-slate-200" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">New here?</span>
+                  <span className="bg-white px-2 text-muted-foreground">
+                    New here?
+                  </span>
                 </div>
               </div>
 
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
                   Don't have an account?{" "}
-                  <Link href={WEBSITE_REGISTER} className="font-semibold text-primary hover:underline">
+                  <Link
+                    href={WEBSITE_REGISTER}
+                    className="font-semibold text-primary hover:underline"
+                  >
                     Create Account
                   </Link>
                 </p>
