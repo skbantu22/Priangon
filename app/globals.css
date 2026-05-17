@@ -207,11 +207,15 @@
     visibility: hidden !important;
   }
 
+  /* BOTH SUPPORT */
   #receipt,
-  #receipt * {
+  #receipt *,
+  #print-area,
+  #print-area * {
     visibility: visible !important;
   }
 
+  /* CHECKOUT RECEIPT */
   #receipt {
     position: absolute;
     left: 0;
@@ -219,33 +223,30 @@
     width: 80mm;
   }
 
+  /* BARCODE PRINT */
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    background: white;
+  }
+
+  .thermal-label {
+    width: 58mm;
+    padding: 3mm;
+    page-break-after: always;
+  }
+
   @page {
     size: 80mm auto;
     margin: 0;
   }
-}
-
-@media print {
-  body {
-    background: white !important;
-  }
 
   .no-print {
     display: none !important;
-  }
-
-  /* 2-column print grid */
-  .print-grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 30px;
-    padding: 10px;
-  }
-
-  .label-cell {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    border: 1px solid #ddd;
-    padding: 8px;
   }
 }
