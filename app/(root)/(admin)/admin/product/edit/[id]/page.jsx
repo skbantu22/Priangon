@@ -49,19 +49,22 @@ const EditProduct = ({ params }) => {
   const prevCategoryRef = useRef("");
   const productSubRef = useRef("");
 
-  const formSchema = zSchema.pick({
-    _id: true,
-    name: true,
-    slug: true,
-    category: true,
-    subcategory: true,
-    mrp: true,
-    sellingPrice: true,
-    discountPercentage: true,
-    description: true,
-    media: true,
-    freeDelivery: true,
-  });
+  const formSchema = zSchema
+    .pick({
+      _id: true,
+      name: true,
+      slug: true,
+      category: true,
+      mrp: true,
+      sellingPrice: true,
+      discountPercentage: true,
+      description: true,
+      media: true,
+      freeDelivery: true,
+    })
+    .extend({
+      subcategory: z.string().optional().or(z.literal("")),
+    });
 
   const form = useForm({
     resolver: zodResolver(formSchema),

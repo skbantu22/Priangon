@@ -3,14 +3,13 @@ import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
+import { z } from "zod";
 
 export async function PUT(request) {
   try {
     await connectDB();
 
     const payload = await request.json();
-
-    console.log("PAYLOAD:", payload); // ✅ See incoming data
 
     const schema = zSchema
       .pick({
@@ -44,11 +43,8 @@ export async function PUT(request) {
 
     const validatedData = validate.data;
 
-    console.log("VALIDATED DATA:", validatedData);
-
     // ✅ Check _id
     if (!validatedData?._id) {
-      console.log("ID MISSING");
       return response(false, 400, "_id missing");
     }
 
@@ -56,8 +52,6 @@ export async function PUT(request) {
       deletedAt: null,
       _id: validatedData._id,
     });
-
-    console.log("FOUND PRODUCT:", getProduct);
 
     if (!getProduct) {
       return response(false, 404, "Product not found");
@@ -83,8 +77,6 @@ export async function PUT(request) {
 
     return response(true, 200, "Product updated successfully.");
   } catch (error) {
-    // ✅ Full error log
-    console.log("SERVER ERROR:");
     console.log(error);
 
     // ✅ Axios readable error
