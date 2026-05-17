@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { response, catchError } from "@/lib/helperfunction";
-import ShowroomProductVariant from "@/models/ShowroomProductVariant";
+import ShowroomProductVariant from "@/models/ShowroomProductVariant.model";
 // (YOU NEED THIS MODEL)
 
 export async function GET(req) {
