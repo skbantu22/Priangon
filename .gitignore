@@ -1,6 +1,5 @@
 node_modules/
 .next/
-.env
 out/
 npm-debug.log*
 yarn-debug.log*
