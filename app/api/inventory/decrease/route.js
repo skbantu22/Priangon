@@ -1,4 +1,4 @@
-import { connectDB } from "@/lib/db";
+import { connectDB } from "@/lib/databaseconnection";
 import { decreaseStock } from "@/lib/inventoryService";
 
 export async function POST(req) {
