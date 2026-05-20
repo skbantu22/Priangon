@@ -31,6 +31,7 @@ import { setCart } from "@/store/reducer/cartReducer";
 import { zSchema } from "@/lib/zodschema";
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 import { showToast } from "@/lib/showToast";
+import { Textarea } from "@/components/ui/textarea";
 
 const formatCurrency = (amount) =>
   Number(amount || 0).toLocaleString("en-BD", {
@@ -153,6 +154,7 @@ export default function CheckoutPage() {
     })
     .extend({
       userId: z.string().optional(),
+      note: z.string().optional(),
     });
 
   const orderForm = useForm({
@@ -162,7 +164,7 @@ export default function CheckoutPage() {
       phone: authStore?.auth?.phone || "",
       address: authStore?.auth?.address || "",
       city: authStore?.auth?.city || "", // <-- Add default value here
-
+      note: "",
       userId: authStore?.auth?._id || "",
     },
   });
@@ -175,6 +177,10 @@ export default function CheckoutPage() {
       orderForm.setValue("phone", auth.phone || "");
       orderForm.setValue("address", auth.address || "");
       orderForm.setValue("city", auth.city || ""); // <-- Add this line
+      // ✅ IMPORTANT: don't overwrite user's note if already typing
+      if (!orderForm.getValues("note")) {
+        orderForm.setValue("note", "");
+      }
     }
   }, [authStore, orderForm]);
 
@@ -295,10 +301,12 @@ export default function CheckoutPage() {
           phone: formData.phone,
           address: formData.address,
           cityId: shippingMethod === "inside_dhaka" ? "dhaka" : "other",
+          note: formData.note || "", // ✅ add here
         },
         items: liveProducts.map((item) => ({
           productId: item?.productId,
-          variantId: item.variantId || item.productId || item._id, // ✅ Backend needs this!          quantity: Number(item?.quantity || 1),
+          variantId: item.variantId || item.productId || item._id, // ✅ Backend needs this!
+          quantity: Number(item?.quantity || 1),
           price: Number(item?.sellingPrice || 0),
         })),
         coupon: isCouponApplied ? { code: appliedCoupon.code } : null,
@@ -306,6 +314,24 @@ export default function CheckoutPage() {
 
       const { data: response } = await axios.post("/api/checkout", payload);
       console.log("Checkout API response:", response);
+
+      // CREATE STEADFAST PARCEL
+      try {
+        await axios.post("/api/courier/steadfast", {
+          invoice: response.orderId,
+
+          name: formData.name,
+          phone: formData.phone,
+
+          address: `${formData.address}, ${formData.city}`,
+
+          cod_amount: payment === "cod" ? total : 0, //
+
+          note: `Order ID: ${response.orderId}`,
+        });
+      } catch (courierError) {
+        console.log("Steadfast Error:", courierError);
+      }
 
       if (!response?.success) throw new Error(response?.message);
 
@@ -496,6 +522,29 @@ export default function CheckoutPage() {
                                   <FormControl>
                                     <Input
                                       placeholder="Enter your city name"
+                                      className="rounded-none border-gray-400"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-3">
+                          <Label>Order Note (Optional)</Label>
+
+                          <div className="mt-3">
+                            <FormField
+                              control={orderForm.control}
+                              name="note"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Write any special instruction (e.g. call before delivery)"
                                       className="rounded-none border-gray-400"
                                       {...field}
                                     />

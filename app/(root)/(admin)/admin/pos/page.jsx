@@ -17,11 +17,13 @@ export default function POSPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [openProduct, setOpenProduct] = useState(null);
-  const [selectedProducts, setSelectedProducts] = useState([]);
-
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [qty, setQty] = useState(1);
+
   const [barcode, setBarcode] = useState("");
+
+  const [showrooms, setShowrooms] = useState([]);
+  const [selectedShowroomId, setSelectedShowroomId] = useState("");
 
   // ---------------- FETCH PRODUCTS ----------------
   const fetchProducts = useCallback(
@@ -32,10 +34,7 @@ export default function POSPage() {
         setLoading(true);
 
         const params = new URLSearchParams();
-
-        if (q) {
-          params.set("q", q);
-        }
+        if (q) params.set("q", q);
 
         const showroomId = user?.data?.user?.showroomId;
 
@@ -52,13 +51,6 @@ export default function POSPage() {
         const formatted = (data.items || []).map((item) => {
           const product = item?.productId || {};
 
-          console.log("USER:", user?.data?.user);
-
-          console.log("ROLE:", user?.data?.user?.role);
-
-          console.log("SHOWROOM ID:", showroomId);
-
-          console.log("PARAMS:", params.toString());
           return {
             _id: product._id || item._id,
             name: product.name || "Unnamed Product",
@@ -70,23 +62,17 @@ export default function POSPage() {
 
               return {
                 _id: variant._id || v._id,
-                color: variant.color || "N/A",
-                size: variant.size || "N/A",
-                stock: v.stock || 0,
-                barcode: variant.barcode || "",
+                color: v.color || variant.color || "N/A",
+                size: v.size || variant.size || "N/A",
+                stock: v.showroomStock ?? variant.showroomStock ?? 0,
+                barcode: v.barcode || variant.barcode || "",
                 sellingPrice: variant.sellingPrice || product.sellingPrice || 0,
               };
             }),
           };
         });
 
-        // remove duplicate products
-        const uniqueProducts = formatted.filter(
-          (product, index, self) =>
-            index === self.findIndex((p) => p._id === product._id),
-        );
-
-        setProducts(uniqueProducts);
+        setProducts(formatted);
       } catch (error) {
         console.log(error);
       } finally {
@@ -96,13 +82,24 @@ export default function POSPage() {
     [user],
   );
 
+  // ---------------- SHOWROOMS ----------------
   useEffect(() => {
-    if (user) {
-      fetchProducts("");
-    }
+    const fetchShowrooms = async () => {
+      if (user?.data?.user?.role !== "admin") return;
+
+      const res = await fetch("/api/showrooms");
+      const data = await res.json();
+
+      setShowrooms(data.showrooms || []);
+    };
+
+    fetchShowrooms();
+  }, [user]);
+
+  useEffect(() => {
+    if (user) fetchProducts("");
   }, [user, fetchProducts]);
 
-  // ---------------- SEARCH ----------------
   useEffect(() => {
     const t = setTimeout(() => {
       fetchProducts(search);
@@ -111,9 +108,8 @@ export default function POSPage() {
     return () => clearTimeout(t);
   }, [search, fetchProducts]);
 
-  // ---------------- TOTAL ----------------
+  // ---------------- CART TOTAL ----------------
   const total = cart.reduce((s, p) => s + p.price * p.qty, 0);
-
   const totalQty = cart.reduce((s, p) => s + p.qty, 0);
 
   // ---------------- ADD TO CART ----------------
@@ -128,7 +124,6 @@ export default function POSPage() {
     setCart((prev) => {
       const exist = prev.find((x) => x.variantId === selectedVariant._id);
 
-      // already exists
       if (exist) {
         const newQty = exist.qty + qty;
 
@@ -138,12 +133,7 @@ export default function POSPage() {
         }
 
         return prev.map((x) =>
-          x.variantId === selectedVariant._id
-            ? {
-                ...x,
-                qty: newQty,
-              }
-            : x,
+          x.variantId === selectedVariant._id ? { ...x, qty: newQty } : x,
         );
       }
 
@@ -152,35 +142,25 @@ export default function POSPage() {
         {
           productId: openProduct._id,
           variantId: selectedVariant._id,
-
           name: `${openProduct.name} (${selectedVariant.color}-${selectedVariant.size})`,
-
           price: selectedVariant.sellingPrice,
-
           qty,
         },
       ];
     });
 
+    // CLEAN RESET (important)
     setOpenProduct(null);
     setSelectedVariant(null);
     setQty(1);
+    setBarcode("");
   };
 
-  // ---------------- CART QTY ----------------
+  // ---------------- CART UPDATE ----------------
   const increaseQty = (item) => {
-    const stock = products
-      .flatMap((p) => p.variants)
-      .find((v) => v._id === item.variantId)?.stock;
-
     setCart((prev) =>
       prev.map((x) =>
-        x.variantId === item.variantId
-          ? {
-              ...x,
-              qty: x.qty < stock ? x.qty + 1 : x.qty,
-            }
-          : x,
+        x.variantId === item.variantId ? { ...x, qty: x.qty + 1 } : x,
       ),
     );
   };
@@ -189,30 +169,22 @@ export default function POSPage() {
     setCart((prev) =>
       prev
         .map((x) =>
-          x.variantId === item.variantId
-            ? {
-                ...x,
-                qty: x.qty - 1,
-              }
-            : x,
+          x.variantId === item.variantId ? { ...x, qty: x.qty - 1 } : x,
         )
         .filter((x) => x.qty > 0),
     );
   };
 
-  // ---------------- REMOVE CART ITEM ----------------
   const removeCartItem = (variantId) => {
     setCart((prev) => prev.filter((x) => x.variantId !== variantId));
   };
 
+  // ---------------- BARCODE ----------------
   const handleBarcodeScan = () => {
     if (!barcode.trim()) return;
 
     const allVariants = products.flatMap((p) =>
-      p.variants.map((v) => ({
-        ...v,
-        product: p,
-      })),
+      p.variants.map((v) => ({ ...v, product: p })),
     );
 
     const found = allVariants.find((v) => v.barcode === barcode.trim());
@@ -233,18 +205,8 @@ export default function POSPage() {
       const exist = prev.find((x) => x.variantId === found._id);
 
       if (exist) {
-        if (exist.qty >= found.stock) {
-          showToast("Stock limit exceeded");
-          return prev;
-        }
-
         return prev.map((x) =>
-          x.variantId === found._id
-            ? {
-                ...x,
-                qty: x.qty + 1,
-              }
-            : x,
+          x.variantId === found._id ? { ...x, qty: x.qty + 1 } : x,
         );
       }
 
@@ -261,7 +223,6 @@ export default function POSPage() {
     });
 
     showToast("Added to cart");
-
     setBarcode("");
   };
 
@@ -272,52 +233,58 @@ export default function POSPage() {
       return;
     }
 
+    const showroomId =
+      user?.data?.user?.role === "admin"
+        ? selectedShowroomId
+        : user?.data?.user?.showroomId;
+
+    if (user?.data?.user?.role === "admin" && !showroomId) {
+      showToast("Select showroom");
+      return;
+    }
+
     try {
       setCheckoutLoading(true);
 
+      const payload = {
+        items: cart.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          qty: i.qty,
+          price: i.price,
+        })),
+        total,
+        paymentMethod,
+        orderType: "pos",
+        showroomId,
+        createdBy: user?.data?.user?._id,
+      };
+
       const res = await fetch("/api/showroom-orders", {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          items: cart.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId,
-            qty: i.qty,
-            price: i.price,
-          })),
-
-          total,
-          paymentMethod,
-
-          showroomId: user?.data?.user?.showroomId,
-
-          orderType: "pos",
-
-          createdBy: user?.data?.user?.id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        showToast("Order created successfully");
+        showToast("Order created");
 
+        // CLEAN RESET
         setCart([]);
+        setSearch("");
+        setBarcode("");
 
         await fetchProducts(search);
 
         window.open(`print/${data.order._id}`, "_blank");
       } else {
-        showToast(data.message || "Checkout failed");
+        showToast(data.message || "Failed");
       }
-    } catch (error) {
-      console.log(error);
-
-      showToast("Server Error");
+    } catch (err) {
+      console.log(err);
+      showToast("Server error");
     } finally {
       setCheckoutLoading(false);
     }
@@ -325,238 +292,153 @@ export default function POSPage() {
 
   return (
     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-screen bg-gray-100">
-      {/* ---------------- LEFT SIDE ---------------- */}
-      <div className="lg:col-span-8 bg-white p-3 sm:p-5">
-        {/* SEARCH */}
+      {/* LEFT */}
+      <div className="lg:col-span-8 bg-white p-4">
         <input
-          type="text"
+          className="w-full border p-3 mb-3 rounded"
           placeholder="Search products..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border border-gray-300 p-3 rounded-lg mb-4 text-sm outline-none focus:border-green-500"
         />
 
         <input
-          autoFocus
-          type="text"
+          className="w-full border p-3 mb-3 rounded border-green-400"
           placeholder="Scan barcode..."
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleBarcodeScan();
-            }
-          }}
-          className="w-full border border-green-400 p-3 rounded-lg mb-4 text-sm outline-none"
+          onKeyDown={(e) => e.key === "Enter" && handleBarcodeScan()}
         />
 
-        {/* PRODUCTS */}
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {products.map((p) => (
               <div
                 key={p._id}
                 onClick={() => {
-                  setSelectedProducts((prev) =>
-                    prev.includes(p._id)
-                      ? prev.filter((id) => id !== p._id)
-                      : [...prev, p._id],
-                  );
-
                   setOpenProduct(p);
-
                   setSelectedVariant(null);
-
                   setQty(1);
                 }}
-                className={`relative border rounded-xl p-2 cursor-pointer transition-all duration-200 active:scale-[0.98]
-
-                ${
-                  selectedProducts.includes(p._id)
-                    ? "border-green-600 bg-green-50 shadow-lg"
-                    : "bg-white hover:border-green-400 hover:shadow"
-                }`}
+                className="border rounded p-2 cursor-pointer hover:shadow"
               >
-                {/* SELECTED BADGE */}
-                {selectedProducts.includes(p._id) && (
-                  <div className="absolute top-2 right-2 bg-green-600 text-white text-[10px] px-2 py-1 rounded-full">
-                    Selected
-                  </div>
-                )}
-
                 <Image
                   src={p.media?.[0]?.secure_url || "/placeholder.png"}
-                  width={300}
-                  height={300}
+                  width={200}
+                  height={200}
+                  className="w-full h-28 object-cover rounded"
                   alt={p.name}
-                  className="w-full h-28 sm:h-36 object-cover rounded-lg"
                 />
-
-                <h2 className="text-xs sm:text-sm font-semibold mt-2 line-clamp-2">
-                  {p.name}
-                </h2>
-
-                <p className="text-green-700 font-bold text-sm mt-1">
-                  ৳ {p.sellingPrice}
-                </p>
+                <p className="text-sm font-semibold mt-2">{p.name}</p>
+                <p className="text-green-600 font-bold">৳{p.sellingPrice}</p>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* ---------------- RIGHT SIDE / CART ---------------- */}
-      <div className="lg:col-span-4 bg-white border-t lg:border-l p-3 sm:p-4 flex flex-col min-h-[40vh] lg:min-h-screen">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-lg">Cart</h2>
+      {/* CART */}
+      <div className="lg:col-span-4 bg-white p-4 border-l">
+        <h2 className="font-bold mb-2">Cart ({totalQty})</h2>
 
-          <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-            {totalQty} Items
-          </div>
-        </div>
-
-        {/* CART ITEMS */}
-        <div className="flex-1 overflow-y-auto space-y-3">
-          {cart.length === 0 && (
-            <div className="text-center text-gray-400 text-sm mt-10">
-              No items in cart
-            </div>
-          )}
-
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
           {cart.map((item) => (
-            <div
-              key={`${item.variantId}-${item.productId}`}
-              className="border rounded-xl p-3"
-            >
-              <div className="flex justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-medium">{item.name}</h3>
-
-                  <p className="text-green-700 font-bold text-sm mt-1">
-                    ৳ {item.price}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => removeCartItem(item.variantId)}
-                  className="text-red-500 text-lg"
-                >
+            <div key={item.variantId} className="border p-2 rounded">
+              <div className="flex justify-between">
+                <p className="text-sm">{item.name}</p>
+                <button onClick={() => removeCartItem(item.variantId)}>
                   ✕
                 </button>
               </div>
 
-              {/* QTY */}
-              <div className="flex items-center gap-3 mt-3">
-                <button
-                  onClick={() => decreaseQty(item)}
-                  className="w-8 h-8 rounded bg-gray-100"
-                >
-                  -
-                </button>
-
-                <span className="font-semibold">{item.qty}</span>
-
-                <button
-                  onClick={() => increaseQty(item)}
-                  className="w-8 h-8 rounded bg-gray-100"
-                >
-                  +
-                </button>
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => decreaseQty(item)}>-</button>
+                <span>{item.qty}</span>
+                <button onClick={() => increaseQty(item)}>+</button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* PAYMENT */}
-        <div className="pt-4 border-t mt-4">
+        <div className="mt-4 border-t pt-3">
+          <div className="flex justify-between font-bold">
+            <span>Total</span>
+            <span>৳{total}</span>
+          </div>
+
+          {user?.data?.user?.role === "admin" && (
+            <select
+              className="w-full border p-2 mt-2"
+              value={selectedShowroomId}
+              onChange={(e) => setSelectedShowroomId(e.target.value)}
+            >
+              <option value="">Select Showroom</option>
+              {showrooms.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select
+            className="w-full border p-2 mt-2"
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
-            className="w-full border p-3 rounded-lg text-sm mb-4"
           >
             <option value="cash">Cash</option>
             <option value="bkash">Bkash</option>
             <option value="card">Card</option>
           </select>
 
-          {/* TOTAL */}
-          <div className="flex justify-between text-lg font-bold mb-4">
-            <span>Total</span>
-
-            <span className="text-green-700">৳ {total}</span>
-          </div>
-
-          {/* CHECKOUT */}
           <button
-            onClick={handleCheckout}
             disabled={checkoutLoading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
+            onClick={handleCheckout}
+            className="w-full bg-green-600 text-white p-3 mt-3 rounded"
           >
             {checkoutLoading ? "Processing..." : "Complete Sale"}
           </button>
         </div>
       </div>
 
-      {/* ---------------- MODAL ---------------- */}
+      {/* MODAL */}
       {openProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-2">
-          <div className="bg-white w-full sm:w-[450px] rounded-t-2xl sm:rounded-2xl p-4">
-            <h2 className="font-bold text-lg mb-4">{openProduct.name}</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-3">
+          <div className="bg-white w-full max-w-md p-4 rounded">
+            <h2 className="font-bold mb-3">{openProduct.name}</h2>
 
-            {/* VARIANTS */}
-            <div className="space-y-2">
-              {openProduct.variants?.map((v) => (
-                <div
-                  key={v._id}
-                  onClick={() => setSelectedVariant(v)}
-                  className={`border rounded-lg p-3 cursor-pointer transition-all
+            {openProduct.variants.map((v) => (
+              <div
+                key={v._id}
+                onClick={() => setSelectedVariant(v)}
+                className={`border p-2 mb-2 cursor-pointer ${
+                  selectedVariant?._id === v._id ? "bg-green-100" : ""
+                }`}
+              >
+                {v.color} - {v.size} | Stock: {v.stock}
+              </div>
+            ))}
 
-                  ${
-                    selectedVariant?._id === v._id
-                      ? "bg-green-100 border-green-500"
-                      : "hover:border-green-400"
-                  }`}
-                >
-                  <div className="flex justify-between text-sm">
-                    <span>
-                      {v.color} - {v.size}
-                    </span>
-
-                    <span className="font-semibold">Stock: {v.stock}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* QTY */}
             <input
               type="number"
-              min={1}
-              max={selectedVariant?.stock || 1}
               value={qty}
-              onChange={(e) =>
-                setQty(
-                  Math.min(Number(e.target.value), selectedVariant?.stock || 1),
-                )
-              }
-              className="border p-3 rounded-lg w-full mt-4"
+              min={1}
+              onChange={(e) => setQty(Number(e.target.value))}
+              className="border p-2 w-full mt-2"
             />
 
-            {/* ADD BUTTON */}
             <button
-              disabled={!selectedVariant}
               onClick={addToCart}
-              className="bg-green-600 text-white w-full p-3 rounded-xl mt-4 disabled:opacity-50"
+              disabled={!selectedVariant}
+              className="w-full bg-green-600 text-white p-2 mt-3"
             >
               Add to Cart
             </button>
 
-            {/* CLOSE */}
             <button
               onClick={() => setOpenProduct(null)}
-              className="w-full mt-3 text-red-500"
+              className="w-full mt-2 text-red-500"
             >
               Close
             </button>

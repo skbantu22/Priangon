@@ -1,59 +1,84 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-import { WEBSITE_LOGIN, WEBSITE_USER_DASHBOARD } from "@/Route/Websiteroute";
-import { ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
+const SECRET = new TextEncoder().encode(process.env.SECRET_KEY);
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
-  // ✅ token আছে কিনা (সবচেয়ে safe way)
   const token = request.cookies.get("access_token")?.value;
 
-  // 🔥 debug (এটা terminal/edge logs এ দেখবে)
-  // console.log("PATH:", pathname, "TOKEN?", !!token);
+  const isAuthRoute = pathname.startsWith("/auth");
 
-  // ✅ token নাই
+  // PUBLIC ROUTES
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname.startsWith("/product") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname === "/favicon.ico";
+
+  // allow public routes
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+
+  // NO TOKEN
   if (!token) {
-    // শুধু auth page allow
-    if (pathname.startsWith("/auth")) return NextResponse.next();
+    // allow auth pages
+    if (isAuthRoute) {
+      return NextResponse.next();
+    }
 
-    // protected page গেলে login
-    return NextResponse.redirect(new URL(WEBSITE_LOGIN, request.nextUrl));
+    // redirect protected routes
+    return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
   try {
-    // ✅ token verify
-    const { payload } = await jwtVerify(
-      token,
-      new TextEncoder().encode(process.env.SECRET_KEY)
-    );
+    // VERIFY TOKEN
+    const { payload } = await jwtVerify(token, SECRET);
 
-    const role = payload?.role; // "admin" | "user"
+    const role = payload?.role;
 
-    // ✅ login করা user /auth এ গেলে dashboard এ পাঠাও
-    if (pathname.startsWith("/auth")) {
-      return NextResponse.redirect(
-        new URL(role === "admin" ? ADMIN_DASHBOARD : WEBSITE_USER_DASHBOARD, request.nextUrl)
-      );
+    // already logged in user visiting auth page
+    if (isAuthRoute) {
+      if (role === "admin") {
+        return NextResponse.redirect(new URL("/admin", request.url));
+      }
+
+      if (role === "cashier" || role === "manager") {
+        return NextResponse.redirect(new URL("/admin/pos", request.url));
+      }
+
+      return NextResponse.redirect(new URL("/my-account", request.url));
     }
 
-    // ✅ /admin route only admin
-    if (pathname.startsWith("/admin") && role !== "admin") {
-      return NextResponse.redirect(new URL(WEBSITE_LOGIN, request.nextUrl));
+    // ADMIN ONLY
+    // ADMIN PANEL ACCESS
+    if (
+      pathname.startsWith("/admin") &&
+      role !== "admin" &&
+      role !== "cashier" &&
+      role !== "manager"
+    ) {
+      return NextResponse.redirect(new URL("/my-account", request.url));
     }
 
-    // ✅ /my-account route only user
-    if (pathname.startsWith("/my-account") && role !== "user") {
-      return NextResponse.redirect(new URL(WEBSITE_LOGIN, request.nextUrl));
+    // USER ONLY
+    if (pathname.startsWith("/my-account") && role === "admin") {
+      return NextResponse.redirect(new URL("/admin", request.url));
     }
+    if (
+      pathname.startsWith("/my-account") &&
+      (role === "admin" || role === "cashier" || role === "manager")
+    )
+      return NextResponse.next();
+  } catch (error) {
+    const response = NextResponse.redirect(new URL("/auth/login", request.url));
 
-    return NextResponse.next();
-  } catch (err) {
-    // ✅ token invalid/expired => cookie delete + login
-    const res = NextResponse.redirect(new URL(WEBSITE_LOGIN, request.nextUrl));
-    res.cookies.delete("access_token");
-    return res;
+    response.cookies.delete("access_token");
+
+    return response;
   }
 }
 

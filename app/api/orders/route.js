@@ -6,13 +6,13 @@ import OrderModel from "@/models/Order.model";
 
 export async function GET(request) {
   try {
-    const auth = await isAuthenticated("admin");
-    if (!auth.isAuth) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized." },
-        { status: 403 }
-      );
-    }
+    // const auth = await isAuthenticated("admin");
+    // if (!auth.isAuth) {
+    //   return NextResponse.json(
+    //     { success: false, message: "Unauthorized." },
+    //     { status: 403 }
+    //   );
+    // }
 
     await connectDB();
 
@@ -65,11 +65,7 @@ export async function GET(request) {
 
       {
         $facet: {
-          data: [
-            { $sort: finalSort },
-            { $skip: start },
-            { $limit: size },
-          ],
+          data: [{ $sort: finalSort }, { $skip: start }, { $limit: size }],
           total: [{ $count: "count" }],
         },
       },

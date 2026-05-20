@@ -1,9 +1,10 @@
 import { connectDB } from "@/lib/databaseconnection";
-import ShowroomProduct from "@/models/ShowroomProductVariant.model";
+
+import ShowroomStock from "@/models/ShowroomStock";
 
 import "@/models/Product.model";
-import "@/models/Media.model";
 import "@/models/ProductVariant.model ";
+import "@/models/Media.model";
 
 export async function GET(req) {
   try {
@@ -11,25 +12,26 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
 
-    // ---------------- QUERY PARAMS ----------------
     const showroomId = searchParams.get("showroomId");
-
     const q = searchParams.get("q") || "";
 
-    // ---------------- FILTER ----------------
-    const filter = {};
+    // =========================
+    // FILTER
+    // =========================
+    const filter = {
+      stock: { $gt: 0 }, // only available stock
+    };
 
-    // showroom user only
     if (showroomId) {
       filter.showroomId = showroomId;
     }
 
-    // ---------------- FETCH PRODUCTS ----------------
-    const data = await ShowroomProduct.find(filter)
+    // =========================
+    // FETCH SHOWROOM STOCK
+    // =========================
+    const data = await ShowroomStock.find(filter)
       .populate({
         path: "productId",
-
-        // search by product name
         match: q
           ? {
               name: {
@@ -38,39 +40,68 @@ export async function GET(req) {
               },
             }
           : {},
-
         populate: {
           path: "media",
           select: "secure_url",
         },
       })
       .populate({
-        path: "variants.variantId",
-
-        select: "color size stock sellingPrice barcode",
+        path: "variantId",
+        select: "color size sku barcode mrp sellingPrice",
       })
       .lean();
 
-    // ---------------- REMOVE EMPTY PRODUCTS ----------------
-    const filtered = data.filter((item) => item.productId);
+    // =========================
+    // REMOVE EMPTY RESULTS
+    // =========================
+    const filtered = data.filter((item) => item.productId && item.variantId);
 
-    // IMPORTANT:
-    // DO NOT REMOVE DUPLICATES
-    // because admin must see all showroom stock
+    // =========================
+    // GROUP BY PRODUCT (FIXED)
+    // =========================
+    const grouped = {};
 
-    const total = await ShowroomProduct.countDocuments({});
-    console.log("TOTAL SHOWROOM PRODUCTS IN DB:", total);
+    for (const item of filtered) {
+      const pid = item.productId._id.toString();
+      const vid = item.variantId._id.toString();
 
-    const sample = await ShowroomProduct.findOne({}).lean();
-    console.log("RAW DATA LENGTH:", data.length);
-    console.log("FIRST ITEM productId:", data[0]?.productId);
-    console.log("FILTERED LENGTH:", filtered.length);
-    console.log("SAMPLE DOC:", JSON.stringify(sample, null, 2));
+      if (!grouped[pid]) {
+        grouped[pid] = {
+          productId: item.productId,
+          variantsMap: new Map(),
+        };
+      }
 
+      // ✅ prevent duplicate variants
+      grouped[pid].variantsMap.set(vid, {
+        ...item.variantId,
+        showroomStock: item.stock,
+      });
+    }
+
+    // =========================
+    // CONVERT MAP → ARRAY
+    // =========================
+    const items = Object.values(grouped).map((g) => ({
+      productId: g.productId,
+      variants: Array.from(g.variantsMap.values()),
+    }));
+
+    // =========================
+    // DEBUG (optional)
+    // =========================
+    console.log("SHOWROOM STOCK ITEMS:", items.length);
+
+    if (items.length > 0) {
+      console.log("FIRST ITEM:", JSON.stringify(items[0], null, 2));
+    }
+
+    // =========================
+    // RESPONSE
+    // =========================
     return Response.json({
       success: true,
-
-      items: filtered,
+      items,
     });
   } catch (error) {
     console.log("POS API ERROR:", error);
@@ -78,12 +109,9 @@ export async function GET(req) {
     return Response.json(
       {
         success: false,
-
         message: "Server Error",
       },
-      {
-        status: 500,
-      },
+      { status: 500 },
     );
   }
 }

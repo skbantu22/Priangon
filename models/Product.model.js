@@ -21,7 +21,8 @@ const productSchema = new mongoose.Schema(
     subcategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subcategory",
-      required: true,
+      required: false,
+      default: null,
     },
 
     mrp: { type: Number, required: true, min: 0 },

@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 const showroomProductVariantSchema = new mongoose.Schema(
   {
     showroomId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Showroom",
       required: true,
       index: true,
     },

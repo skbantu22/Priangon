@@ -34,8 +34,24 @@ const PaymentSchema = new mongoose.Schema(
   {
     method: {
       type: String,
-      enum: ["cod"],
+      enum: ["cod", "online"], // ✅ Added "online" for future online payment integration
       required: true,
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid", "failed"],
+      default: "pending",
+    },
+
+    courier: {
+      status: {
+        type: String,
+        enum: ["pending", "created", "failed"],
+        default: "pending",
+      },
+      trackingCode: { type: String, default: "" },
+      consignmentId: { type: String, default: "" },
     },
 
     merchantInvoiceNumber: { type: String, default: "", index: true },

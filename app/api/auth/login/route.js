@@ -14,14 +14,17 @@ export async function POST(request) {
   try {
     await connectDB();
 
+    // ================= REQUEST BODY =================
     const payload = await request.json();
+    console.log("🔥 LOGIN PAYLOAD:", payload);
 
-    // ---------------- VALIDATION ----------------
+    // ================= VALIDATION =================
     const validationSchema = zSchema.pick({ email: true }).extend({
-      password: z.string().min(6, "Password must be at least 6 characters"),
+      password: z.string().min(4, "Password must be at least 6 characters"),
     });
 
     const validatedData = validationSchema.safeParse(payload);
+    console.log("🧪 VALIDATION RESULT:", validatedData);
 
     if (!validatedData.success) {
       return response(
@@ -34,16 +37,20 @@ export async function POST(request) {
 
     const { email, password } = validatedData.data;
 
-    // ---------------- FIND USER ----------------
+    console.log("📧 EMAIL:", email);
+
+    // ================= FIND USER =================
     const getUser = await UserModel.findOne({ email }).select("+password");
 
-    console.log("LOGIN USER FROM DB:", getUser);
+    console.log("👤 USER FROM DB:", getUser);
 
     if (!getUser) {
       return response(false, 404, "Invalid login credentials.");
     }
 
-    // ---------------- EMAIL VERIFY ----------------
+    console.log("📨 EMAIL VERIFIED STATUS:", getUser.isEmailVerified);
+
+    // ================= EMAIL VERIFY CHECK =================
     if (!getUser.isEmailVerified) {
       if (!process.env.SECRET_KEY) {
         return response(false, 500, "SECRET_KEY is not set in env.");
@@ -51,7 +58,9 @@ export async function POST(request) {
 
       const secret = new TextEncoder().encode(process.env.SECRET_KEY);
 
-      const token = await new SignJWT({ userId: getUser._id.toString() })
+      const token = await new SignJWT({
+        userId: getUser._id.toString(),
+      })
         .setIssuedAt()
         .setExpirationTime("1h")
         .setProtectedHeader({ alg: "HS256" })
@@ -67,14 +76,16 @@ export async function POST(request) {
       return response(false, 403, "Please verify your email.");
     }
 
-    // ---------------- PASSWORD CHECK ----------------
+    // ================= PASSWORD CHECK =================
     const isPasswordVerified = await getUser.comparePassword(password);
+
+    console.log("🔑 PASSWORD MATCH:", isPasswordVerified);
 
     if (!isPasswordVerified) {
       return response(false, 400, "Invalid login credentials.");
     }
 
-    // ---------------- JWT TOKEN ----------------
+    // ================= JWT TOKEN =================
     if (!process.env.SECRET_KEY) {
       return response(false, 500, "SECRET_KEY is not set in env.");
     }
@@ -86,7 +97,6 @@ export async function POST(request) {
       email: getUser.email,
       role: getUser.role,
       showroomId: getUser.showroomId,
-
       phone: getUser.phone,
       address: getUser.address,
       city: getUser.city,
@@ -96,7 +106,7 @@ export async function POST(request) {
       .setExpirationTime("7d")
       .sign(secret);
 
-    // ---------------- COOKIE SET ----------------
+    // ================= COOKIE SET =================
     const cookieStore = await cookies();
 
     cookieStore.set("access_token", accessToken, {
@@ -107,7 +117,7 @@ export async function POST(request) {
       maxAge: 60 * 60 * 24 * 7,
     });
 
-    // ---------------- FINAL RESPONSE ----------------
+    // ================= RESPONSE =================
     const responseData = {
       user: {
         id: getUser._id,
@@ -118,14 +128,14 @@ export async function POST(request) {
         phone: getUser.phone,
         address: getUser.address,
         city: getUser.city,
-        // ✅ IMPORTANT
       },
     };
 
-    console.log("FINAL RESPONSE DATA:", responseData);
+    console.log("✅ LOGIN SUCCESS RESPONSE:", responseData);
 
     return response(true, 200, "Login success.", responseData);
   } catch (error) {
+    console.log("❌ LOGIN ERROR:", error);
     return catchError(error);
   }
 }

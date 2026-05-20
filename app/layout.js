@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
+import CrispChat from "@/components/ui/CrispChat";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,11 +25,8 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <GlobalStoreProvider>
-
-           {children}
-        </GlobalStoreProvider>
-       
+        <GlobalStoreProvider>{children}</GlobalStoreProvider>
+        <CrispChat />
 
         {/* ✅ Toast Provider */}
         <Toaster position="top-right" richColors />

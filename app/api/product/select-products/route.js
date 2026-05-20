@@ -2,8 +2,8 @@ import ProductModel from "@/models/Product.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ShowroomModel from "@/models/ShowroomProductVariant.model";
 import { connectDB } from "@/lib/databaseconnection";
-import "@/models/Media.model";
 import { response, catchError } from "@/lib/helperfunction";
+import "@/models/Media.model";
 
 export async function GET(req) {
   try {
@@ -13,10 +13,12 @@ export async function GET(req) {
 
     const showroomId = searchParams.get("showroomId");
     const search = searchParams.get("search") || "";
-    const page = parseInt(searchParams.get("page") || "1");
+    const page = Number(searchParams.get("page") || 1);
     const limit = 20;
 
-    // ---------------- PRODUCTS ----------------
+    // ===============================
+    // 1. PRODUCTS
+    // ===============================
     const products = await ProductModel.find({
       deletedAt: null,
       name: { $regex: search, $options: "i" },
@@ -29,16 +31,21 @@ export async function GET(req) {
 
     const productIds = products.map((p) => p._id);
 
-    // ---------------- VARIANTS ----------------
+    // ===============================
+    // 2. VARIANTS (OPTIMIZED)
+    // ===============================
     const variants = await ProductVariantModel.find({
       product: { $in: productIds },
       deletedAt: null,
+      isActive: true,
     })
-      .select("product color size media")
+      .select("product color size media sku barcode mrp sellingPrice")
       .populate("media", "secure_url")
       .lean();
 
-    // ---------------- SHOWROOM DATA ----------------
+    // ===============================
+    // 3. SHOWROOM SELECTED DATA
+    // ===============================
     let selectedMap = {};
 
     if (showroomId) {
@@ -46,20 +53,24 @@ export async function GET(req) {
         showroomId,
       }).lean();
 
-      showroomData.forEach((item) => {
+      for (const item of showroomData) {
+        if (!item.productId) continue;
+
         selectedMap[item.productId.toString()] = (item.variants || []).map(
           (v) => ({
-            variantId: v.variantId.toString(),
+            variantId: v.variantId?.toString?.() || String(v.variantId),
             stock: Number(v.stock || 0),
           }),
         );
-      });
+      }
     }
 
-    // ---------------- GROUP VARIANTS ----------------
+    // ===============================
+    // 4. GROUP VARIANTS
+    // ===============================
     const variantMap = {};
 
-    variants.forEach((v) => {
+    for (const v of variants) {
       const pid = v.product.toString();
 
       if (!variantMap[pid]) variantMap[pid] = [];
@@ -73,17 +84,19 @@ export async function GET(req) {
         isSelected: !!selected,
         stock: selected?.stock || 0,
       });
-    });
+    }
 
-    // ---------------- FINAL RESPONSE ----------------
+    // ===============================
+    // 5. FINAL OUTPUT
+    // ===============================
     const finalData = products.map((p) => ({
       ...p,
       variants: variantMap[p._id.toString()] || [],
     }));
 
-    return response(true, 200, "OK", finalData);
+    return response(true, 200, "Products loaded", finalData);
   } catch (error) {
-    console.error("GET /api/product/select-products ERROR:", error);
+    console.error("SELECT PRODUCT ERROR:", error);
     return catchError(error);
   }
 }

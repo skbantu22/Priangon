@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Phone, MessageCircle } from "lucide-react";
 import { addIntoCart } from "@/store/reducer/cartReducer";
 import { showToast } from "@/lib/showToast";
 import Link from "next/link";
@@ -50,7 +51,32 @@ const ProductDetails = ({
     },
     { label: product?.name || "Product" },
   ];
+  const WHATSAPP_NUMBER = "8801XXXXXXXXX";
+  const CALL_NUMBER = "8801XXXXXXXXX";
 
+  const handleWhatsAppOrder = () => {
+    const message = `
+🛍️ Order Request
+
+Product: ${product?.name}
+Color: ${selectedColor || "N/A"}
+Size: ${selectedSize || "N/A"}
+Quantity: ${quantity}
+
+Price: ৳${displaySellingPrice}
+
+Product Link:
+${window.location.href}
+  `;
+
+    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, "_blank");
+  };
+
+  const handleCallOrder = () => {
+    window.location.href = `tel:+${CALL_NUMBER}`;
+  };
   // ==========================================
   // STEP 1: Create Flat Gallery List
   // ==========================================
@@ -463,6 +489,28 @@ const ProductDetails = ({
                 >
                   {isOutOfStock ? "Out of Stock" : "Buy It Now"}
                 </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {/* CALL BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleCallOrder}
+                    className="w-full flex items-center justify-center gap-2 bg-white text-black border border-black font-bold uppercase text-[12px] tracking-widest py-3 hover:bg-black hover:text-white transition-all duration-300"
+                  >
+                    <Phone size={18} strokeWidth={2.2} />
+                    Call For Order
+                  </button>
+
+                  {/* WHATSAPP BUTTON */}
+                  <button
+                    type="button"
+                    onClick={handleWhatsAppOrder}
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white border border-green-600 font-bold uppercase text-[12px] tracking-widest py-3 hover:bg-green-700 transition-all duration-300"
+                  >
+                    <MessageCircle size={18} strokeWidth={2.2} />
+                    Order On WhatsApp
+                  </button>
+                </div>
               </div>
             </div>
 

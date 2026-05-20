@@ -5,8 +5,22 @@ const userSchema = new mongoose.Schema(
   {
     role: {
       type: String,
-      enum: ["user", "admin"],
-      default: "user",
+
+      enum: ["customer", "cashier", "admin"],
+
+      default: "customer",
+    },
+
+    showroomId: {
+      type: mongoose.Schema.Types.ObjectId,
+
+      ref: "Showroom",
+
+      required: function () {
+        return this.role === "cashier";
+      },
+
+      default: null,
     },
 
     name: {
@@ -34,6 +48,7 @@ const userSchema = new mongoose.Schema(
         type: String,
         trim: true,
       },
+
       public_id: {
         type: String,
         trim: true,
@@ -54,6 +69,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+
     city: {
       type: String,
       trim: true,
@@ -65,20 +81,29 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
   },
-  { timestamps: true }
+
+  {
+    timestamps: true,
+  },
 );
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return ;
+// ================= HASH PASSWORD =================
+userSchema.pre("save", async function () {
+  // PASSWORD NOT MODIFIED
+  if (!this.isModified("password")) {
+    return;
+  }
 
+  // HASH PASSWORD
   this.password = await bcrypt.hash(this.password, 10);
-
 });
 
+// ================= COMPARE PASSWORD =================
 userSchema.methods.comparePassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
+
 const UserModel =
-  mongoose.models.User ||
-  mongoose.model("User", userSchema, "users");
-  export default UserModel;
+  mongoose.models.User || mongoose.model("User", userSchema, "users");
+
+export default UserModel;

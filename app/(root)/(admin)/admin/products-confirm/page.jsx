@@ -1,224 +1,136 @@
 "use client";
 
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import Image from "next/image";
 
-export default function ShowroomTestPage() {
-  const showroomId = "showroom1";
+export default function WarehousePage() {
+  const [stock, setStock] = useState([]);
+  const [showrooms, setShowrooms] = useState([]);
 
-  const allproducts = [
-    {
-      _id: "p1",
-      name: "T-Shirt",
-      variants: [
-        { _id: "v1", color: "Red", size: "M", price: 500 },
-        { _id: "v2", color: "Blue", size: "L", price: 550 },
-      ],
-    },
-    {
-      _id: "p2",
-      name: "Shirt",
-      variants: [
-        { _id: "v3", color: "White", size: "M", price: 700 },
-        { _id: "v4", color: "Black", size: "L", price: 750 },
-      ],
-    },
-  ];
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [showroomId, setShowroomId] = useState("");
+  const [qty, setQty] = useState("");
 
-  // 🔥 selected PRODUCTS for showroom
-  const selectedProducts = [
-    {
-      _id: "p1",
-      name: "T-Shirt",
-      variants: [
-        { _id: "v1", color: "Red", size: "M", price: 500 },
-        { _id: "v2", color: "Blue", size: "L", price: 550 },
-      ],
-    },
-    {
-      _id: "p2",
-      name: "Shirt",
-      variants: [
-        { _id: "v3", color: "White", size: "M", price: 700 },
-        { _id: "v4", color: "Black", size: "L", price: 750 },
-      ],
-    },
-  ];
-
-  const [openProduct, setOpenProduct] = useState(null);
-
-  // productId -> [{ variant + qty }]
-  const [selected, setSelected] = useState({});
-
-  // ---------------- TOGGLE VARIANT ----------------
-  const toggleVariant = (product, variant) => {
-    setSelected((prev) => {
-      const list = prev[product._id] || [];
-
-      const exists = list.find((v) => v._id === variant._id);
-
-      return {
-        ...prev,
-        [product._id]: exists
-          ? list.filter((v) => v._id !== variant._id)
-          : [...list, { ...variant, qty: 1, productName: product.name }],
-      };
-    });
+  // ---------------- LOAD STOCK ----------------
+  const loadStock = async () => {
+    const res = await axios.get("/api/warehouse-stock");
+    setStock(res.data.data || []);
   };
 
-  // ---------------- QTY UPDATE ----------------
-  const updateQty = (productId, variantId, type) => {
-    setSelected((prev) => {
-      const list = prev[productId] || [];
-
-      return {
-        ...prev,
-        [productId]: list.map((item) => {
-          if (item._id !== variantId) return item;
-
-          const newQty =
-            type === "inc" ? item.qty + 1 : item.qty > 1 ? item.qty - 1 : 1;
-
-          return { ...item, qty: newQty };
-        }),
-      };
-    });
+  // ---------------- LOAD SHOWROOMS ----------------
+  const loadShowrooms = async () => {
+    const res = await axios.get("/api/showrooms");
+    setShowrooms(res.data.showrooms || []);
   };
 
-  // ---------------- REMOVE ITEM ----------------
-  const removeItem = (productId, variantId) => {
-    setSelected((prev) => {
-      const list = prev[productId] || [];
-
-      return {
-        ...prev,
-        [productId]: list.filter((v) => v._id !== variantId),
-      };
-    });
-  };
-
-  // ---------------- CHECKOUT ----------------
-  const checkout = () => {
-    console.log("SHOWROOM:", showroomId);
-    console.log("ORDER:", selected);
-
-    alert("Checkout Done (Check Console)");
-  };
-
-  // ---------------- TOTAL CALC ----------------
-  const total = Object.values(selected)
-    .flat()
-    .reduce((sum, v) => sum + v.price * v.qty, 0);
+  useEffect(() => {
+    loadStock();
+    loadShowrooms();
+  }, []);
 
   return (
-    <div className="p-6 grid grid-cols-3 gap-6">
-      {/* ================= LEFT: PRODUCTS ================= */}
-      <div className="col-span-2">
-        <h1 className="text-xl font-bold mb-4">Product List</h1>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      <h1 className="text-2xl font-bold mb-4">🏭 Warehouse Stock</h1>
 
-        <div className="grid grid-cols-2 gap-4">
-          {allproducts.map((p) => (
-            <div key={p._id} className="border p-3 rounded">
-              <h2 className="font-semibold">{p.name}</h2>
+      {/* GRID */}
+      <div className="grid grid-cols-4 gap-4">
+        {stock.map((item) => (
+          <div key={item._id} className="bg-white p-3 rounded shadow">
+            <Image
+              src={item.productId?.media?.[0]?.secure_url || "/placeholder.png"}
+              width={200}
+              height={200}
+              className="w-full h-32 object-contain"
+              alt=""
+            />
 
-              <button
-                onClick={() => setOpenProduct(p)}
-                className="bg-blue-500 text-white px-3 py-1 mt-2"
-              >
-                View Variants
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
+            <h2 className="font-bold text-sm mt-2">{item.productId?.name}</h2>
 
-      {/* ================= RIGHT: CART ================= */}
-      <div className="border p-4 rounded h-fit">
-        <h1 className="font-bold text-lg mb-3">POS CART</h1>
+            <p className="text-xs text-gray-500">
+              {item.variantId?.color} / {item.variantId?.size}
+            </p>
 
-        {Object.keys(selected).length === 0 && (
-          <p className="text-gray-500">No items selected</p>
-        )}
+            <p className="text-lg font-bold text-green-600">
+              Stock: {item.stock}
+            </p>
 
-        {Object.entries(selected).map(([pid, variants]) => (
-          <div key={pid} className="mb-4">
-            <h2 className="font-semibold mb-2">{variants[0]?.productName}</h2>
-
-            {variants.map((v) => (
-              <div key={v._id} className="text-sm border p-2 mb-2">
-                <div>
-                  {v.color} - {v.size} - ৳{v.price}
-                </div>
-
-                <div className="flex gap-2 items-center mt-1">
-                  <button
-                    onClick={() => updateQty(pid, v._id, "dec")}
-                    className="px-2 bg-gray-300"
-                  >
-                    -
-                  </button>
-
-                  <span>{v.qty}</span>
-
-                  <button
-                    onClick={() => updateQty(pid, v._id, "inc")}
-                    className="px-2 bg-gray-300"
-                  >
-                    +
-                  </button>
-
-                  <button
-                    onClick={() => removeItem(pid, v._id)}
-                    className="ml-2 text-red-500"
-                  >
-                    remove
-                  </button>
-                </div>
-              </div>
-            ))}
+            {/* TRANSFER BUTTON */}
+            <button
+              onClick={() => setSelectedItem(item)}
+              className="bg-blue-600 text-white w-full mt-2 py-1 text-xs"
+            >
+              Transfer to Showroom
+            </button>
           </div>
         ))}
-
-        <hr className="my-3" />
-
-        <div className="font-bold text-lg">Total: ৳{total}</div>
-
-        <button
-          onClick={checkout}
-          className="bg-green-600 text-white w-full mt-3 py-2"
-        >
-          Checkout
-        </button>
       </div>
 
-      {/* ================= POPUP ================= */}
-      {openProduct && (
+      {/* ================= MODAL ================= */}
+      {selectedItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white w-[400px] p-5 rounded">
-            <h2 className="font-bold mb-3">{openProduct.name}</h2>
+          <div className="bg-white p-5 rounded w-[350px]">
+            <h2 className="font-bold mb-3">Transfer Stock</h2>
 
-            {openProduct.variants.map((v) => {
-              const isSelected = selected[openProduct._id]?.find(
-                (x) => x._id === v._id,
-              );
+            <p className="text-sm">Product: {selectedItem.productId?.name}</p>
 
-              return (
-                <div
-                  key={v._id}
-                  onClick={() => toggleVariant(openProduct, v)}
-                  className={`p-2 border mb-2 cursor-pointer ${
-                    isSelected ? "bg-green-200" : ""
-                  }`}
-                >
-                  {v.color} - {v.size} - ৳{v.price}
-                </div>
-              );
-            })}
+            <p className="text-xs text-gray-500 mb-2">
+              Variant: {selectedItem.variantId?.color} /{" "}
+              {selectedItem.variantId?.size}
+            </p>
+
+            {/* SHOWROOM SELECT */}
+            <select
+              value={showroomId}
+              onChange={(e) => setShowroomId(e.target.value)}
+              className="border p-2 w-full mb-2"
+            >
+              <option value="">Select Showroom</option>
+
+              {showrooms.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+
+            {/* QTY */}
+            <input
+              type="number"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className="border p-2 w-full mb-3"
+              placeholder="Quantity"
+            />
+
+            {/* ACTION */}
+            <button
+              onClick={async () => {
+                await axios.post("/api/stock/allocate-to-showroom", {
+                  showroomId,
+                  productId: selectedItem.productId._id,
+                  variantId: selectedItem.variantId._id,
+                  qty,
+                });
+
+                setSelectedItem(null);
+                setQty("");
+                setShowroomId("");
+
+                alert("Stock transferred successfully");
+
+                loadStock();
+              }}
+              className="bg-green-600 text-white w-full py-2"
+            >
+              Transfer
+            </button>
 
             <button
-              onClick={() => setOpenProduct(null)}
-              className="mt-3 bg-gray-500 text-white px-3 py-1"
+              onClick={() => setSelectedItem(null)}
+              className="mt-2 w-full border py-2"
             >
-              Close
+              Cancel
             </button>
           </div>
         </div>

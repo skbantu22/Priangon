@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 
-const producVariantSchema = new mongoose.Schema(
+const productVariantSchema = new mongoose.Schema(
   {
+    // ================= PRODUCT LINK =================
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -9,10 +10,25 @@ const producVariantSchema = new mongoose.Schema(
       index: true,
     },
 
-    color: { type: String, required: true, trim: true },
-    size: { type: String, required: true, trim: true },
+    // ================= ATTRIBUTES =================
+    color: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-    mrp: { type: Number, required: true, min: 0 },
+    size: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    // ================= PRICING =================
+    mrp: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
     sellingPrice: {
       type: Number,
@@ -33,47 +49,79 @@ const producVariantSchema = new mongoose.Schema(
       default: 0,
     },
 
-    sku: { type: String, required: true, unique: true, index: true },
+    // ================= IDENTIFIERS =================
+    sku: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      trim: true,
+    },
+
+    barcode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
 
     stock: { type: Number, required: true, min: 0, default: 0 },
-    sold: { type: Number, default: 0, min: 0 },
+    sold: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
-    isActive: { type: Boolean, default: true },
+    // ================= STATUS =================
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
 
+    // ================= MEDIA =================
     media: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "Media", required: true },
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Media",
+        required: true,
+      },
     ],
 
-    description: { type: String, required: true },
+    description: {
+      type: String,
+      required: true,
+    },
 
-    deletedAt: { type: Date, default: null, index: true },
+    // ================= SOFT DELETE =================
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  },
 );
 
-// Unique combination of product + color + size
-producVariantSchema.index(
-  { product: 1, color: 1, size: 1 },
-  { unique: true }
-);
+// ================= UNIQUE VARIANT RULE =================
+productVariantSchema.index({ product: 1, color: 1, size: 1 }, { unique: true });
 
-//
-// 🔹 PRE SAVE: AUTO CALCULATE DISCOUNT (async-safe)
-//
-producVariantSchema.pre("save", function () {
+// ================= AUTO DISCOUNT CALC =================
+productVariantSchema.pre("save", function () {
   if (this.mrp > 0 && this.sellingPrice >= 0) {
     const pct = ((this.mrp - this.sellingPrice) / this.mrp) * 100;
+
     this.discountPercentage = Math.max(0, Math.min(100, Math.round(pct)));
   }
-  // ✅ no next() needed because this is not async
 });
 
-//
-// 🔹 POST SAVE: AUTO PUSH VARIANT → PRODUCT
-//
-producVariantSchema.post("save", async function (doc) {
+// ================= LINK TO PRODUCT =================
+productVariantSchema.post("save", async function (doc) {
   try {
     if (!doc.product) return;
+
     await mongoose.model("Product").findByIdAndUpdate(doc.product, {
       $addToSet: { variants: doc._id },
     });
@@ -82,13 +130,10 @@ producVariantSchema.post("save", async function (doc) {
   }
 });
 
-//
-// 🔹 POST DELETE: REMOVE VARIANT FROM PRODUCT
-// (optional; use only if you want Product.variants to stay clean)
-//
-producVariantSchema.post("findOneAndDelete", async function (doc) {
+// ================= REMOVE LINK =================
+productVariantSchema.post("findOneAndDelete", async function (doc) {
   try {
-    if (doc && doc.product) {
+    if (doc?.product) {
       await mongoose.model("Product").findByIdAndUpdate(doc.product, {
         $pull: { variants: doc._id },
       });
@@ -98,8 +143,9 @@ producVariantSchema.post("findOneAndDelete", async function (doc) {
   }
 });
 
+// ================= EXPORT =================
 const ProductVariantModel =
   mongoose.models.ProductVariant ||
-  mongoose.model("ProductVariant", producVariantSchema, "productvariants");
+  mongoose.model("ProductVariant", productVariantSchema, "productvariants");
 
 export default ProductVariantModel;

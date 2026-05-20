@@ -10,18 +10,39 @@ import { useProducts } from "@/hooks/useProducts";
 
 export default function ShowroomVariantAssign() {
   const [search, setSearch] = useState("");
-  const [showroomId, setShowroomId] = useState("showroom1");
 
-  // IMPORTANT STRUCTURE:
-  // {
-  //   productId: [{ variantId, stock }]
-  // }
+  const [showrooms, setShowrooms] = useState([]);
+  const [showroomId, setShowroomId] = useState("");
+
   const [selectedVariants, setSelectedVariants] = useState({});
-
   const [openProduct, setOpenProduct] = useState(null);
+
   const [saving, setSaving] = useState(false);
 
   const observerRef = useRef(null);
+
+  // ---------------- LOAD SHOWROOMS ----------------
+  useEffect(() => {
+    const fetchShowrooms = async () => {
+      try {
+        const res = await axios.get("/api/showrooms");
+
+        setShowrooms(res.data.showrooms || []);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+
+    fetchShowrooms();
+  }, []);
+
+  // ---------------- RESET ----------------
+  useEffect(() => {
+    if (!showroomId) return;
+
+    setSelectedVariants({});
+    setOpenProduct(null);
+  }, [showroomId]);
 
   // ---------------- PRODUCTS ----------------
   const { data, fetchNextPage, hasNextPage, isLoading } = useProducts(
@@ -33,40 +54,52 @@ export default function ShowroomVariantAssign() {
     return data?.pages?.flat() || [];
   }, [data]);
 
-  // ---------------- LOAD SELECTED ----------------
+  // ---------------- LOAD SHOWROOM STOCK ----------------
   useEffect(() => {
-    const loadSelected = async () => {
-      const res = await axios.get(
-        `/api/showroom-product-variants/get?showroomId=${showroomId}`,
-      );
+    const loadShowroomStock = async () => {
+      if (!showroomId) return;
 
-      const mapped = {};
+      try {
+        const res = await axios.get(
+          `/api/showroom-stock?showroomId=${showroomId}`,
+        );
 
-      (res.data.data || []).forEach((item) => {
-        mapped[item.productId] = (item.variants || []).map((v) => ({
-          variantId: String(v.variantId || v),
-          stock: Number(v.stock || 0),
-        }));
-      });
+        const mapped = {};
 
-      setSelectedVariants(mapped);
+        (res.data.data || []).forEach((item) => {
+          if (!mapped[item.productId]) {
+            mapped[item.productId] = [];
+          }
+
+          mapped[item.productId].push({
+            variantId: String(item.variantId),
+            stock: Number(item.stock || 0),
+          });
+        });
+
+        setSelectedVariants(mapped);
+      } catch (err) {
+        console.log(err);
+      }
     };
 
-    loadSelected();
+    loadShowroomStock();
   }, [showroomId]);
 
   // ---------------- INFINITE SCROLL ----------------
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasNextPage) {
+      if (entries[0].isIntersecting && hasNextPage && showroomId) {
         fetchNextPage();
       }
     });
 
-    if (observerRef.current) observer.observe(observerRef.current);
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
 
     return () => observer.disconnect();
-  }, [hasNextPage, fetchNextPage]);
+  }, [hasNextPage, fetchNextPage, showroomId]);
 
   // ---------------- TOGGLE VARIANT ----------------
   const toggleVariant = (productId, variantId) => {
@@ -79,7 +112,7 @@ export default function ShowroomVariantAssign() {
         ...prev,
         [productId]: exists
           ? list.filter((v) => v.variantId !== variantId)
-          : [...list, { variantId, stock: "" }],
+          : [...list, { variantId, stock: 1 }],
       };
     });
   };
@@ -88,40 +121,56 @@ export default function ShowroomVariantAssign() {
   const updateStock = (productId, variantId, value) => {
     setSelectedVariants((prev) => ({
       ...prev,
+
       [productId]: (prev[productId] || []).map((v) =>
-        v.variantId === variantId ? { ...v, stock: Number(value) } : v,
+        v.variantId === variantId
+          ? {
+              ...v,
+              stock: Number(value),
+            }
+          : v,
       ),
     }));
   };
 
   // ---------------- SAVE ----------------
   const handleSave = async () => {
+    if (!showroomId) {
+      alert("Select showroom first");
+      return;
+    }
+
     try {
       setSaving(true);
 
-      await axios.post("/api/showroom-product-variants/save", {
+      const payload = {
         showroomId,
 
         data: Object.entries(selectedVariants).map(([productId, variants]) => ({
           productId,
 
-          variants: variants.map((v) => ({
-            variantId: v.variantId,
-            stock: Number(v.stock || 0),
-          })),
+          variants: variants
+            .filter((v) => Number(v.stock) > 0)
+            .map((v) => ({
+              variantId: v.variantId,
+              stock: Number(v.stock),
+            })),
         })),
-      });
+      };
 
-      alert("Saved Successfully");
+      await axios.post("/api/stock/allocate-to-showroom", payload);
+
+      alert("Stock allocated successfully");
     } catch (err) {
       console.log(err);
-      alert("Save Failed");
+
+      alert(err?.response?.data?.message || "Save Failed");
     } finally {
       setSaving(false);
     }
   };
 
-  // ---------------- RIGHT PANEL ----------------
+  // ---------------- SUMMARY ----------------
   const selectedSummary = useMemo(() => {
     return products
       .map((p) => {
@@ -138,9 +187,12 @@ export default function ShowroomVariantAssign() {
             };
           });
 
-        if (variants.length === 0) return null;
+        if (!variants.length) return null;
 
-        return { ...p, variants };
+        return {
+          ...p,
+          variants,
+        };
       })
       .filter(Boolean);
   }, [products, selectedVariants]);
@@ -150,7 +202,6 @@ export default function ShowroomVariantAssign() {
     <div className="grid grid-cols-12 gap-4 p-4 bg-gray-100 min-h-screen">
       {/* LEFT */}
       <div className="col-span-8 bg-white rounded-2xl p-4">
-        {/* TOP BAR */}
         <div className="flex gap-3 mb-4 items-center">
           <input
             value={search}
@@ -164,27 +215,24 @@ export default function ShowroomVariantAssign() {
             onChange={(e) => setShowroomId(e.target.value)}
             className="border p-2 rounded"
           >
-            <option value="showroom1">Showroom 1</option>
-            <option value="showroom2">Showroom 2</option>
+            <option value="">Select Showroom</option>
+
+            {showrooms.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name}
+              </option>
+            ))}
           </select>
 
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
+          <Button onClick={handleSave} disabled={!showroomId || saving}>
+            {saving ? "Saving..." : "Allocate Stock"}
           </Button>
         </div>
 
-        {/* PRODUCTS */}
-        {isLoading ? (
-          <div className="grid grid-cols-4 gap-3">
-            {Array(8)
-              .fill(0)
-              .map((_, i) => (
-                <div
-                  key={i}
-                  className="h-40 bg-gray-200 animate-pulse rounded"
-                />
-              ))}
-          </div>
+        {!showroomId ? (
+          <p>Please select showroom</p>
+        ) : isLoading ? (
+          <p>Loading...</p>
         ) : (
           <>
             <div className="grid grid-cols-4 gap-3">
@@ -194,20 +242,20 @@ export default function ShowroomVariantAssign() {
                 return (
                   <Card
                     key={p._id}
-                    onClick={() => setOpenProduct(p)}
                     className="cursor-pointer"
+                    onClick={() => setOpenProduct(p)}
                   >
                     <div className="relative h-36">
                       <Image
                         src={p?.media?.[0]?.secure_url || "/placeholder.png"}
                         fill
-                        className="object-contain"
                         alt=""
+                        className="object-contain"
                       />
                     </div>
 
                     <CardHeader>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-sm font-semibold">{p.name}</span>
 
                         {count > 0 && (
@@ -229,10 +277,12 @@ export default function ShowroomVariantAssign() {
 
       {/* RIGHT */}
       <div className="col-span-4 bg-white rounded-2xl p-4 h-[95vh] overflow-y-auto">
-        <h2 className="font-bold mb-3">Selected Variants</h2>
+        <h2 className="font-bold mb-3">Allocated Variants</h2>
 
-        {selectedSummary.length === 0 ? (
-          <p className="text-gray-400">No selection</p>
+        {!showroomId ? (
+          <p>Select showroom first</p>
+        ) : selectedSummary.length === 0 ? (
+          <p>No variants selected</p>
         ) : (
           selectedSummary.map((p) => (
             <div key={p._id} className="border p-2 rounded mb-3">
@@ -241,9 +291,10 @@ export default function ShowroomVariantAssign() {
                   src={p.media?.[0]?.secure_url || "/placeholder.png"}
                   width={40}
                   height={40}
-                  className="rounded"
                   alt=""
+                  className="rounded"
                 />
+
                 <div className="text-sm font-bold">{p.name}</div>
               </div>
 
@@ -255,29 +306,29 @@ export default function ShowroomVariantAssign() {
                 return (
                   <div
                     key={v._id}
-                    className="flex justify-between items-center text-xs bg-gray-100 p-2 mt-1 rounded"
+                    className="bg-gray-100 p-2 rounded mt-1 flex justify-between items-center"
                   >
                     <div>
-                      <div>
+                      <div className="text-xs">
                         {v.color} - {v.size}
                       </div>
 
                       {selected && (
                         <input
                           type="number"
-                          min="0"
+                          min={1}
                           value={selected.stock}
                           onChange={(e) =>
                             updateStock(p._id, v._id, e.target.value)
                           }
-                          className="border mt-1 p-1 w-20 text-xs"
+                          className="border mt-1 p-1 w-24 text-xs"
                         />
                       )}
                     </div>
 
                     <button
                       onClick={() => toggleVariant(p._id, v._id)}
-                      className="text-red-500"
+                      className="text-red-500 text-sm"
                     >
                       ✕
                     </button>
@@ -291,8 +342,8 @@ export default function ShowroomVariantAssign() {
 
       {/* MODAL */}
       {openProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white w-[420px] p-4 rounded">
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className="bg-white p-4 rounded w-[420px]">
             <h2 className="font-bold mb-3">{openProduct.name}</h2>
 
             {openProduct.variants.map((v) => {
@@ -303,7 +354,7 @@ export default function ShowroomVariantAssign() {
               return (
                 <div
                   key={v._id}
-                  className={`p-2 border mb-2 rounded ${
+                  className={`border p-2 rounded mb-2 ${
                     selected ? "bg-green-100" : ""
                   }`}
                 >
@@ -314,7 +365,7 @@ export default function ShowroomVariantAssign() {
 
                     <button
                       onClick={() => toggleVariant(openProduct._id, v._id)}
-                      className="text-xs border px-2 py-1 rounded"
+                      className="border px-2 py-1 rounded text-xs"
                     >
                       {selected ? "Remove" : "Select"}
                     </button>
@@ -323,13 +374,12 @@ export default function ShowroomVariantAssign() {
                   {selected && (
                     <input
                       type="number"
-                      min="0"
+                      min={1}
                       value={selected.stock}
                       onChange={(e) =>
                         updateStock(openProduct._id, v._id, e.target.value)
                       }
-                      className="border mt-2 p-1 w-full"
-                      placeholder="Stock"
+                      className="border p-1 mt-2 w-full"
                     />
                   )}
                 </div>
