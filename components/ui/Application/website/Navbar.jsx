@@ -81,7 +81,7 @@ const Navbar = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-white">
       <div className="mx-auto max-w-[1400px] px-4 lg:px-8">
         {/* MAIN BAR */}
-        <div className="flex items-center justify-between py-3 lg:py-4">
+        <div className="flex items-center justify-between py-2 lg:py-4">
           {/* Mobile Menu Button */}
           <button className="lg:hidden p-2" onClick={() => setOpenMenu(true)}>
             <Menu size={24} />
@@ -92,10 +92,9 @@ const Navbar = () => {
             <Image
               src={logo}
               alt="Minithiland"
-              width={55}
-              height={55}
-              className=""
-              priority
+              width={60}
+              height={60}
+              className="w-9 h-9 lg:w-14 lg:h-14 object-contain"
             />
           </Link>
 

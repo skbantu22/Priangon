@@ -83,18 +83,118 @@ export default function POSPage() {
   );
 
   // ---------------- SHOWROOMS ----------------
+  // 1. This is your existing showroom fetcher
   useEffect(() => {
     const fetchShowrooms = async () => {
       if (user?.data?.user?.role !== "admin") return;
-
       const res = await fetch("/api/showrooms");
       const data = await res.json();
-
       setShowrooms(data.showrooms || []);
     };
-
     fetchShowrooms();
   }, [user]);
+
+  // 2. This is your existing product fetcher
+  useEffect(() => {
+    if (user) fetchProducts("");
+  }, [user, fetchProducts]);
+
+  // 3. This is your existing search bar debouncer
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchProducts(search);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search, fetchProducts]);
+
+  // ==========================================================
+  // PASTE THE NEW CODE DIRECTLY HERE:
+  // ==========================================================
+  useEffect(() => {
+    let scannedBuffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleGlobalKeyDown = (e) => {
+      // If cashier is actively typing in the search bar, don't hijack their typing
+      if (
+        document.activeElement &&
+        document.activeElement.tagName === "INPUT" &&
+        document.activeElement.placeholder?.includes("Search")
+      ) {
+        return;
+      }
+
+      const currentTime = Date.now();
+
+      // If typing is slow (greater than 50ms per key), it's a human, not a scanner. Reset.
+      if (currentTime - lastKeyTime > 50) {
+        scannedBuffer = "";
+      }
+      lastKeyTime = currentTime;
+
+      // Barcode scanners send "Enter" when they finish reading a code
+      if (e.key === "Enter") {
+        if (scannedBuffer.trim()) {
+          processBarcode(scannedBuffer.trim());
+          scannedBuffer = "";
+        }
+        e.preventDefault();
+        return;
+      }
+
+      // Build the barcode number letter by letter
+      if (e.key.length === 1) {
+        scannedBuffer += e.key;
+      }
+    };
+
+    const processBarcode = (code) => {
+      const allVariants = products.flatMap((p) =>
+        p.variants.map((v) => ({ ...v, product: p })),
+      );
+
+      const found = allVariants.find((v) => v.barcode === code);
+
+      if (!found) {
+        showToast(`Product not found: ${code}`);
+        return;
+      }
+
+      if (found.stock <= 0) {
+        showToast(`${found.product.name} is out of stock`);
+        return;
+      }
+
+      setCart((prev) => {
+        const exist = prev.find((x) => x.variantId === found._id);
+        if (exist) {
+          if (exist.qty + 1 > found.stock) {
+            showToast("Stock limit exceeded");
+            return prev;
+          }
+          return prev.map((x) =>
+            x.variantId === found._id ? { ...x, qty: x.qty + 1 } : x,
+          );
+        }
+
+        return [
+          ...prev,
+          {
+            productId: found.product._id,
+            variantId: found._id,
+            name: `${found.product.name} (${found.color}-${found.size})`,
+            price: found.sellingPrice,
+            qty: 1,
+          },
+        ];
+      });
+
+      showToast(`Added: ${found.product.name}`);
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [products]); // Keeps listening seamlessly whenever your product list updates
 
   useEffect(() => {
     if (user) fetchProducts("");
@@ -180,51 +280,51 @@ export default function POSPage() {
   };
 
   // ---------------- BARCODE ----------------
-  const handleBarcodeScan = () => {
-    if (!barcode.trim()) return;
+  // const handleBarcodeScan = () => {
+  //   if (!barcode.trim()) return;
 
-    const allVariants = products.flatMap((p) =>
-      p.variants.map((v) => ({ ...v, product: p })),
-    );
+  //   const allVariants = products.flatMap((p) =>
+  //     p.variants.map((v) => ({ ...v, product: p })),
+  //   );
 
-    const found = allVariants.find((v) => v.barcode === barcode.trim());
+  //   const found = allVariants.find((v) => v.barcode === barcode.trim());
 
-    if (!found) {
-      showToast("Product not found");
-      setBarcode("");
-      return;
-    }
+  //   if (!found) {
+  //     showToast("Product not found");
+  //     setBarcode("");
+  //     return;
+  //   }
 
-    if (found.stock <= 0) {
-      showToast("Out of stock");
-      setBarcode("");
-      return;
-    }
+  //   if (found.stock <= 0) {
+  //     showToast("Out of stock");
+  //     setBarcode("");
+  //     return;
+  //   }
 
-    setCart((prev) => {
-      const exist = prev.find((x) => x.variantId === found._id);
+  //   setCart((prev) => {
+  //     const exist = prev.find((x) => x.variantId === found._id);
 
-      if (exist) {
-        return prev.map((x) =>
-          x.variantId === found._id ? { ...x, qty: x.qty + 1 } : x,
-        );
-      }
+  //     if (exist) {
+  //       return prev.map((x) =>
+  //         x.variantId === found._id ? { ...x, qty: x.qty + 1 } : x,
+  //       );
+  //     }
 
-      return [
-        ...prev,
-        {
-          productId: found.product._id,
-          variantId: found._id,
-          name: `${found.product.name} (${found.color}-${found.size})`,
-          price: found.sellingPrice,
-          qty: 1,
-        },
-      ];
-    });
+  //     return [
+  //       ...prev,
+  //       {
+  //         productId: found.product._id,
+  //         variantId: found._id,
+  //         name: `${found.product.name} (${found.color}-${found.size})`,
+  //         price: found.sellingPrice,
+  //         qty: 1,
+  //       },
+  //     ];
+  //   });
 
-    showToast("Added to cart");
-    setBarcode("");
-  };
+  //   showToast("Added to cart");
+  //   setBarcode("");
+  // };
 
   // ---------------- CHECKOUT ----------------
   const handleCheckout = async () => {
@@ -301,13 +401,13 @@ export default function POSPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        <input
+        {/* <input
           className="w-full border p-3 mb-3 rounded border-green-400"
           placeholder="Scan barcode..."
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleBarcodeScan()}
-        />
+        /> */}
 
         {loading ? (
           <p>Loading...</p>
