@@ -6,7 +6,7 @@ import Link from "next/link";
 const categories = [
   {
     title: "Modest Cord's Set",
-    image: "/assets/images/ModestCordsSet.jpg",
+    image: "/assets/images/beachgownnn.png",
     link: "shop?category=women",
   },
   {
