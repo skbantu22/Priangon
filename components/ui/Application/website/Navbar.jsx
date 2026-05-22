@@ -120,7 +120,6 @@ const Navbar = () => {
               <Link href="#">Women</Link>
               <Link href="#">Combo</Link>
               <Link href="#">Kids</Link>
-              <Link href="#">Accessories</Link>
             </nav>
 
             {/* Search */}
