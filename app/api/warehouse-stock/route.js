@@ -21,7 +21,16 @@ export async function GET(req) {
 
     // ================= FETCH STOCK =================
     const stock = await WarehouseStock.find(filter)
-      .populate("productId", "name media")
+
+      .populate({
+        path: "productId",
+        select: "name media",
+        populate: {
+          path: "media",
+          select: "secure_url",
+        },
+      })
+
       .populate("variantId", "color size sku")
       .sort({ createdAt: -1 });
 

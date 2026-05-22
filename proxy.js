@@ -43,7 +43,7 @@ export async function proxy(request) {
     // already logged in user visiting auth page
     if (isAuthRoute) {
       if (role === "admin") {
-        return NextResponse.redirect(new URL("/admin", request.url));
+        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       }
 
       if (role === "cashier" || role === "manager") {
@@ -65,8 +65,11 @@ export async function proxy(request) {
     }
 
     // USER ONLY
-    if (pathname.startsWith("/my-account") && role === "admin") {
-      return NextResponse.redirect(new URL("/admin", request.url));
+    if (
+      pathname.startsWith("/admin") &&
+      !["admin", "cashier", "manager"].includes(role)
+    ) {
+      return NextResponse.redirect(new URL("/my-account", request.url));
     }
     if (
       pathname.startsWith("/my-account") &&

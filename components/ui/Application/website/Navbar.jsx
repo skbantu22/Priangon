@@ -19,7 +19,6 @@ import Image from "next/image";
 import axios from "axios";
 
 import {
-  USER_DASHBOARD,
   WEBSITE_HOME,
   WEBSITE_LOGIN,
   WEBSITE_REGISTER,
@@ -38,9 +37,17 @@ const Navbar = () => {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   const auth = useSelector((store) => store.authStore.auth);
+  console.log("Auth in Navbar:", auth);
+
   const router = useRouter();
   const dispatch = useDispatch();
   const searchRef = useRef(null);
+
+  // ✅ FIX: correct role path
+  const role = auth?.data?.user?.role;
+
+  // ✅ FIX: dashboard route based on role
+  const dashboard = role === "admin" ? "/admin/dashboard" : "/my-account";
 
   const handleLogout = async () => {
     try {
@@ -82,12 +89,12 @@ const Navbar = () => {
       <div className="mx-auto max-w-[1400px] px-4 lg:px-8">
         {/* MAIN BAR */}
         <div className="flex items-center justify-between py-2 lg:py-4">
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu */}
           <button className="lg:hidden p-2" onClick={() => setOpenMenu(true)}>
             <Menu size={24} />
           </button>
 
-          {/* LOGO (FIXED - NO GAP) */}
+          {/* LOGO */}
           <Link href={WEBSITE_HOME} className="flex items-center">
             <Image
               src={logo}
@@ -108,7 +115,6 @@ const Navbar = () => {
 
           {/* DESKTOP MENU */}
           <div className="hidden lg:flex items-center gap-10">
-            {/* Nav Links */}
             <nav className="flex gap-8 text-sm font-semibold uppercase">
               <Link href="#">Men</Link>
               <Link href="#">Women</Link>
@@ -139,7 +145,7 @@ const Navbar = () => {
                   <span>Profile</span>
                 </Link>
               ) : (
-                <Link href={USER_DASHBOARD} className={iconItem}>
+                <Link href={dashboard} className={iconItem}>
                   <Avatar className="h-6 w-6">
                     <AvatarImage src={auth?.avatar?.url || userIcon.src} />
                   </Avatar>
@@ -180,15 +186,12 @@ const Navbar = () => {
       {/* MOBILE MENU */}
       {openMenu && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Overlay */}
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpenMenu(false)}
           />
 
-          {/* Sidebar */}
           <div className="absolute left-0 top-0 h-full w-[280px] bg-white p-4 flex flex-col">
-            {/* Header */}
             <div className="flex justify-between items-center border-b pb-3">
               <span className="font-bold text-lg">Menu</span>
               <button onClick={() => setOpenMenu(false)}>
@@ -196,7 +199,6 @@ const Navbar = () => {
               </button>
             </div>
 
-            {/* Links */}
             <nav className="flex flex-col gap-4 pt-4 text-sm font-semibold uppercase border-b pb-4">
               <Link href="#">Men</Link>
               <Link href="#">Women</Link>
@@ -205,7 +207,6 @@ const Navbar = () => {
               <Link href="#">Sports</Link>
             </nav>
 
-            {/* USER SECTION */}
             <div className="flex flex-col gap-4 pt-4 text-sm">
               {!auth ? (
                 <>
@@ -225,10 +226,7 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <Link
-                    href={USER_DASHBOARD}
-                    className="flex items-center gap-2"
-                  >
+                  <Link href={dashboard} className="flex items-center gap-2">
                     <User size={18} /> My Account
                   </Link>
 

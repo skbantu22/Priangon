@@ -15,6 +15,7 @@ export default function WarehousePage() {
   // ---------------- LOAD STOCK ----------------
   const loadStock = async () => {
     const res = await axios.get("/api/warehouse-stock");
+    console.log("STOCK RES:", res.data);
     setStock(res.data.data || []);
   };
 

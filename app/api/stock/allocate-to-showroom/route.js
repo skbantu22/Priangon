@@ -2,6 +2,10 @@ import { connectDB } from "@/lib/databaseconnection";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock";
 
+// Optional but recommended
+import "@/models/Product.model";
+import "@/models/ProductVariant.model";
+
 export async function POST(req) {
   try {
     await connectDB();
@@ -10,42 +14,63 @@ export async function POST(req) {
 
     const quantity = Number(qty);
 
+    // ================= VALIDATION =================
     if (!quantity || quantity <= 0) {
-      return Response.json({
-        success: false,
-        message: "Invalid quantity",
-      });
+      return Response.json(
+        {
+          success: false,
+          message: "Invalid quantity",
+        },
+        { status: 400 },
+      );
     }
 
-    // 1. CHECK WAREHOUSE STOCK
+    // ================= CHECK WAREHOUSE STOCK =================
     const warehouse = await WarehouseStock.findOne({
       productId,
       variantId,
     });
 
-    if (!warehouse || warehouse.stock < quantity) {
-      return Response.json({
-        success: false,
-        message: "Not enough warehouse stock",
-      });
+    if (!warehouse) {
+      return Response.json(
+        {
+          success: false,
+          message: "Warehouse stock not found",
+        },
+        { status: 404 },
+      );
     }
 
-    // 2. DECREASE WAREHOUSE
+    if (warehouse.stock < quantity) {
+      return Response.json(
+        {
+          success: false,
+          message: "Not enough warehouse stock",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ================= DECREASE WAREHOUSE STOCK =================
     warehouse.stock -= quantity;
     await warehouse.save();
 
-    // 3. INCREASE SHOWROOM
-    const showroom = await ShowroomStock.findOne({
+    // ================= FIND SHOWROOM STOCK =================
+    let showroom = await ShowroomStock.findOne({
       showroomId,
       productId,
       variantId,
     });
 
+    let updatedShowroom;
+
+    // ================= UPDATE OR CREATE SHOWROOM STOCK =================
     if (showroom) {
       showroom.stock += quantity;
-      await showroom.save();
+
+      updatedShowroom = await showroom.save();
     } else {
-      await ShowroomStock.create({
+      updatedShowroom = await ShowroomStock.create({
         showroomId,
         productId,
         variantId,
@@ -53,15 +78,36 @@ export async function POST(req) {
       });
     }
 
+    // ================= POPULATE DATA =================
+    const populatedData = await ShowroomStock.findById(updatedShowroom._id)
+      .populate({
+        path: "productId",
+        select: "name media",
+      })
+      .populate({
+        path: "variantId",
+        select: "color size sku",
+      })
+      .populate({
+        path: "showroomId",
+        select: "name",
+      });
+
+    // ================= RESPONSE =================
     return Response.json({
       success: true,
       message: "Stock transferred successfully",
+      data: populatedData,
     });
   } catch (error) {
-    return Response.json({
-      success: false,
-      message: "Server error",
-      error: error.message,
-    });
+    console.log("SHOWROOM TRANSFER ERROR:", error);
+
+    return Response.json(
+      {
+        success: false,
+        message: error.message || "Server error",
+      },
+      { status: 500 },
+    );
   }
 }

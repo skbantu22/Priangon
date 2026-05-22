@@ -14,15 +14,9 @@ import ProductVariantModel from "@/models/ProductVariant.model ";
 import CouponModel from "@/models/Coupon.model";
 
 const shippingMap = {
-  dhaka: 70,
-  chattogram: 120,
-  rajshahi: 120,
-  khulna: 120,
-  sylhet: 120,
-  barisal: 120,
-  rangpur: 120,
-  mymensingh: 120,
-  other: 150,
+  dhaka: 80,
+
+  other: 120,
 };
 
 export async function POST(req) {
