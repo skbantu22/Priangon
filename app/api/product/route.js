@@ -10,7 +10,7 @@ export async function GET(request) {
     if (!auth.isAuth) {
       return NextResponse.json(
         { success: false, message: "Unauthorized." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -39,54 +39,51 @@ export async function GET(request) {
     // ✅ Sort Query
     const sortQuery = {};
     sorting.forEach((s) => (sortQuery[s.id] = s.desc ? -1 : 1));
-    const finalSort = Object.keys(sortQuery).length ? sortQuery : { createdAt: -1 };
+    const finalSort = Object.keys(sortQuery).length
+      ? sortQuery
+      : { createdAt: -1 };
 
     // ✅ Global filter match (AFTER lookup/unwind, because categoryData exists then)
-    const searchMatch =
-      globalFilter
-        ? {
-            $match: {
-              $or: [
-                { name: { $regex: globalFilter, $options: "i" } },
-                { slug: { $regex: globalFilter, $options: "i" } },
-                { "categoryData.name": { $regex: globalFilter, $options: "i" } },
+    const searchMatch = globalFilter
+      ? {
+          $match: {
+            $or: [
+              { name: { $regex: globalFilter, $options: "i" } },
+              { slug: { $regex: globalFilter, $options: "i" } },
+              { "categoryData.name": { $regex: globalFilter, $options: "i" } },
 
-                // numeric field search (mrp) by converting to string
-                {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$mrp" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
+              // numeric field search (mrp) by converting to string
+              {
+                $expr: {
+                  $regexMatch: {
+                    input: { $toString: "$mrp" },
+                    regex: globalFilter,
+                    options: "i",
                   },
                 },
-                     {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$sellingPrice" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
+              },
+              {
+                $expr: {
+                  $regexMatch: {
+                    input: { $toString: "$sellingPrice" },
+                    regex: globalFilter,
+                    options: "i",
                   },
                 },
-                  {
-                  $expr: {
-                    $regexMatch: {
-                      input: { $toString: "$discountPercentage" },
-                      regex: globalFilter,
-                      options: "i",
-                    },
+              },
+              {
+                $expr: {
+                  $regexMatch: {
+                    input: { $toString: "$discountPercentage" },
+                    regex: globalFilter,
+                    options: "i",
                   },
                 },
-
-
-
-
-              ],
-            },
-          }
-        : null;
+              },
+            ],
+          },
+        }
+      : null;
 
     const pipeline = [
       { $match: baseMatch },
@@ -97,6 +94,15 @@ export async function GET(request) {
           localField: "category",
           foreignField: "_id",
           as: "categoryData",
+        },
+      },
+
+      {
+        $lookup: {
+          from: "medias",
+          localField: "media",
+          foreignField: "_id",
+          as: "mediaData",
         },
       },
       {
@@ -126,6 +132,12 @@ export async function GET(request) {
                 updatedAt: 1,
                 deletedAt: 1,
                 category: "$categoryData.name",
+                image: {
+                  $ifNull: [
+                    { $arrayElemAt: ["$mediaData.secure_url", 0] },
+                    null,
+                  ],
+                },
               },
             },
           ],

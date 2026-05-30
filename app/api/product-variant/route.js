@@ -94,6 +94,15 @@ export async function GET(request) {
         },
       },
 
+      {
+        $lookup: {
+          from: "medias",
+          localField: "media",
+          foreignField: "_id",
+          as: "variantMedia",
+        },
+      },
+
       ...(searchMatch ? [searchMatch] : []),
 
       {
@@ -112,16 +121,37 @@ export async function GET(request) {
 
                   // 🔥 FIRST IMAGE FROM MEDIA ARRAY
                   image: {
-                    $arrayElemAt: [
-                      {
-                        $map: {
-                          input: "$mediaData",
-                          as: "m",
-                          in: "$$m.secure_url",
+                    $let: {
+                      vars: {
+                        variantImg: {
+                          $arrayElemAt: [
+                            {
+                              $map: {
+                                input: "$variantMedia",
+                                as: "m",
+                                in: "$$m.secure_url",
+                              },
+                            },
+                            0,
+                          ],
+                        },
+                        productImg: {
+                          $arrayElemAt: [
+                            {
+                              $map: {
+                                input: "$mediaData",
+                                as: "m",
+                                in: "$$m.secure_url",
+                              },
+                            },
+                            0,
+                          ],
                         },
                       },
-                      0,
-                    ],
+                      in: {
+                        $ifNull: ["$$variantImg", "$$productImg"],
+                      },
+                    },
                   },
                 },
 

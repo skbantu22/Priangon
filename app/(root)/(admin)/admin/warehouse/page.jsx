@@ -138,7 +138,9 @@ export default function WarehousePage() {
               >
                 <Image
                   src={
-                    item.productId?.media?.[0]?.secure_url || "/placeholder.png"
+                    item.variantId?.media?.[0]?.secure_url ||
+                    item.productId?.media?.[0]?.secure_url ||
+                    "/placeholder.png"
                   }
                   width={200}
                   height={200}

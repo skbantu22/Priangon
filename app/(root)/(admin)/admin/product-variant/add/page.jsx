@@ -109,6 +109,8 @@ const AddProductVariant = () => {
     try {
       const payload = {
         ...values,
+        color: values.color?.trim() || null,
+
         mrp: Number(values.mrp),
         sellingPrice: Number(values.sellingPrice),
         stock: Number(values.stock),

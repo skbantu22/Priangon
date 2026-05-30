@@ -412,7 +412,7 @@ export default function POSPage() {
         {loading ? (
           <p>Loading...</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {products.map((p) => (
               <div
                 key={p._id}
@@ -421,17 +421,33 @@ export default function POSPage() {
                   setSelectedVariant(null);
                   setQty(1);
                 }}
-                className="border rounded p-2 cursor-pointer hover:shadow"
+                className="
+  border
+  rounded-xl
+  p-4
+  cursor-pointer
+  hover:shadow-lg
+  transition-all
+  bg-white
+  flex
+  flex-col
+"
               >
-                <Image
-                  src={p.media?.[0]?.secure_url || "/placeholder.png"}
-                  width={200}
-                  height={200}
-                  className="w-full h-28 object-cover rounded"
-                  alt={p.name}
-                />
-                <p className="text-sm font-semibold mt-2">{p.name}</p>
-                <p className="text-green-600 font-bold">৳{p.sellingPrice}</p>
+                <div className="h-64 w-full flex items-center justify-center bg-gray-50 rounded-lg">
+                  <Image
+                    src={p.media?.[0]?.secure_url || "/placeholder.png"}
+                    width={220}
+                    height={220}
+                    className="max-h-60 w-auto object-contain"
+                    alt={p.name}
+                  />
+                </div>
+                <p className="text-center font-semibold mt-3 line-clamp-2 min-h-[48px]">
+                  {p.name}
+                </p>
+                <p className="text-center text-2xl font-bold text-green-600 mt-2">
+                  ৳{p.sellingPrice}
+                </p>
               </div>
             ))}
           </div>
@@ -495,7 +511,7 @@ export default function POSPage() {
           <button
             disabled={checkoutLoading}
             onClick={handleCheckout}
-            className="w-full bg-green-600 text-white p-3 mt-3 rounded"
+            className="w-full bg-green-600 text-white p-6 mt-6 rounded"
           >
             {checkoutLoading ? "Processing..." : "Complete Sale"}
           </button>

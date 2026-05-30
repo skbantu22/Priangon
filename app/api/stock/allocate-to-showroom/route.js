@@ -4,7 +4,7 @@ import ShowroomStock from "@/models/ShowroomStock";
 
 // Optional but recommended
 import "@/models/Product.model";
-import "@/models/ProductVariant.model";
+import "@/models/ProductVariant.model ";
 
 export async function POST(req) {
   try {

@@ -268,6 +268,7 @@ ${window.location.href}
             {/* STEP 7: Connect ProductGallery */}
             <ProductGallery
               galleryMedia={flatGallery.map((i) => i.image)}
+              productName={product.name}
               activeIndex={activeIndex}
               setActiveIndex={setActiveIndex}
               onNext={handleNext}
@@ -312,40 +313,103 @@ ${window.location.href}
             </div>
 
             <div className="space-y-4 md:space-y-5 mb-3 md:mb-4 ">
+              {/* PREMIUM COLOR SELECTOR */}
               {colors?.length > 0 && (
                 <div className="select-none">
-                  <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">
-                    Color:
-                    <span className="font-normal text-gray-600 ml-1">
-                      {selectedColor || "Select"}
+                  {/* Heading */}
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm md:text-lg font-semibold text-gray-900 tracking-wide">
+                      Select Color
+                    </h3>
+
+                    <span className="text-xs md:text-sm text-gray-500 font-medium">
+                      {selectedColor}
                     </span>
-                  </h3>
-                  <div className="flex flex-wrap gap-2 sm:gap-3">
+                  </div>
+
+                  {/* Color Grid */}
+                  <div className="flex flex-wrap gap-3">
                     {colors.map((color) => {
                       const isSelected = selectedColor === color;
+
+                      // Variant image
+                      const colorVariant = allVariants.find(
+                        (v) => v.color === color,
+                      );
+
+                      const image =
+                        colorVariant?.media?.[0]?.secure_url ||
+                        product?.media?.[0]?.secure_url;
+
                       return (
                         <button
                           key={color}
                           type="button"
-                          onClick={() => handleVariantSelection(color, null)}
-                          className={`
-                            relative flex items-center gap-2
-                            min-w-[30px] h-[25px] md:h-[40px] px-4
-                            text-xs transition-all duration-200 
-                            rounded-full border
-                            ${
-                              isSelected
-                                ? "border-black bg-white text-black shadow-sm scale-105"
-                                : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-400"
+                          onClick={() => {
+                            const colorIndex = flatGallery.findIndex(
+                              (item) => item.color === color,
+                            );
+
+                            if (colorIndex !== -1) {
+                              setActiveIndex(colorIndex);
                             }
-                            active:scale-90
-                          `}
+                          }}
+                          className={`
+              group relative
+              w-[90px] md:w-[100px]
+              rounded-2xl overflow-hidden
+              transition-all duration-300
+              ${
+                isSelected
+                  ? "ring-2 ring-black shadow-xl scale-[1.03]"
+                  : "border border-gray-200 hover:border-gray-400 hover:shadow-md"
+              }
+            `}
                         >
-                          <span
-                            className={`text-[9px] md:text-[12px] tracking-wider ${isSelected ? "font-bold" : "font-medium"}`}
+                          {/* Image Area */}
+                          <div className="bg-[#f8f8f8] h-[110px] md:h-[125px] flex items-center justify-center overflow-hidden">
+                            <img
+                              src={image}
+                              alt={color}
+                              className="
+                  h-[90px] md:h-[105px]
+                  object-contain
+                  transition-transform duration-300
+                  group-hover:scale-105
+                "
+                            />
+                          </div>
+
+                          {/* Bottom Label */}
+                          <div
+                            className={`
+                px-2 py-2 text-center text-[11px] md:text-xs font-medium tracking-wide uppercase
+                transition-all duration-300
+                ${isSelected ? "bg-black text-white" : "bg-white text-gray-700"}
+              `}
                           >
                             {color}
-                          </span>
+                          </div>
+
+                          {/* Active Badge */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black text-white flex items-center justify-center shadow-md">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="w-3 h-3"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={3}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            </div>
+                          )}
                         </button>
                       );
                     })}

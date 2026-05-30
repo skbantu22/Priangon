@@ -28,15 +28,26 @@ import {
 
 import { sidebarMenu } from "@/lib/adminappsidebarmenu";
 import { Button } from "../../button";
+import { useSelector, useDispatch } from "react-redux";
 
+import { resetOrderNotification } from "@/store/reducer/notificationSlice";
 export default function Appsidebar() {
   const { toggleSidebar, isMobile } = useSidebar();
 
+  const dispatch = useDispatch();
+
+  const notificationCount = useSelector(
+    (state) => state.notification.orderCount,
+  );
+
   // ✅ Close only on mobile after navigation
-  const handleNav = () => {
+  const handleNav = (menuTitle) => {
+    if (menuTitle === "Orders") {
+      dispatch(resetOrderNotification());
+    }
+
     if (isMobile) toggleSidebar();
   };
-
   return (
     <Sidebar className="z-50">
       <SidebarHeader className="border-b h-14 p-0">
@@ -81,12 +92,20 @@ export default function Appsidebar() {
                         >
                           <menu.icon />
                           <span>{menu.title}</span>
+                          {menu.title === "Orders" && notificationCount > 0 && (
+                            <div className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+                              {notificationCount}
+                            </div>
+                          )}
                           <LuChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                     ) : (
-                      <SidebarMenuButton asChild className="flex items-center gap-2">
-                        <Link href={href} onClick={handleNav}>
+                      <SidebarMenuButton
+                        asChild
+                        className="flex items-center gap-2"
+                      >
+                        <Link href={href} onClick={() => handleNav(menu.title)}>
                           <menu.icon />
                           <span>{menu.title}</span>
                         </Link>
@@ -107,7 +126,10 @@ export default function Appsidebar() {
                             return (
                               <SidebarMenuSubItem key={subIndex}>
                                 <SidebarMenuSubButton asChild>
-                                  <Link href={subHref} onClick={handleNav}>
+                                  <Link
+                                    href={subHref}
+                                    onClick={() => handleNav(menu.title)}
+                                  >
                                     {sub.title}
                                   </Link>
                                 </SidebarMenuSubButton>

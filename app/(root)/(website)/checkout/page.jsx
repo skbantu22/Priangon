@@ -73,7 +73,7 @@ export default function CheckoutPage() {
   }, [liveProducts]);
 
   const shipping = useMemo(() => {
-    if (shippingMethod === "inside_dhaka") return 70;
+    if (shippingMethod === "inside_dhaka") return 80;
     if (shippingMethod === "outside_dhaka") return 120;
     return 0;
   }, [shippingMethod]);

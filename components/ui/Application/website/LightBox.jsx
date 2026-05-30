@@ -1,116 +1,210 @@
-import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn, Maximize, Share2 } from 'lucide-react';
+"use client";
 
-const LightBox = ({ images, activeIndex, onClose, onNext, onPrev, onSelect }) => {
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  Share2,
+} from "lucide-react";
+
+const LightBox = ({
+  images = [],
+  activeIndex = 0,
+  onClose,
+  onNext,
+  onPrev,
+  onSelect,
+}) => {
   const [isZoomed, setIsZoomed] = useState(false);
 
-  // Function to handle the native share API
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: 'Product Image',
-        url: window.location.href,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert("Link copied to clipboard!");
+  // ================= NORMALIZE IMAGES =================
+  const normalizedImages = images.map((img) =>
+    typeof img === "string" ? img : img?.secure_url,
+  );
+
+  // ================= ESC KEY CLOSE =================
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose?.();
+
+      if (e.key === "ArrowRight") {
+        onNext?.();
+      }
+
+      if (e.key === "ArrowLeft") {
+        onPrev?.();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, onNext, onPrev]);
+
+  // ================= SHARE =================
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Product",
+          url: window.location.href,
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        alert("Link copied!");
+      }
+    } catch (err) {
+      console.log(err);
     }
   };
 
-  // Toggle Fullscreen mode
-  const toggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else if (document.exitFullscreen) {
-      document.exitFullscreen();
+  // ================= FULLSCREEN =================
+  const toggleFullScreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.log(err);
     }
   };
+
+  // ================= SAFETY =================
+  const currentImage = normalizedImages[activeIndex];
+
+  if (!currentImage) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col select-none transition-all duration-300">
-      {/* 1. Header Tools - Functional Icons */}
-      <div className="flex justify-between items-center p-4 text-white bg-black/50 z-20">
-        <div className="text-[13px] font-medium tracking-widest">
-          {activeIndex + 1} / {images.length}
+    <div className="fixed inset-0 z-[999] bg-black flex flex-col">
+      {/* ================= HEADER ================= */}
+      <div className="h-16 shrink-0 flex items-center justify-between px-4 md:px-6 bg-black/60 backdrop-blur-md border-b border-white/10">
+        <div className="text-white text-sm tracking-wider font-medium">
+          {activeIndex + 1} / {normalizedImages.length}
         </div>
-        <div className="flex gap-6 items-center">
-          <ZoomIn 
-            size={22} 
-            onClick={() => setIsZoomed(!isZoomed)}
-            className={`cursor-pointer transition-colors ${isZoomed ? 'text-blue-400' : 'hover:text-gray-400'}`} 
-          />
-          <Maximize 
-            size={20} 
+
+        <div className="flex items-center gap-2 md:gap-4 text-white">
+          {/* Zoom */}
+          <button
+            type="button"
+            onClick={() => setIsZoomed((prev) => !prev)}
+            className="p-2 rounded-full hover:bg-white/10 transition"
+          >
+            {isZoomed ? <ZoomOut size={20} /> : <ZoomIn size={20} />}
+          </button>
+
+          {/* Fullscreen */}
+          <button
+            type="button"
             onClick={toggleFullScreen}
-            className="cursor-pointer hover:text-gray-400" 
-          />
-          <Share2 
-            size={20} 
+            className="p-2 rounded-full hover:bg-white/10 transition"
+          >
+            <Maximize size={19} />
+          </button>
+
+          {/* Share */}
+          <button
+            type="button"
             onClick={handleShare}
-            className="cursor-pointer hover:text-gray-400" 
-          />
-          <button 
-            onClick={onClose} 
-            className="ml-4 p-1 hover:bg-white/10 rounded-full transition-colors"
+            className="p-2 rounded-full hover:bg-white/10 transition"
           >
-            <X size={28} strokeWidth={1.5} />
+            <Share2 size={19} />
+          </button>
+
+          {/* Close */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-red-500 transition"
+          >
+            <X size={24} />
           </button>
         </div>
       </div>
 
-      {/* 2. Main Image Area - Navigation and Zoom Logic */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-        {/* Navigation Arrows - Hidden if zoomed in */}
+      {/* ================= MAIN IMAGE ================= */}
+      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
+        {/* LEFT */}
         {!isZoomed && (
-          <>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onPrev(); }} 
-              className="absolute left-6 z-20 p-3 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            >
-              <ChevronLeft size={40} strokeWidth={1} />
-            </button>
-            <button 
-              onClick={(e) => { e.stopPropagation(); onNext(); }} 
-              className="absolute right-6 z-20 p-3 text-white/40 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            >
-              <ChevronRight size={40} strokeWidth={1} />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => onPrev?.()}
+            className="absolute left-3 md:left-6 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white hover:bg-white hover:text-black transition"
+          >
+            <ChevronLeft size={28} />
+          </button>
         )}
-        
-        {/* The Main Image */}
-        <div 
-          className={`transition-transform duration-300 ease-in-out ${isZoomed ? 'scale-150 cursor-zoom-out' : 'scale-100 cursor-zoom-in'}`}
-          onClick={() => setIsZoomed(!isZoomed)}
+
+        {/* IMAGE */}
+        <div
+          onClick={() => setIsZoomed((prev) => !prev)}
+          className={`transition-transform duration-300 ${
+            isZoomed ? "scale-150 cursor-zoom-out" : "scale-100 cursor-zoom-in"
+          }`}
         >
-          <img 
-            src={images[activeIndex]?.secure_url} 
-            className="max-h-[80vh] max-w-[95vw] object-contain shadow-2xl"
-            alt="Product view"
+          <img
+            src={currentImage}
+            alt={`product-${activeIndex}`}
+            className="max-h-[82vh] max-w-[95vw] object-contain"
           />
         </div>
+
+        {/* RIGHT */}
+        {!isZoomed && (
+          <button
+            type="button"
+            onClick={() => onNext?.()}
+            className="absolute right-3 md:right-6 z-20 w-12 h-12 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white hover:bg-white hover:text-black transition"
+          >
+            <ChevronRight size={28} />
+          </button>
+        )}
       </div>
 
-      {/* 3. Footer Thumbnails - Matching your exact screenshot style */}
-      <div className="h-32 bg-black/80 flex justify-center items-center gap-3 px-4 pb-6 overflow-x-auto no-scrollbar z-10">
-        {images.map((img, i) => (
-          <button 
-            key={i}
-            onClick={() => {
-              setIsZoomed(false);
-              onSelect(i); // This updates the state in the parent ProductGallery
-            }}
-            className={`relative h-20 aspect-[3/4] shrink-0 overflow-hidden border-2 transition-all duration-200 ${
-              i === activeIndex ? 'border-white opacity-100 scale-105' : 'border-transparent opacity-40 hover:opacity-70'
-            }`}
-          >
-            <img 
-              src={img.secure_url}
-              className="w-full h-full object-cover"
-              alt={`Gallery thumb ${i}`}
-            />
-          </button>
-        ))}
+      {/* ================= THUMBNAILS ================= */}
+      <div className="h-28 md:h-32 shrink-0 bg-black/90 border-t border-white/10">
+        <div className="h-full flex items-center justify-center gap-3 overflow-x-auto no-scrollbar px-4">
+          {normalizedImages.map((img, idx) => {
+            const isActive = idx === activeIndex;
+
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  setIsZoomed(false);
+                  onSelect?.(idx);
+                }}
+                className={`
+                  relative shrink-0 
+                  h-20 md:h-24 
+                  aspect-[3/4] 
+                  overflow-hidden 
+                  rounded-md
+                  border transition-all duration-300
+                  ${
+                    isActive
+                      ? "border-white scale-105 opacity-100"
+                      : "border-white/10 opacity-40 hover:opacity-80"
+                  }
+                `}
+              >
+                <img
+                  src={img}
+                  alt={`thumb-${idx}`}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

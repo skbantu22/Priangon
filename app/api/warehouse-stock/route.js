@@ -31,7 +31,14 @@ export async function GET(req) {
         },
       })
 
-      .populate("variantId", "color size sku")
+      .populate({
+        path: "variantId",
+        select: "color size sku stock media",
+        populate: {
+          path: "media",
+          select: "secure_url",
+        },
+      })
       .sort({ createdAt: -1 });
 
     return Response.json({

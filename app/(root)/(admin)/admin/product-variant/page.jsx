@@ -24,11 +24,7 @@ import {
 import { DT_PRODUCT_VARIANT_COLUMN } from "@/lib/column";
 import { columnConfig } from "@/lib/helperfunction";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
 import { FiPlus } from "react-icons/fi";
@@ -45,61 +41,45 @@ const ShowProductVariant = () => {
   }, []);
 
   // ✅ row action menu
-  const action = useCallback(
-    (row, deleteType, handleDelete) => {
-      const actionMenu = [];
+  const action = useCallback((row, deleteType, handleDelete) => {
+    const actionMenu = [];
 
-      actionMenu.push(
-        <EditAction
-          key="edit"
-          href={ADMIN_PRODUCT__VARIANT_EDIT(row.original._id)}
-        />
-      );
+    actionMenu.push(
+      <EditAction
+        key="edit"
+        href={ADMIN_PRODUCT__VARIANT_EDIT(row.original._id)}
+      />,
+    );
 
-      actionMenu.push(
-        <DeleteAction
-          key="delete"
-          row={row}
-          deleteType={deleteType}
-          handleDelete={handleDelete}
-        />
-      );
+    actionMenu.push(
+      <DeleteAction
+        key="delete"
+        row={row}
+        deleteType={deleteType}
+        handleDelete={handleDelete}
+      />,
+    );
 
-      return actionMenu;
-    },
-    []
-  );
+    return actionMenu;
+  }, []);
 
   return (
     <div>
-      <BreadCrumb breadcrumbData={breadcrumbData} />
-
       <Card className="py-0 rounded shadow-sm">
-        <CardHeader className="pt-3 px-3 border-b flex flex-row items-center justify-between">
-          <h4 className="text-xl font-semibold">Show Products Varient</h4>
-
-          <Button asChild>
-            <Link href={ADMIN_PRODUCT_VARIANT_ADD}>
-              <FiPlus className="mr-2" />
-              New Category
-            </Link>
-          </Button>
-        </CardHeader>
-
-        <CardContent className="pb-5">
+        <CardContent className="p-0 rounded-b-none">
           <DatatableWrapperr
-  queryKey="product-variant-data"
-  fetchUrl="/api/product-variant"
-  initialPageSize={10}
-  columnsConfig={columns}
-  exportEndpoint="/api/product-variant/export"
-  deleteEndpoint="/api/product-variant/delete"
-  deleteType="SD"
-  trashView={`${ADMIN_TRASH}?trashof=product-variant`}
-  createAction={action}
-/>
+            queryKey="product-variant-data"
+            fetchUrl="/api/product-variant"
+            initialPageSize={10}
+            columnsConfig={columns}
+            exportEndpoint="/api/product-variant/export"
+            deleteEndpoint="/api/product-variant/delete"
+            deleteType="SD"
+            trashView={`${ADMIN_TRASH}?trashof=product-variant`}
+            createAction={action}
+          />
         </CardContent>
-      </Card> 
+      </Card>
     </div>
   );
 };

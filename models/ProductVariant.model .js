@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
 
-const productVariantSchema = new mongoose.Schema(
+const producVariantSchema = new mongoose.Schema(
   {
-    // ================= PRODUCT LINK =================
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -10,25 +9,11 @@ const productVariantSchema = new mongoose.Schema(
       index: true,
     },
 
-    // ================= ATTRIBUTES =================
-    color: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    color: { type: String, required: true, trim: true },
 
-    size: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    size: { type: String, required: true, trim: true },
 
-    // ================= PRICING =================
-    mrp: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+    mrp: { type: Number, required: true, min: 0 },
 
     sellingPrice: {
       type: Number,
@@ -49,7 +34,7 @@ const productVariantSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // ================= IDENTIFIERS =================
+    // SKU
     sku: {
       type: String,
       required: true,
@@ -58,6 +43,7 @@ const productVariantSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // ✅ BARCODE
     barcode: {
       type: String,
       unique: true,
@@ -67,49 +53,26 @@ const productVariantSchema = new mongoose.Schema(
     },
 
     stock: { type: Number, required: true, min: 0, default: 0 },
-    sold: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    sold: { type: Number, default: 0, min: 0 },
 
-    // ================= STATUS =================
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    isActive: { type: Boolean, default: true },
 
-    // ================= MEDIA =================
     media: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Media",
-        required: true,
-      },
+      { type: mongoose.Schema.Types.ObjectId, ref: "Media", required: true },
     ],
 
-    description: {
-      type: String,
-      required: true,
-    },
+    description: { type: String, required: true },
 
-    // ================= SOFT DELETE =================
-    deletedAt: {
-      type: Date,
-      default: null,
-      index: true,
-    },
+    deletedAt: { type: Date, default: null, index: true },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
-// ================= UNIQUE VARIANT RULE =================
-productVariantSchema.index({ product: 1, color: 1, size: 1 }, { unique: true });
+// UNIQUE PRODUCT VARIANT
+producVariantSchema.index({ product: 1, color: 1, size: 1 }, { unique: true });
 
-// ================= AUTO DISCOUNT CALC =================
-productVariantSchema.pre("save", function () {
+// AUTO DISCOUNT
+producVariantSchema.pre("save", function () {
   if (this.mrp > 0 && this.sellingPrice >= 0) {
     const pct = ((this.mrp - this.sellingPrice) / this.mrp) * 100;
 
@@ -117,8 +80,8 @@ productVariantSchema.pre("save", function () {
   }
 });
 
-// ================= LINK TO PRODUCT =================
-productVariantSchema.post("save", async function (doc) {
+// AUTO LINK PRODUCT
+producVariantSchema.post("save", async function (doc) {
   try {
     if (!doc.product) return;
 
@@ -130,10 +93,10 @@ productVariantSchema.post("save", async function (doc) {
   }
 });
 
-// ================= REMOVE LINK =================
-productVariantSchema.post("findOneAndDelete", async function (doc) {
+// REMOVE LINK
+producVariantSchema.post("findOneAndDelete", async function (doc) {
   try {
-    if (doc?.product) {
+    if (doc && doc.product) {
       await mongoose.model("Product").findByIdAndUpdate(doc.product, {
         $pull: { variants: doc._id },
       });
@@ -143,9 +106,8 @@ productVariantSchema.post("findOneAndDelete", async function (doc) {
   }
 });
 
-// ================= EXPORT =================
 const ProductVariantModel =
   mongoose.models.ProductVariant ||
-  mongoose.model("ProductVariant", productVariantSchema, "productvariants");
+  mongoose.model("ProductVariant", producVariantSchema, "productvariants");
 
 export default ProductVariantModel;

@@ -50,7 +50,8 @@ const ProductGallery = ({
   };
 
   const nextImg = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
+
     if (typeof onNext === "function") {
       onNext();
     } else {
@@ -59,7 +60,8 @@ const ProductGallery = ({
   };
 
   const prevImg = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
+
     if (typeof onPrev === "function") {
       onPrev();
     } else {
@@ -69,7 +71,11 @@ const ProductGallery = ({
 
   // activeImg ভেরিয়েবল ব্যাকওয়ার্ড কম্পাটিবিলিটির জন্য প্রপ্স বা লোকাল স্টেট থেকে ডিফাইন করা
   const currentActiveIdx = activeIndex !== undefined ? activeIndex : 0;
-
+  useEffect(() => {
+    console.log("galleryMedia:", galleryMedia);
+    console.log("productName:", productName);
+    console.log("activeIndex:", activeIndex);
+  }, [galleryMedia, productName, activeIndex]);
   return (
     <div className="flex flex-col md:flex-row gap-4 w-full">
       {/* ================= THUMBNAILS ================= */}
