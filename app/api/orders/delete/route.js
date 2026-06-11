@@ -3,7 +3,6 @@ import { catchError, response } from "@/lib/helperfunction";
 
 import OrderModel from "@/models/Order.model";
 
-
 /* ================= PUT → Soft Delete / Restore ================= */
 export async function PUT(request) {
   try {
@@ -21,13 +20,11 @@ export async function PUT(request) {
     }
 
     const update =
-      deleteType === "SD"
-        ? { deletedAt: new Date() }
-        : { deletedAt: null };
+      deleteType === "SD" ? { deletedAt: new Date() } : { deletedAt: null };
 
     const result = await OrderModel.updateMany(
       { _id: { $in: ids } },
-      { $set: update }
+      { $set: update },
     );
 
     return response(true, 200, "Category updated successfully", {
@@ -59,10 +56,11 @@ export async function DELETE(request) {
       _id: { $in: ids },
     });
 
-    return response(true, 200, "Category deleted permanently", {
+    return response(true, 200, "Orders deleted permanently", {
       deletedCount: result.deletedCount,
     });
   } catch (error) {
+    console.error("Error in DELETE /api/orders/delete:", error);
     return catchError(error);
   }
 }

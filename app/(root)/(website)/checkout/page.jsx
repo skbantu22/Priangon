@@ -74,7 +74,7 @@ export default function CheckoutPage() {
 
   const shipping = useMemo(() => {
     if (shippingMethod === "inside_dhaka") return 80;
-    if (shippingMethod === "outside_dhaka") return 120;
+    if (shippingMethod === "outside_dhaka") return 150;
     return 0;
   }, [shippingMethod]);
 
@@ -316,22 +316,22 @@ export default function CheckoutPage() {
       console.log("Checkout API response:", response);
 
       // CREATE STEADFAST PARCEL
-      try {
-        await axios.post("/api/courier/steadfast", {
-          invoice: response.orderId,
+      // try {
+      //   await axios.post("/api/courier/steadfast", {
+      //     invoice: response.orderId,
 
-          name: formData.name,
-          phone: formData.phone,
+      //     name: formData.name,
+      //     phone: formData.phone,
 
-          address: `${formData.address}, ${formData.city}`,
+      //     address: `${formData.address}, ${formData.city}`,
 
-          cod_amount: payment === "cod" ? total : 0, //
+      //     cod_amount: payment === "cod" ? total : 0, //
 
-          note: `Order ID: ${response.orderId}`,
-        });
-      } catch (courierError) {
-        console.log("Steadfast Error:", courierError);
-      }
+      //     note: `Order ID: ${response.orderId}`,
+      //   });
+      // } catch (courierError) {
+      //   console.log("Steadfast Error:", courierError);
+      // }
 
       if (!response?.success) throw new Error(response?.message);
 
@@ -725,7 +725,7 @@ export default function CheckoutPage() {
                         </p>
                       </div>
                       <div className="text-sm font-semibold">
-                        {formatCurrency(70)}
+                        {formatCurrency(80)}
                       </div>
                     </label>
 
@@ -740,7 +740,7 @@ export default function CheckoutPage() {
                         </p>
                       </div>
                       <div className="text-sm font-semibold">
-                        {formatCurrency(120)}
+                        {formatCurrency(150)}
                       </div>
                     </label>
                   </RadioGroup>

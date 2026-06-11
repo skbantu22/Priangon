@@ -103,9 +103,6 @@ const Page = () => {
       // newest order
       const newestOrderId = ordersData[0]?._id;
 
-      console.log("OLD:", latestOrderIdRef.current);
-      console.log("NEW:", newestOrderId);
-
       // detect new order
       if (
         latestOrderIdRef.current &&
@@ -205,18 +202,26 @@ const Page = () => {
     try {
       const deleteIds = Array.isArray(ids) ? ids : [ids];
 
-      await fetch("/api/orders", {
+      const res = await fetch("/api/orders/delete", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ids: deleteIds,
+          deleteType: "PD",
         }),
       });
 
-      setOrders((prev) => prev.filter((o) => !deleteIds.includes(o._id)));
+      const data = await res.json();
 
+      console.log(data);
+
+      if (!res.ok) {
+        throw new Error(data.message);
+      }
+
+      setOrders((prev) => prev.filter((o) => !deleteIds.includes(o._id)));
       setSelectedOrders([]);
     } catch (error) {
       console.error(error);
@@ -298,13 +303,35 @@ const Page = () => {
       a.click();
     }
   };
+  const handleConfirmCourierDispatch = async () => {
+    try {
+      console.log("🚀 BUTTON CLICKED");
+      console.log("orderIds:", courierTargets);
+      console.log("courierId:", selectedCarrier);
+      const res = await fetch("/api/couriers/dispatch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderIds: courierTargets,
+          courierId: selectedCarrier,
+        }),
+      });
 
-  const handleConfirmCourierDispatch = () => {
-    handleSetStatus(courierTargets, "Shipped");
+      const data = await res.json();
 
-    setIsCourierModalOpen(false);
+      if (data.success) {
+        alert("Courier order created");
 
-    setSelectedCarrier("");
+        setIsCourierModalOpen(false);
+        setSelectedCarrier("");
+
+        fetchOrders(); // refresh
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleCreateOrder = async (e) => {
