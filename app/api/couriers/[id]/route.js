@@ -1,5 +1,5 @@
 import { connectDB } from "@/lib/databaseconnection";
-import Courier from "@/models/Courier";
+import Courier from "@/models/Courier.model";
 
 export async function PUT(req, { params }) {
   await connectDB();
