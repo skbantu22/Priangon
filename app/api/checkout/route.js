@@ -6,8 +6,6 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/databaseconnection";
 import { getNextOrderNumber } from "@/lib/getNextOrderNumber";
 
-import steadfast from "@/lib/steadfast";
-
 import OrderModel from "@/models/Order.model";
 import ProductModel from "@/models/Product.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
@@ -16,7 +14,7 @@ import CouponModel from "@/models/Coupon.model";
 const shippingMap = {
   dhaka: 80,
 
-  other: 120,
+  other: 150,
 };
 
 export async function POST(req) {
