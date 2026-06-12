@@ -1,12 +1,25 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, MapPinned, PhoneCall, MailOpen } from "lucide-react";
 
 const footerData = [
   {
-    title: "Get in touch",
-    links: [{ label: "Contact Us", href: "/contact" }],
+    title: "Contact Us",
+    links: [
+      {
+        label: "📍 House 25, Road 10, Sector 4, Uttara, Dhaka",
+        href: "#",
+      },
+      {
+        label: "📞 01400209876",
+        href: "tel:01400209876",
+      },
+      {
+        label: "✉️ minithailand@gmail.com",
+        href: "mailto:minithailand@gmail.com",
+      },
+    ],
   },
   {
     title: "Policies",
@@ -54,18 +67,43 @@ const FooterSection = ({ title, links }) => {
           isOpen ? "max-h-96 pb-5" : "max-h-0"
         } lg:max-h-none lg:block lg:mt-5`}
       >
-        <ul className="space-y-2.5">
-          {links.map((link) => (
-            <li key={link.label}>
-              <Link
-                href={link.href}
-                className="text-zinc-400 hover:text-red-600 transition-colors duration-200 text-[13px]"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {title === "Contact Us" ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 text-zinc-400 text-[13px]">
+              <MapPinned size={18} className="text-red-600 mt-0.5 shrink-0" />
+              <span>House 25, Road 10, Sector 4, Uttara, Dhaka</span>
+            </div>
+
+            <a
+              href="tel:01400209876"
+              className="flex items-center gap-3 text-zinc-400 hover:text-red-600 transition-colors text-[13px]"
+            >
+              <PhoneCall size={18} className="text-red-600 shrink-0" />
+              <span>01400209876</span>
+            </a>
+
+            <a
+              href="mailto:minithailand@gmail.com"
+              className="flex items-center gap-3 text-zinc-400 hover:text-red-600 transition-colors text-[13px]"
+            >
+              <MailOpen size={18} className="text-red-600 shrink-0" />
+              <span>minithailand@gmail.com</span>
+            </a>
+          </div>
+        ) : (
+          <ul className="space-y-2.5">
+            {links.map((link) => (
+              <li key={link.label}>
+                <Link
+                  href={link.href}
+                  className="text-zinc-400 hover:text-red-600 transition-colors duration-200 text-[13px]"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

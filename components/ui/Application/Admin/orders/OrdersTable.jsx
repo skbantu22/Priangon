@@ -143,9 +143,10 @@ export default function OrdersTable({
                 const consignmentId = courierData?.consignmentId || "";
 
                 const hasCourier =
-                  courierStatus === "created" ||
-                  !!trackingCode ||
-                  !!consignmentId;
+                  order?.status !== "pending" &&
+                  (courierStatus === "created" ||
+                    !!trackingCode ||
+                    !!consignmentId);
 
                 return (
                   <tr
@@ -285,9 +286,10 @@ export default function OrdersTable({
               const consignmentId = courierData?.consignmentId || "";
 
               const hasCourier =
-                courierStatus === "created" ||
-                !!trackingCode ||
-                !!consignmentId;
+                order?.status !== "pending" &&
+                (courierStatus === "created" ||
+                  !!trackingCode ||
+                  !!consignmentId);
 
               return (
                 <div

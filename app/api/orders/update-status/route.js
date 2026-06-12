@@ -5,31 +5,35 @@ import OrderModel from "@/models/Order.model";
 
 export async function PUT(request) {
   try {
-//     const auth = await isAuthenticated('admin')
-// if (!auth.isAuth) {
-//   return response(false, 403, 'Unauthorized.')
-// }
-    await connectDB()
- const { _id, status } = await request.json()
+    await connectDB();
 
-if (!_id || !status) {
-  return response(false, 400, 'Order id and status are required.')
-}
+    const body = await request.json();
 
-const orderData = await OrderModel.findById(_id)
+    console.log("REQUEST BODY:", body);
 
-if (!orderData) {
-  return response(false, 404, 'Order not found.')
-}
+    const { ids, status } = body;
 
-orderData.status = status
-await orderData.save()
+    console.log("IDS:", ids);
+    console.log("STATUS:", status);
 
-return response(true, 200, 'Order status updated successfully.', orderData)
-  }
+    if (!ids?.length || !status) {
+      return response(false, 400, "Ids and status are required.");
+    }
 
+    const result = await OrderModel.updateMany(
+      {
+        _id: { $in: ids },
+      },
+      {
+        $set: { status },
+      },
+    );
 
-   catch (error) {
-    return catchError(error)
+    console.log("UPDATE RESULT:", result);
+
+    return response(true, 200, "Order status updated successfully.", result);
+  } catch (error) {
+    console.error("UPDATE STATUS ERROR:", error);
+    return catchError(error);
   }
 }

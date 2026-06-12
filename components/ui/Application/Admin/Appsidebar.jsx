@@ -52,10 +52,11 @@ export default function Appsidebar() {
     <Sidebar className="z-50">
       <SidebarHeader className="border-b h-14 p-0">
         <div className="flex justify-between items-center px-4">
-          <h1 className="text-xl font-bold tracking-wide text-primary">
-            Priangon
+          <h1 className="text-2xl md:text-3xl font-black tracking-wider">
+            <span className="bg-gradient-to-r from-primary via-pink-500 to-orange-500 bg-clip-text text-transparent">
+              MiniThailand
+            </span>
           </h1>
-
           <Button
             onClick={toggleSidebar}
             type="button"

@@ -93,6 +93,7 @@ export async function GET(req) {
 
       if (!grouped[sid]) {
         grouped[sid] = {
+          _id: sid,
           showroom: item.showroomId.name,
           items: [],
           map: new Map(),
@@ -176,8 +177,9 @@ export async function GET(req) {
       },
 
       ...Object.values(grouped).map((g) => ({
-        showroom: g.showroom,
+        _id: g._id,
         items: g.items,
+        showroom: g.showroom, // <-- ADD THIS
       })),
     ];
 

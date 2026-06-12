@@ -32,7 +32,7 @@ const Page = () => {
   /* =========================
      STATES
   ========================= */
-
+  const knownIdsRef = useRef([]);
   const [orders, setOrders] = useState([]);
   const latestOrderIdRef = useRef(null);
   const dispatch = useDispatch();
@@ -95,25 +95,23 @@ const Page = () => {
       setLoading(true);
 
       const res = await fetch("/api/orders");
-
       const data = await res.json();
 
       const ordersData = data.data || [];
 
-      // newest order
-      const newestOrderId = ordersData[0]?._id;
+      // detect truly new orders
+      if (knownIdsRef.current.size > 0) {
+        const newOrders = ordersData.filter(
+          (order) => !knownIdsRef.current.has(order._id),
+        );
 
-      // detect new order
-      if (
-        latestOrderIdRef.current &&
-        newestOrderId &&
-        newestOrderId !== latestOrderIdRef.current
-      ) {
-        dispatch(incrementOrderNotification());
+        if (newOrders.length > 0) {
+          dispatch(incrementOrderNotification());
+        }
       }
 
-      // save latest id
-      latestOrderIdRef.current = newestOrderId;
+      // save current ids
+      knownIdsRef.current = new Set(ordersData.map((order) => order._id));
 
       setOrders(ordersData);
     } catch (error) {
@@ -122,7 +120,6 @@ const Page = () => {
       setLoading(false);
     }
   };
-
   /* =========================
      FILTERED ORDERS
   ========================= */
@@ -251,16 +248,33 @@ const Page = () => {
     setIsCourierModalOpen(true);
   };
 
-  const handleSetStatus = (ids, status) => {
-    const updateIds = Array.isArray(ids) ? ids : [ids];
+  const handleSetStatus = async (ids, status) => {
+    try {
+      const updateIds = Array.isArray(ids) ? ids : [ids];
 
-    setOrders((prev) =>
-      prev.map((order) =>
-        updateIds.includes(order._id) ? { ...order, status } : order,
-      ),
-    );
+      console.log("SENDING:", {
+        ids: updateIds,
+        status,
+      });
+
+      const res = await fetch("/api/orders/update-status", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ids: updateIds,
+          status,
+        }),
+      });
+
+      const data = await res.json();
+
+      console.log("RESPONSE:", data);
+    } catch (error) {
+      console.error(error);
+    }
   };
-
   const exportData = (type) => {
     if (type === "json") {
       const blob = new Blob([JSON.stringify(filteredOrders, null, 2)], {

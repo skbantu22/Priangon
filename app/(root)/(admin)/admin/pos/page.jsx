@@ -27,20 +27,34 @@ export default function POSPage() {
 
   // ---------------- FETCH PRODUCTS ----------------
   const fetchProducts = useCallback(
-    async (q = "") => {
+    async (q = "", showroomIdParam = "") => {
       if (!user) return;
 
       try {
         setLoading(true);
 
         const params = new URLSearchParams();
-        if (q) params.set("q", q);
 
-        const showroomId = user?.data?.user?.showroomId;
-
-        if (user?.data?.user?.role !== "admin" && showroomId) {
-          params.set("showroomId", showroomId);
+        if (q) {
+          params.set("q", q);
         }
+
+        // =========================
+        // SHOWROOM FILTER
+        // =========================
+        if (user?.data?.user?.role === "admin") {
+          if (showroomIdParam) {
+            params.set("showroomId", showroomIdParam);
+          }
+        } else {
+          const showroomId = user?.data?.user?.showroomId;
+
+          if (showroomId) {
+            params.set("showroomId", showroomId);
+          }
+        }
+
+        console.log("POS URL:", `/api/pos?${params.toString()}`);
 
         const res = await fetch(`/api/pos?${params.toString()}`, {
           cache: "no-store",
@@ -58,15 +72,13 @@ export default function POSPage() {
             media: Array.isArray(product.media) ? product.media : [],
 
             variants: (item?.variants || []).map((v) => {
-              const variant = v?.variantId || {};
-
               return {
-                _id: variant._id || v._id,
-                color: v.color || variant.color || "N/A",
-                size: v.size || variant.size || "N/A",
-                stock: v.showroomStock ?? variant.showroomStock ?? 0,
-                barcode: v.barcode || variant.barcode || "",
-                sellingPrice: variant.sellingPrice || product.sellingPrice || 0,
+                _id: v._id,
+                color: v.color || "N/A",
+                size: v.size || "N/A",
+                stock: v.showroomStock || 0,
+                barcode: v.barcode || "",
+                sellingPrice: v.sellingPrice || product.sellingPrice || 0,
               };
             }),
           };
@@ -74,7 +86,7 @@ export default function POSPage() {
 
         setProducts(formatted);
       } catch (error) {
-        console.log(error);
+        console.log("FETCH PRODUCTS ERROR:", error);
       } finally {
         setLoading(false);
       }
@@ -94,18 +106,20 @@ export default function POSPage() {
     fetchShowrooms();
   }, [user]);
 
-  // 2. This is your existing product fetcher
   useEffect(() => {
-    if (user) fetchProducts("");
-  }, [user, fetchProducts]);
+    if (user) {
+      fetchProducts("", selectedShowroomId);
+      setCart([]);
+    }
+  }, [user, selectedShowroomId, fetchProducts]);
 
-  // 3. This is your existing search bar debouncer
   useEffect(() => {
     const t = setTimeout(() => {
-      fetchProducts(search);
+      fetchProducts(search, selectedShowroomId);
     }, 300);
+
     return () => clearTimeout(t);
-  }, [search, fetchProducts]);
+  }, [search, selectedShowroomId, fetchProducts]);
 
   // ==========================================================
   // PASTE THE NEW CODE DIRECTLY HERE:
@@ -445,8 +459,11 @@ export default function POSPage() {
                 <p className="text-center font-semibold mt-3 line-clamp-2 min-h-[48px]">
                   {p.name}
                 </p>
-                <p className="text-center text-2xl font-bold text-green-600 mt-2">
-                  ৳{p.sellingPrice}
+                <p className="text-center mt-2 flex items-center justify-center gap-1">
+                  <span className="text-3xl font-extrabold text-green-600 tracking-tight">
+                    {Number(p.sellingPrice).toLocaleString()}
+                  </span>
+                  <span className="text-3xl font-bold text-green-700">৳</span>
                 </p>
               </div>
             ))}
@@ -462,7 +479,7 @@ export default function POSPage() {
           {cart.map((item) => (
             <div key={item.variantId} className="border p-2 rounded">
               <div className="flex justify-between">
-                <p className="text-sm">{item.name}</p>
+                <p className="text-lg font-semibold">{item.name}</p>
                 <button onClick={() => removeCartItem(item.variantId)}>
                   ✕
                 </button>
@@ -478,18 +495,25 @@ export default function POSPage() {
         </div>
 
         <div className="mt-4 border-t pt-3">
-          <div className="flex justify-between font-bold">
+          <div className="flex justify-between text-3xl font-bold">
             <span>Total</span>
-            <span>৳{total}</span>
+            <span>{total}৳</span>
           </div>
 
           {user?.data?.user?.role === "admin" && (
             <select
-              className="w-full border p-2 mt-2"
+              className="w-full border p-2 mt-2 text-lg"
               value={selectedShowroomId}
-              onChange={(e) => setSelectedShowroomId(e.target.value)}
+              onChange={(e) => {
+                const showroomId = e.target.value;
+
+                setSelectedShowroomId(showroomId);
+
+                fetchProducts(search, showroomId);
+              }}
             >
               <option value="">Select Showroom</option>
+
               {showrooms.map((s) => (
                 <option key={s._id} value={s._id}>
                   {s.name}
@@ -511,7 +535,7 @@ export default function POSPage() {
           <button
             disabled={checkoutLoading}
             onClick={handleCheckout}
-            className="w-full bg-green-600 text-white p-6 mt-6 rounded"
+            className="w-full bg-green-600 text-white p-6 mt-6 rounded text-xl font-bold"
           >
             {checkoutLoading ? "Processing..." : "Complete Sale"}
           </button>
