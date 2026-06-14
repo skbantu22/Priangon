@@ -5,7 +5,7 @@ import { catchError, response } from "@/lib/helperfunction";
 import MediaModel from "@/models/Media.model";
 import CategoryModel from "@/models/category.model";
 import SubCategoryModel from "@/models/subcategory.model";
-
+import { sizes as SIZE_MAP } from "@/lib/utils";
 export async function GET(request, { params }) {
   try {
     await connectDB();
@@ -66,9 +66,17 @@ export async function GET(request, { params }) {
     };
 
     const allVariants = rawVariants.sort((a, b) => sortSizes(a.size, b.size));
-    const sortedSizes = [...new Set(allVariants.map((v) => v.size))].filter(
-      Boolean,
-    );
+
+    const sortedSizes = [...new Set(allVariants.map((v) => v.size))]
+      .filter(Boolean)
+      .map((size) => {
+        const match = SIZE_MAP.find((s) => s.value === size);
+
+        return {
+          value: size,
+          label: match?.label || size,
+        };
+      });
     const getColor = [...new Set(allVariants.map((v) => v.color))];
 
     const activeVariant =

@@ -30,6 +30,7 @@ const ProductDetails = ({
   allVariants = [],
   colors = [],
   similarProducts = [],
+  sizes = { sizes },
 }) => {
   const cartStore = useSelector((store) => store.cartStore);
   const dispatch = useDispatch();
@@ -129,17 +130,24 @@ ${window.location.href}
       if (colorIndex !== -1) setActiveIndex(colorIndex);
     }
   };
-
+  const sizeMap = useMemo(() => {
+    const map = {};
+    (sizes || []).forEach((s) => {
+      map[s.value] = s.label;
+    });
+    return map;
+  }, [sizes]);
   // কালার ওয়াইজ ডাইনামিক সাইজ লিস্ট (স্টক চেক করার জন্য)
   const dynamicSizes = useMemo(() => {
     return allVariants
       .filter((v) => v.color === selectedColor)
       .map((v) => ({
         size: v.size,
+        label: sizeMap[v.size] || v.size,
         stock: v.stock || 0,
         id: v._id,
       }));
-  }, [selectedColor, allVariants]);
+  }, [selectedColor, allVariants, sizeMap]);
 
   // ==========================================
   // STEP 5: Dynamic Price, SKU, Stock
@@ -420,9 +428,6 @@ ${window.location.href}
               <div className="mt-4">
                 <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">
                   Size:
-                  <span className="font-normal text-gray-600 ml-1">
-                    {selectedSize || "Select"}
-                  </span>
                 </h3>
                 <div className="flex flex-wrap items-center gap-2 md:gap-3 ">
                   {dynamicSizes.length > 0 ? (
@@ -453,7 +458,7 @@ ${window.location.href}
                               isSelected ? "font-semibold" : "font-normal"
                             }
                           >
-                            {item.size}
+                            {item.label}
                           </span>
                           {item.stock === 0 && (
                             <span className="absolute inset-0 flex items-center justify-center pointer-events-none">

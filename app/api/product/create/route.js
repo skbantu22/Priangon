@@ -10,7 +10,7 @@ export async function POST(request) {
 
     const payload = await request.json();
 
-    // ✅ Zod validation schema
+    // ✅ Validation schema
     const schema = zSchema.pick({
       name: true,
       slug: true,
@@ -34,7 +34,7 @@ export async function POST(request) {
 
     let productData = validate.data;
 
-    // ✅ CLEAN subcategory (IMPORTANT FIX)
+    // ✅ Clean subcategory
     productData.subcategory =
       productData.subcategory && productData.subcategory !== ""
         ? productData.subcategory
@@ -45,8 +45,6 @@ export async function POST(request) {
       name: productData.name,
       slug: productData.slug,
       category: productData.category,
-
-      // ✅ SAFE OPTIONAL FIELD
       subcategory: productData.subcategory,
 
       mrp: productData.mrp,
@@ -66,7 +64,8 @@ export async function POST(request) {
 
     await newProduct.save();
 
-    return response(true, 200, "Product added successfully.");
+    // ✅ FIX: return created product
+    return response(true, 200, "Product added successfully.", newProduct);
   } catch (error) {
     console.log("PRODUCT CREATE ERROR:");
     console.log(error);

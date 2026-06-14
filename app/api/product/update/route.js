@@ -1,9 +1,8 @@
 import { connectDB } from "@/lib/databaseconnection";
-import { catchError, response } from "@/lib/helperfunction";
+import { response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
-import { z } from "zod";
 
 export async function PUT(request) {
   try {
@@ -11,75 +10,63 @@ export async function PUT(request) {
 
     const payload = await request.json();
 
-    const schema = zSchema
-      .pick({
-        _id: true,
-        name: true,
-        slug: true,
-        category: true,
-        subcategory: true,
-        mrp: true,
-        sellingPrice: true,
-        discountPercentage: true,
-        description: true,
-        media: true,
-        offers: true,
-        freeDelivery: true,
-        color: true, // ✅ ADDED
-        size: true, // ✅ ADDED
-      })
-      .extend({
-        sizeChart: z.string().optional().or(z.literal("")).nullable(), // ✅ ADDED
-      });
+    const schema = zSchema.pick({
+      _id: true,
+      name: true,
+      slug: true,
+      category: true,
+      subcategory: true,
+      mrp: true,
+      sellingPrice: true,
+      discountPercentage: true,
+      description: true,
+      media: true,
+    });
 
     const validate = schema.safeParse(payload);
 
-    // ✅ Zod error show
     if (!validate.success) {
-      console.log("ZOD ERROR:", validate.error.format());
-
       return response(false, 400, "Validation Error", validate.error.format());
     }
 
-    const validatedData = validate.data;
+    const data = validate.data;
 
-    // ✅ Check _id
-    if (!validatedData?._id) {
+    if (!data?._id) {
       return response(false, 400, "_id missing");
     }
 
-    const getProduct = await ProductModel.findOne({
+    const product = await ProductModel.findOne({
       deletedAt: null,
-      _id: validatedData._id,
+      _id: data._id,
     });
 
-    if (!getProduct) {
+    if (!product) {
       return response(false, 404, "Product not found");
     }
 
-    getProduct.name = validatedData.name;
-    getProduct.slug = validatedData.slug;
-    getProduct.category = validatedData.category;
-    getProduct.subcategory = validatedData.subcategory;
-    getProduct.mrp = validatedData.mrp;
-    getProduct.sellingPrice = validatedData.sellingPrice;
-    getProduct.discountPercentage = validatedData.discountPercentage;
-    getProduct.description = encode(validatedData.description);
-    getProduct.media = validatedData.media;
-    getProduct.color = validatedData.color; // ✅ ADDED
-    getProduct.size = validatedData.size; // ✅ ADDED
-    getProduct.sizeChart =
-      validatedData.sizeChart && validatedData.sizeChart !== ""
-        ? validatedData.sizeChart
-        : null; // ✅ ADDED
+    // ✅ SAFE ObjectId handling (IMPORTANT FIX)
+    const subcategory =
+      data.subcategory && data.subcategory !== "" ? data.subcategory : null;
 
-    await getProduct.save();
+    const category =
+      data.category && data.category !== "" ? data.category : null;
+
+    // ✅ Assign safely
+    product.name = data.name;
+    product.slug = data.slug;
+    product.category = category;
+    product.subcategory = subcategory;
+    product.mrp = data.mrp;
+    product.sellingPrice = data.sellingPrice;
+    product.discountPercentage = data.discountPercentage;
+    product.description = encode(data.description);
+    product.media = data.media;
+
+    await product.save();
 
     return response(true, 200, "Product updated successfully.");
   } catch (error) {
     console.log(error);
-
-    // ✅ Axios readable error
-    return response(false, 500, error.message, error);
+    return response(false, 500, error.message);
   }
 }

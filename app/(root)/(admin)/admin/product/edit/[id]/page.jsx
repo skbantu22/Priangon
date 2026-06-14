@@ -7,6 +7,7 @@ import axios from "axios";
 import slugify from "slugify";
 import Image from "next/image";
 import { X, ImageIcon, LayoutGrid } from "lucide-react";
+import { z } from "zod";
 
 // UI Components
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
@@ -30,6 +31,7 @@ import { ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
 import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
+import VariantManager from "@/components/ui/Application/Admin/products/modals/VariantManager";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -434,6 +436,8 @@ const EditProduct = ({ params }) => {
         setSelectedMedia={setSelectedMedia}
         isMultiple={true}
       />
+
+      <VariantManager productId={id} />
     </div>
   );
 };

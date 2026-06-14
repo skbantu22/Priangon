@@ -1,16 +1,39 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
-import { zSchema } from "@/lib/zodschema";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
 import WarehouseStock from "@/models/WarehouseStock.model";
+
+// SKU generator
+const generateSKU = (productId) => {
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `SKU-${productId.toString().slice(-4)}-${rand}`;
+};
+
+// Barcode generator (12 digit)
+const generateBarcode = () => {
+  let code = "";
+  for (let i = 0; i < 12; i++) {
+    code += Math.floor(Math.random() * 10);
+  }
+  return code;
+};
 
 export async function POST(request) {
   try {
     await connectDB();
     const payload = await request.json();
 
-    // ১. ডুপ্লিকেট কম্বিনেশন চেক (একই প্রোডাক্টের একই কালার ও সাইজ কি আগে থেকেই আছে?)
+    // 1. Product check
+    const product = await ProductModel.findById(payload.product).select(
+      "mrp sellingPrice",
+    );
+
+    if (!product) {
+      return response(false, 404, "Product not found");
+    }
+
+    // 2. Duplicate variant check
     const existingVariant = await ProductVariantModel.findOne({
       product: payload.product,
       color: payload.color,
@@ -25,75 +48,57 @@ export async function POST(request) {
       );
     }
 
-    // ২. SKU ইউনিক চেক (SKU সবসময় ইউনিক হতে হবে)
-    const existingSku = await ProductVariantModel.findOne({ sku: payload.sku });
-    if (existingSku) {
-      return response(
-        false,
-        400,
-        "এই SKU টি অন্য একটি ভ্যারিয়েন্টে ব্যবহার করা হয়েছে।",
-      );
-    }
+    // 3. Stock sanitize
+    const initialStock = Math.max(0, Number(payload.stock) || 0);
 
-    // ৩. Zod validation
-    const schema = zSchema.pick({
-      product: true,
-      sku: true,
-      color: true,
-      size: true,
-      mrp: true,
-      sellingPrice: true,
-      stock: true,
-      description: true,
-      media: true,
-      isActive: true,
-      barcode: true,
-    });
+    // 4. Auto generate identifiers
+    const sku = generateSKU(payload.product);
+    const barcode = generateBarcode();
 
-    const validate = schema.safeParse(payload);
-    if (!validate.success) {
-      return response(false, 400, "ভ্যালিডেশন এরর।", validate.error);
-    }
+    // 5. CREATE VARIANT (PRICE FROM PRODUCT + PRICE SOURCE SYSTEM)
+    const newProductVariant = await ProductVariantModel.create({
+      product: payload.product,
+      color: payload.color || "",
+      size: payload.size || "",
 
-    const variantData = validate.data;
+      sku,
+      barcode,
 
-    // ৪. স্টক নেগেтивного নিচে নামলে ০ করে দিন
-    const initialStock = variantData.stock < 0 ? 0 : variantData.stock;
+      // ✅ inherit product price
+      mrp: product.mrp,
+      sellingPrice: product.sellingPrice,
 
-    // ৫. Create Variant
-    const newProductVariant = new ProductVariantModel({
-      ...variantData,
+      // ✅ IMPORTANT: price source system
+      priceSource: "PRODUCT",
+
       stock: initialStock,
-      sold: 0, // নতুন প্রোডাক্টের ক্ষেত্রে সোল্ড সবসময় ০ হবে
+      sold: 0,
+
+      media: payload.media || [],
+      isActive: payload.isActive ?? true,
     });
 
-    await newProductVariant.save();
-
-    // =========================================================
-    // 🔥 ৫.১ নতুন সংযোজন: WarehouseStock মডেলে মাদার স্টক এন্ট্রি করা
-    // =========================================================
+    // 6. Warehouse stock entry
     await WarehouseStock.create({
-      productId: variantData.product,
+      productId: payload.product,
       variantId: newProductVariant._id,
-      stock: initialStock, // ফ্রন্টএন্ড থেকে আসা ৫০/৬০ বা যা দেওয়া হবে
-      reservedStock: 0, // প্রাথমিকভাবে রিজার্ভ স্টক ০ থাকবে
+      stock: initialStock,
+      reservedStock: 0,
     });
 
-    // ৬. Push variant ID into Product.variants
-    await ProductModel.findByIdAndUpdate(variantData.product, {
-      $addToSet: { variants: newProductVariant._id }, // ডুপ্লিকেট পুশ রোধ করবে
+    // 7. Link variant to product
+    await ProductModel.findByIdAndUpdate(payload.product, {
+      $addToSet: { variants: newProductVariant._id },
     });
 
-    return response(
-      true,
-      201,
-      "ভ্যারিয়েন্ট এবং ওয়ারহাউজ স্টক সফলভাবে তৈরি হয়েছে।",
-      {
-        variantId: newProductVariant._id,
-      },
-    );
+    return response(true, 201, "ভ্যারিয়েন্ট সফলভাবে তৈরি হয়েছে।", {
+      variantId: newProductVariant._id,
+      sku,
+      barcode,
+      priceSource: "PRODUCT",
+    });
   } catch (error) {
-    console.error("Error creating product variant and warehouse stock:", error);
+    console.error("Error creating product variant:", error);
     return catchError(error, "ভ্যারিয়েন্ট অ্যাড করতে সমস্যা হয়েছে।");
   }
 }

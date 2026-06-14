@@ -29,7 +29,7 @@ const money = (n) => `৳ ${Number(n || 0).toLocaleString("en-BD")}`;
 // Fetchers
 // -----------------------------------------------------
 async function fetchCategories() {
-  const res = await fetch("/api/category", { cache: "no-store" });
+  const res = await fetch("/api/category?size=1000", { cache: "no-store" });
   const json = await res.json();
   if (!json?.success) {
     throw new Error(json?.message || "Failed to load categories");

@@ -2,22 +2,28 @@ import mongoose from "mongoose";
 
 const POSOrderSchema = new mongoose.Schema(
   {
-    orderNumber: String,
-
-    // Showroom Name
-    showroomId: {
-      type: String, // <-- Changed from ObjectId to String
+    // =========================
+    // BASIC INFO
+    // =========================
+    orderNumber: {
+      type: String,
       required: true,
     },
 
-    // User
+    showroomId: {
+      type: String,
+      required: true,
+    },
+
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
 
-    // Products
+    // =========================
+    // ITEMS (ORIGINAL SALE)
+    // =========================
     items: [
       {
         productId: {
@@ -25,7 +31,18 @@ const POSOrderSchema = new mongoose.Schema(
           ref: "Product",
         },
 
-        productName: String,
+        variantId: {
+          type: mongoose.Schema.Types.ObjectId,
+        },
+
+        productName: {
+          type: String,
+          required: true,
+        },
+
+        image: String,
+        color: String,
+        size: String,
 
         qty: {
           type: Number,
@@ -37,32 +54,147 @@ const POSOrderSchema = new mongoose.Schema(
           required: true,
         },
 
-        subtotal: Number,
+        subtotal: {
+          type: Number,
+          required: true,
+        },
       },
     ],
 
-    // Order Total
+    // =========================
+    // BILL SUMMARY
+    // =========================
+    subTotal: {
+      type: Number,
+      required: true,
+    },
+
+    discount: {
+      type: Number,
+      default: 0,
+    },
+
+    vat: {
+      type: Number,
+      default: 0,
+    },
+
     total: {
       type: Number,
       required: true,
     },
 
-    // Payment
+    // =========================
+    // CUSTOMER INFO
+    // =========================
+    customerName: String,
+    phone: String,
+    address: String,
+
+    saleDate: {
+      type: Date,
+      default: Date.now,
+    },
+
+    remark: String,
+
+    soldBy: String,
+
+    // =========================
+    // PAYMENT INFO
+    // =========================
     paymentMethod: {
       type: String,
       default: "cash",
     },
 
-    // Status
+    payments: [
+      {
+        type: {
+          type: String, // Cash / bKash / Card / Bank
+        },
+        option: String, // transaction id / reference
+        amount: Number,
+      },
+    ],
+
+    paymentDetails: {
+      transactionId: String,
+      cardDigits: String,
+      bankTxnRef: String,
+    },
+
+    // =========================
+    // ORDER STATUS
+    // =========================
     status: {
       type: String,
+      enum: ["completed", "cancelled", "refunded"],
       default: "completed",
     },
 
-    // Order Type
     orderType: {
       type: String,
       default: "pos",
+    },
+
+    // =========================
+    // 🔥 EXCHANGE SYSTEM (REAL POS)
+    // =========================
+    exchange: {
+      isExchange: {
+        type: Boolean,
+        default: false,
+      },
+
+      reason: String,
+
+      originalOrderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "POSOrder",
+      },
+
+      returnedItems: [
+        {
+          productId: mongoose.Schema.Types.ObjectId,
+          variantId: mongoose.Schema.Types.ObjectId,
+          productName: String,
+          qty: Number,
+          price: Number,
+          subtotal: Number,
+        },
+      ],
+
+      newItems: [
+        {
+          productId: mongoose.Schema.Types.ObjectId,
+          variantId: mongoose.Schema.Types.ObjectId,
+          productName: String,
+          qty: Number,
+          price: Number,
+          subtotal: Number,
+        },
+      ],
+
+      refundAmount: {
+        type: Number,
+        default: 0,
+      },
+
+      extraPaid: {
+        type: Number,
+        default: 0,
+      },
+
+      exchangeDate: {
+        type: Date,
+        default: Date.now,
+      },
+
+      processedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     },
   },
   {

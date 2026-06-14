@@ -33,6 +33,7 @@ import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
 import { z } from "zod";
+import { useRouter } from "next/navigation";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -51,6 +52,7 @@ const AddProduct = () => {
   const [subCategoryOption, setSubCategoryOption] = useState([]);
   const [resetKey, setResetKey] = useState(0);
 
+  const router = useRouter();
   // Schema with explicit sizeChart field
   const formSchema = zSchema
     .pick({
@@ -162,24 +164,38 @@ const AddProduct = () => {
   }, [watchedMrp, watchedSellingPrice, form]);
 
   const onSubmit = async (values) => {
-    const cleanText = values.description.replace(/<[^>]*>/g, "").trim();
+    const cleanText = (values.description || "").replace(/<[^>]*>/g, "").trim();
+
     if (!cleanText) {
       showToast("error", "Product description cannot be empty!");
       return;
     }
 
     setLoading(true);
+
     try {
       const { data: response } = await axios.post(
         "/api/product/create",
         values,
       );
+
       if (response?.success) {
         showToast("success", "Listing Published!");
+
         form.reset();
         setSelectedMedia([]);
         setSizeChartMedia(null);
         setResetKey((p) => p + 1);
+
+        // ✅ SAFE EXTRACTION (based on backend fix)
+        const createdProduct = response.data || response.product;
+
+        if (!createdProduct?._id) {
+          showToast("error", "Product created but ID missing");
+          return;
+        }
+
+        router.push(`/admin/product/edit/${createdProduct._id}`);
       }
     } catch (error) {
       showToast("error", "Check required fields or connection");
