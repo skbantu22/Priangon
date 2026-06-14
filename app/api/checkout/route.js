@@ -8,7 +8,7 @@ import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 
 import OrderModel from "@/models/Order.model";
 import ProductModel from "@/models/Product.model";
-import ProductVariantModel from "@/models/ProductVariant.model";
+import ProductVariantModel from "@/models/ProductVariant.model ";
 import CouponModel from "@/models/Coupon.model";
 
 const shippingMap = {
