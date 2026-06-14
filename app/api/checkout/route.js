@@ -4,16 +4,15 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { connectDB } from "@/lib/databaseconnection";
-import { getNextOrderNumber } from "@/lib/getNextOrderNumber";
+import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 
 import OrderModel from "@/models/Order.model";
 import ProductModel from "@/models/Product.model";
-import ProductVariantModel from "@/models/ProductVariant.model ";
+import ProductVariantModel from "@/models/ProductVariant.model";
 import CouponModel from "@/models/Coupon.model";
 
 const shippingMap = {
   dhaka: 80,
-
   other: 150,
 };
 
@@ -22,98 +21,63 @@ export async function POST(req) {
 
   try {
     await connectDB();
+    session.startTransaction();
 
     const body = await req.json();
-
     const { customer, items, coupon, userId, note } = body;
 
-    // =========================
-    // VALIDATION
-    // =========================
-
+    // ================= VALIDATION =================
     if (!customer?.name || !customer?.phone) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Missing customer info",
-        },
+        { success: false, message: "Missing customer info" },
         { status: 400 },
       );
     }
 
     if (!items?.length) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Cart is empty",
-        },
+        { success: false, message: "Cart is empty" },
         { status: 400 },
       );
     }
 
     const phone = customer.phone.replace(/\D/g, "");
-
     if (!/^01\d{9}$/.test(phone)) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid phone number",
-        },
+        { success: false, message: "Invalid phone number" },
         { status: 400 },
       );
     }
 
-    // =========================
-    // START TRANSACTION
-    // =========================
+    // ================= ORDER NUMBER =================
+    const orderNumber = await getNextInvoiceNumber("order");
 
-    session.startTransaction();
-
-    // =========================
-    // ORDER NUMBER
-    // =========================
-
-    const orderNumber = await getNextOrderNumber();
-
-    // =========================
-    // FETCH PRODUCTS
-    // =========================
-
+    // ================= FETCH PRODUCTS =================
     const lookupIds = items.map((i) => i.variantId || i.productId);
 
     const [dbVariants, dbProducts] = await Promise.all([
-      ProductVariantModel.find({
-        _id: { $in: lookupIds },
-      })
+      ProductVariantModel.find({ _id: { $in: lookupIds } })
         .populate("product")
         .populate("media", "secure_url")
         .lean(),
 
-      ProductModel.find({
-        _id: { $in: lookupIds },
-      })
+      ProductModel.find({ _id: { $in: lookupIds } })
         .populate("media", "secure_url")
         .lean(),
     ]);
 
     const variantMap = new Map(dbVariants.map((v) => [String(v._id), v]));
-
     const productMap = new Map(dbProducts.map((p) => [String(p._id), p]));
 
-    // =========================
-    // CLEAN ITEMS
-    // =========================
-
+    // ================= CLEAN ITEMS =================
     const clean = items
       .map((it) => {
         const id = String(it.variantId || it.productId);
 
         const v = variantMap.get(id);
-
         const p = productMap.get(id);
 
         const target = v || p;
-
         if (!target) return null;
 
         const media =
@@ -121,19 +85,12 @@ export async function POST(req) {
 
         return {
           productId: v ? v.product?._id : target._id,
-
           variantId: v ? v._id : null,
-
           name: v ? v.product?.name : target.name,
-
           color: v?.color || "",
-
           size: v?.size || "",
-
           sellingPrice: Number(v?.sellingPrice || target.sellingPrice || 0),
-
           quantity: Math.max(1, Number(it.quantity || 1)),
-
           media,
         };
       })
@@ -141,39 +98,26 @@ export async function POST(req) {
 
     if (!clean.length) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid products",
-        },
+        { success: false, message: "Invalid products" },
         { status: 400 },
       );
     }
 
-    // =========================
-    // CALCULATION
-    // =========================
-
+    // ================= CALCULATION =================
     const subtotal = clean.reduce(
       (sum, item) => sum + item.sellingPrice * item.quantity,
       0,
     );
 
     const city = String(customer.cityId || "other").toLowerCase();
-
     const shippingFee = shippingMap[city] ?? shippingMap.other;
 
     let discount = 0;
-
-    let couponData = {
-      code: "",
-      discountPercentage: 0,
-    };
+    let couponData = { code: "", discountPercentage: 0 };
 
     if (coupon?.code) {
       const doc = await CouponModel.findOne({
-        code: {
-          $regex: new RegExp(`^${coupon.code.trim()}$`, "i"),
-        },
+        code: new RegExp(`^${coupon.code.trim()}$`, "i"),
       }).lean();
 
       if (doc && subtotal >= (doc.minShoppingAmount || 0)) {
@@ -188,69 +132,26 @@ export async function POST(req) {
 
     const total = subtotal + shippingFee - discount;
 
-    // =========================
-    // CREATE ORDER
-    // =========================
-
+    // ================= CREATE ORDER =================
     const order = await OrderModel.create(
       [
         {
           orderNumber,
-
           note: note?.slice(0, 500) || "",
-
           userId: userId || null,
-
           customer: {
             ...customer,
             phone,
             cityId: city,
           },
-
           items: clean,
-
           subtotal,
-
           shippingFee,
-
           discount,
-
           total,
-
           coupon: couponData,
-
           status: "pending",
-
           paymentMethodSelected: "cod",
-
-          courier: {
-            name: "steadfast",
-
-            status: "pending",
-
-            consignmentId: null,
-
-            trackingCode: null,
-          },
-
-          payments: [
-            {
-              method: "cod",
-
-              amount: total,
-
-              status: "unpaid",
-
-              initiatedAt: new Date(),
-            },
-          ],
-
-          timeline: [
-            {
-              status: "pending",
-              date: new Date(),
-            },
-          ],
         },
       ],
       { session },
@@ -258,25 +159,17 @@ export async function POST(req) {
 
     const createdOrder = order[0];
 
-    // =========================
-    // STOCK UPDATE
-    // =========================
-
+    // ================= STOCK UPDATE =================
     for (const item of clean) {
       const Model = item.variantId ? ProductVariantModel : ProductModel;
 
       const result = await Model.updateOne(
         {
           _id: item.variantId || item.productId,
-
-          stock: {
-            $gte: item.quantity,
-          },
+          stock: { $gte: item.quantity },
         },
         {
-          $inc: {
-            stock: -item.quantity,
-          },
+          $inc: { stock: -item.quantity },
         },
         { session },
       );
@@ -286,105 +179,18 @@ export async function POST(req) {
       }
     }
 
-    // =========================
-    // SEND TO STEADFAST
-    // =========================
-
-    try {
-      const steadfastPayload = {
-        invoice: String(orderNumber),
-
-        recipient_name: customer.name,
-
-        recipient_phone: phone,
-
-        recipient_address: customer.address,
-
-        cod_amount: total,
-
-        note: note || "",
-
-        item_description: clean
-          .map((i) => `${i.name} x${i.quantity}`)
-          .join(", "),
-      };
-
-      const response = await steadfast.post("/create_order", steadfastPayload);
-
-      const courierData = response.data;
-
-      await OrderModel.findByIdAndUpdate(
-        createdOrder._id,
-        {
-          status: "processing",
-
-          courier: {
-            name: "steadfast",
-
-            status: "created",
-
-            consignmentId: courierData?.consignment?.consignment_id || null,
-
-            trackingCode: courierData?.consignment?.tracking_code || null,
-
-            rawResponse: courierData,
-          },
-
-          $push: {
-            timeline: {
-              status: "processing",
-              date: new Date(),
-            },
-          },
-        },
-        { session },
-      );
-    } catch (courierError) {
-      console.error(
-        "STEADFAST ERROR:",
-        courierError?.response?.data || courierError.message,
-      );
-
-      await OrderModel.findByIdAndUpdate(
-        createdOrder._id,
-        {
-          courier: {
-            name: "steadfast",
-
-            status: "failed",
-
-            error: courierError?.response?.data || courierError.message,
-          },
-        },
-        { session },
-      );
-    }
-
-    // =========================
-    // COMMIT TRANSACTION
-    // =========================
-
     await session.commitTransaction();
 
     return NextResponse.json({
       success: true,
-
       orderId: createdOrder._id,
-
       orderNumber,
-
       message: "Order placed successfully",
     });
   } catch (err) {
-    await session.abortTransaction();
-
-    console.error(err);
-
+    await session.abortTransaction().catch(() => {});
     return NextResponse.json(
-      {
-        success: false,
-        message: err.message,
-      },
+      { success: false, message: err.message },
       { status: 500 },
     );
   } finally {
