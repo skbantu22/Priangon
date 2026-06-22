@@ -104,4 +104,3 @@ export async function POST(req) {
     { status: 500 },
   );
 }
-npm run dev
