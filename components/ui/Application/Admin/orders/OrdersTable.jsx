@@ -42,6 +42,122 @@ export default function OrdersTable({
   handleSetStatus,
   handleDeleteOrders,
 }) {
+  const handlePrintSticker = (order) => {
+    const courier = order?.payments?.[0]?.courier || {};
+    const item = order?.items?.[0] || {};
+
+    const printWindow = window.open("", "_blank");
+
+    printWindow.document.write(`
+    <html>
+      <head>
+        <title>Mini Thailand Sticker</title>
+        <style>
+          @page {
+            size: 4in 6in;
+            margin: 0;
+          }
+
+          body {
+            margin: 0;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            width: 4in;
+            height: 6in;
+          }
+
+          .label {
+            border: 2px solid #000;
+            height: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+          }
+
+          .header {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+          }
+
+          .section {
+            font-size: 13px;
+            margin-bottom: 6px;
+          }
+
+          .title {
+            font-weight: bold;
+          }
+
+          .box {
+            border-top: 1px dashed #000;
+            margin-top: 8px;
+            padding-top: 8px;
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="label">
+
+          <div class="header">MINI THAILAND</div>
+
+          <div class="section">
+            <span class="title">Consignment ID:</span>
+            ${courier?.consignmentId || "N/A"}
+          </div>
+
+          <div class="box">
+            <div class="section">
+              <span class="title">Customer:</span>
+              ${order?.customer?.name || "N/A"}
+            </div>
+
+            <div class="section">
+              <span class="title">Phone:</span>
+              ${order?.customer?.phone || "N/A"}
+            </div>
+
+            <div class="section">
+              <span class="title">Address:</span>
+              ${order?.customer?.address || "N/A"}
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="section">
+              <span class="title">Product:</span>
+              ${item?.name || "N/A"}
+            </div>
+
+            <div class="section">
+              <span class="title">Price:</span>
+              ৳${order?.total || 0}
+            </div>
+
+            <div class="section">
+              <span class="title">Size:</span>
+              ${item?.size || "N/A"}
+            </div>
+
+            <div class="section">
+              <span class="title">Color:</span>
+              ${item?.color || "N/A"}
+            </div>
+          </div>
+
+        </div>
+
+        <script>
+          window.print();
+          window.onafterprint = () => window.close();
+        </script>
+      </body>
+    </html>
+  `);
+
+    printWindow.document.close();
+  };
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm overflow-hidden">
       {/* ========================================================
@@ -241,6 +357,13 @@ export default function OrdersTable({
                     {/* Actions */}
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handlePrintSticker(order)}
+                          title="Print 4x6 Sticker"
+                          className="p-2 hover:bg-green-50 dark:hover:bg-green-950/40 rounded-lg text-green-600"
+                        >
+                          🖨️
+                        </button>
                         <button
                           onClick={() => setSelectedOrderDetail(order)}
                           title="View Order"

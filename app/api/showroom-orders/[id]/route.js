@@ -9,11 +9,7 @@ export async function GET(req, { params }) {
     // ✅ FIX
     const { id } = await params;
 
-    console.log("PARAM ID:", id);
-
     const order = await ShowroomOrder.findById(id);
-
-    console.log("ORDER:", order);
 
     if (!order) {
       return NextResponse.json(

@@ -15,18 +15,19 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
 
     const q = searchParams.get("q") || "";
+    const category = searchParams.get("category") || ""; // ✅ ADDED
 
     // =========================
-    // SEARCH FILTER
+    // SEARCH + CATEGORY FILTER
     // =========================
-    const productMatch = q
-      ? {
-          name: {
-            $regex: q,
-            $options: "i",
-          },
-        }
-      : {};
+    const productMatch = {
+      ...(q && {
+        name: { $regex: q, $options: "i" },
+      }),
+      ...(category && {
+        "category.name": category, // or use category slug if needed
+      }),
+    };
 
     // =========================
     // SHOWROOM STOCK
@@ -39,10 +40,16 @@ export async function GET(req) {
       .populate({
         path: "productId",
         match: productMatch,
-        populate: {
-          path: "media",
-          select: "secure_url",
-        },
+        populate: [
+          {
+            path: "media",
+            select: "secure_url",
+          },
+          {
+            path: "category",
+            select: "name slug",
+          },
+        ],
       })
       .populate({
         path: "variantId",
@@ -57,10 +64,16 @@ export async function GET(req) {
       .populate({
         path: "productId",
         match: productMatch,
-        populate: {
-          path: "media",
-          select: "secure_url",
-        },
+        populate: [
+          {
+            path: "media",
+            select: "secure_url",
+          },
+          {
+            path: "category",
+            select: "name slug",
+          },
+        ],
       })
       .populate({
         path: "variantId",
@@ -102,28 +115,24 @@ export async function GET(req) {
 
       const key = `${item.productId._id}-${vid}`;
 
-      // prevent duplicate variants
       if (!grouped[sid].map.has(key)) {
         grouped[sid].map.set(key, true);
 
         grouped[sid].items.push({
           productId: item.productId._id,
-
           productName: item.productId.name,
 
-          variantId: vid,
+          // ✅ CATEGORY ADDED
+          category: item.productId.category?.name || "UNCATEGORIZED",
 
+          variantId: vid,
           variant: `${item.variantId.color || "N/A"} - ${
             item.variantId.size || "N/A"
           }`,
-
           barcode: item.variantId.barcode || "",
-
           price:
             item.variantId?.sellingPrice ?? item.productId?.sellingPrice ?? 0,
-
           stock: item.stock || 0,
-
           image: item.productId.media?.[0]?.secure_url || null,
         });
       }
@@ -133,12 +142,10 @@ export async function GET(req) {
     // WAREHOUSE ITEMS
     // =========================
     const warehouseItems = [];
-
     const warehouseMap = new Map();
 
     for (const item of filteredWarehouse) {
       const vid = item.variantId._id.toString();
-
       const key = `${item.productId._id}-${vid}`;
 
       if (!warehouseMap.has(key)) {
@@ -146,22 +153,19 @@ export async function GET(req) {
 
         warehouseItems.push({
           productId: item.productId._id,
-
           productName: item.productId.name,
 
-          variantId: vid,
+          // ✅ CATEGORY ADDED
+          category: item.productId.category?.name || "UNCATEGORIZED",
 
+          variantId: vid,
           variant: `${item.variantId.color || "N/A"} - ${
             item.variantId.size || "N/A"
           }`,
-
           barcode: item.variantId.barcode || "",
-
           price:
             item.variantId?.sellingPrice ?? item.productId?.sellingPrice ?? 0,
-
           stock: item.stock || 0,
-
           image: item.productId.media?.[0]?.secure_url || null,
         });
       }
@@ -175,11 +179,10 @@ export async function GET(req) {
         showroom: "Warehouse",
         items: warehouseItems,
       },
-
       ...Object.values(grouped).map((g) => ({
         _id: g._id,
+        showroom: g.showroom,
         items: g.items,
-        showroom: g.showroom, // <-- ADD THIS
       })),
     ];
 
@@ -199,9 +202,7 @@ export async function GET(req) {
         success: false,
         message: "Server Error",
       },
-      {
-        status: 500,
-      },
+      { status: 500 },
     );
   }
 }

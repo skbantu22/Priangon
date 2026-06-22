@@ -10,12 +10,12 @@ const StatusTabs = ({
   statusCounts,
 }) => {
   const tabs = [
-    "All",
-    "Pending",
-    "Processing",
-    "Shipped",
-    "Delivered",
-    "Cancelled",
+    { label: "All", value: "All" },
+    { label: "Pending", value: "pending" },
+    { label: "Processing", value: "processing" },
+    { label: "Shipped", value: "shipped" },
+    { label: "Delivered", value: "delivered" },
+    { label: "Cancelled", value: "cancelled" },
   ];
 
   return (
@@ -27,18 +27,18 @@ const StatusTabs = ({
 
       {/* Tabs */}
       {tabs.map((tab) => {
-        const isActive = statusFilter === tab;
-        const count = statusCounts?.[tab] || 0;
+        const isActive = statusFilter === tab.value;
+        const count = statusCounts?.[tab.label] || 0;
 
         return (
           <button
-            key={tab}
+            key={tab.value}
             onClick={() => {
-              setStatusFilter(tab);
+              setStatusFilter(tab.value);
               setCurrentPage(1);
 
               if (addNotification) {
-                addNotification(`Viewing ${tab} orders.`, "info");
+                addNotification(`Viewing ${tab.label} orders.`, "info");
               }
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
@@ -47,10 +47,8 @@ const StatusTabs = ({
                 : "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50"
             }`}
           >
-            {/* Name */}
-            <span>{tab}</span>
+            <span>{tab.label}</span>
 
-            {/* Count */}
             <span
               className={`px-1.5 py-0.5 rounded-full text-[10px] ${
                 isActive

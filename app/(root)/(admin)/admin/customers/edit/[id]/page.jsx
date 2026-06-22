@@ -51,7 +51,7 @@ export default function EditCustomer({ params }) {
     address: z.string().optional(),
     city: z.string().optional(),
 
-    role: z.enum(["user", "staff", "manager", "admin"]),
+    role: z.enum(["customer", "cashier", "moderator", "manager", "admin"]),
     showroomId: z.string().optional(),
 
     isEmailVerified: z.boolean().optional(),
@@ -175,8 +175,9 @@ export default function EditCustomer({ params }) {
                     <FormLabel>Role</FormLabel>
                     <FormControl>
                       <select {...field} className="w-full border p-2 rounded">
-                        <option value="user">User</option>
-                        <option value="staff">Staff</option>
+                        <option value="customer">Customer</option>
+                        <option value="cashier">Cashier</option>
+                        <option value="moderator">Moderator</option>
                         <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                       </select>

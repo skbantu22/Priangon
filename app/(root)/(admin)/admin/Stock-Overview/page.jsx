@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { showToast } from "@/lib/showToast";
+
+import StockHeader from "@/components/ui/Application/Admin/stock-overview/StockHeader";
+import StockGrid from "@/components/ui/Application/Admin/stock-overview/StockGrid";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -10,358 +13,241 @@ export default function StockOverviewPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // UI Layout States
   const [activeTab, setActiveTab] = useState("ALL");
+  const [activeCategory, setActiveCategory] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ================= FETCH STOCK =================
+  // ================= FETCH =================
   const fetchStock = async (q = "") => {
     try {
       setLoading(true);
+
       const res = await fetch(
         `/api/stock/stock-overview?q=${encodeURIComponent(q)}`,
         { cache: "no-store" },
       );
+
       const result = await res.json();
 
       if (result.success) {
         setData(result.data || []);
-        setCurrentPage(1); // Reset page on new search fetch
+        setCurrentPage(1);
       } else {
         showToast(result.message || "Failed to load stock");
       }
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.error(err);
       showToast("Server Error");
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= INITIAL LOAD =================
   useEffect(() => {
     fetchStock("");
   }, []);
 
-  // ================= SEARCH DEBOUNCE =================
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchStock(search);
     }, 300);
+
     return () => clearTimeout(timer);
   }, [search]);
 
-  // ================= HANDLERS =================
-  const handleTabChange = (tabName) => {
-    setActiveTab(tabName);
-    setCurrentPage(1);
-  };
-
-  // ================= METRICS DATA CALCULATION =================
+  // ================= METRICS =================
   const metrics = useMemo(() => {
-    let globalTotalStock = 0;
-    let globalTotalItems = 0;
-    let lowStockCount = 0;
-    const zonesList = new Set();
+    let totalStock = 0;
+    let totalItems = 0;
+    let lowStock = 0;
+    const zones = new Set();
 
-    data.forEach((zone) => {
-      zonesList.add(zone.showroom);
-      zone.items.forEach((item) => {
-        globalTotalStock += item.stock || 0;
-        globalTotalItems += 1;
-        if (item.stock <= 5) lowStockCount += 1;
+    data.forEach((z) => {
+      zones.add(z.showroom);
+
+      z.items.forEach((i) => {
+        totalStock += i.stock || 0;
+        totalItems += 1;
+        if ((i.stock || 0) <= 5) lowStock += 1;
       });
     });
 
     return {
-      globalTotalStock,
-      globalTotalItems,
-      lowStockCount,
-      uniqueZones: Array.from(zonesList),
+      globalTotalStock: totalStock,
+      globalTotalItems: totalItems,
+      lowStockCount: lowStock,
+      uniqueZones: Array.from(zones),
     };
   }, [data]);
 
-  // ================= FILTER & PAGINATE ITEMS =================
+  // ================= CATEGORIES (FIXED) =================
+  const categories = useMemo(() => {
+    const set = new Set();
+
+    data.forEach((z) => {
+      z.items?.forEach((i) => {
+        const cat = i?.category;
+
+        if (typeof cat === "string") {
+          set.add(cat.trim().toLowerCase());
+        }
+      });
+    });
+
+    return Array.from(set);
+  }, [data]);
+
+  // ================= FILTER + PAGINATION =================
   const paginatedData = useMemo(() => {
-    // 1. Filter by location tab if not "ALL"
-    const filteredZones = data.filter((zone) =>
-      activeTab === "ALL" ? true : zone.showroom === activeTab,
+    const filteredZones = data.filter((z) =>
+      activeTab === "ALL" ? true : z.showroom === activeTab,
     );
 
-    // 2. Flatten all items matching the criteria
-    let allMatchingItems = [];
-    filteredZones.forEach((zone) => {
-      zone.items.forEach((item) => {
-        allMatchingItems.push({
-          ...item,
-          zoneName: zone.showroom,
+    let allItems = [];
+
+    filteredZones.forEach((z) => {
+      z.items.forEach((i) => {
+        allItems.push({
+          ...i,
+          zoneName: z.showroom,
+          category:
+            typeof i.category === "string"
+              ? i.category.trim().toLowerCase()
+              : "uncategorized",
         });
       });
     });
 
-    const totalItems = allMatchingItems.length;
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+    const categoryFiltered =
+      activeCategory === "ALL"
+        ? allItems
+        : allItems.filter(
+            (i) => i.category?.toLowerCase() === activeCategory.toLowerCase(),
+          );
 
-    // 3. Slice array for current active page bounds
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const slicedItems = allMatchingItems.slice(
-      startIndex,
-      startIndex + ITEMS_PER_PAGE,
-    );
+    const totalPages = Math.ceil(categoryFiltered.length / ITEMS_PER_PAGE) || 1;
+
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return {
-      items: slicedItems,
+      items: categoryFiltered.slice(start, start + ITEMS_PER_PAGE),
       totalPages,
-      totalItems,
-      hasData: allMatchingItems.length > 0,
+      totalItems: categoryFiltered.length,
+      hasData: categoryFiltered.length > 0,
     };
-  }, [data, activeTab, currentPage]);
-
-  const getStockStyle = (stock) => {
-    if (stock <= 5) return "bg-red-50 text-red-600 border-red-100";
-    if (stock <= 10) return "bg-amber-50 text-amber-700 border-amber-100";
-    return "bg-emerald-50 text-emerald-700 border-emerald-100";
-  };
+  }, [data, activeTab, activeCategory, currentPage]);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 antialiased text-gray-900">
-      {/* ================= STICKY TOP NAVIGATION BAR ================= */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200/80">
-        <div className="max-w-[1400px] mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-sm shadow-emerald-600/20">
-                IMS
-              </span>
-              <h1 className="text-xl font-bold tracking-tight text-gray-900">
-                Stock Hub
-              </h1>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">
-              Unified cross-docking & distribution storage tracking
-            </p>
-          </div>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      {/* HEADER */}
+      <StockHeader
+        search={search}
+        setSearch={setSearch}
+        loading={loading}
+        data={data}
+        metrics={metrics}
+      />
 
-          {/* DYNAMIC SEARCH INPUT */}
-          <div className="w-full md:w-[340px]">
-            <input
-              type="text"
-              placeholder="Quick search products, variants, identifiers..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-sm outline-none transition-all focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 placeholder:text-gray-400"
-            />
-          </div>
-        </div>
-      </div>
+      <div className="max-w-[1400px] mx-auto p-4 space-y-6">
+        {/* CATEGORY FILTER */}
+        {!loading && categories.length > 0 && (
+          <div className="mb-3 flex items-center gap-3">
+            <select
+              value={activeCategory}
+              onChange={(e) => {
+                setActiveCategory(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="border px-3 py-2 rounded-md text-sm bg-white"
+            >
+              <option value="ALL">All Categories</option>
 
-      {/* ================= MAIN CONTAINER BODY ================= */}
-      <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-6">
-        {/* ================= TOP ROW SUMMARIZED INFOCARDS ================= */}
-        {!loading && data.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-            <div className="bg-white p-4 rounded-xl border border-gray-200/60 shadow-sm flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Aggregate Gross Stock
-              </span>
-              <p className="text-xl md:text-2xl font-bold text-gray-900 mt-2">
-                {metrics.globalTotalStock}{" "}
-                <span className="text-xs font-medium text-gray-400">units</span>
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200/60 shadow-sm flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Unique Active SKUs
-              </span>
-              <p className="text-xl md:text-2xl font-bold text-gray-900 mt-2">
-                {metrics.globalTotalItems}{" "}
-                <span className="text-xs font-medium text-gray-400">lines</span>
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200/60 shadow-sm col-span-2 lg:col-span-1 flex flex-col justify-between">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Critical Reorder Alerts
-              </span>
-              <p
-                className={`text-xl md:text-2xl font-bold mt-2 ${metrics.lowStockCount > 0 ? "text-rose-600" : "text-gray-900"}`}
-              >
-                {metrics.lowStockCount}{" "}
-                <span className="text-xs font-medium text-gray-400">items</span>
-              </p>
-            </div>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 
-        {/* ================= SEGMENTED MODERN ZONE TABS ================= */}
+        {/* ZONE FILTER */}
         {!loading && data.length > 0 && (
-          <div className="flex items-center overflow-x-auto pb-1 border-b border-gray-200 gap-1">
+          <div className="flex gap-2 overflow-x-auto border-b pb-2">
             <button
-              onClick={() => handleTabChange("ALL")}
-              className={`px-4 py-2 text-xs md:text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
+              onClick={() => {
+                setActiveTab("ALL");
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1 text-sm ${
                 activeTab === "ALL"
-                  ? "border-emerald-600 text-emerald-600 font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
+                  ? "text-emerald-600 border-b-2 border-emerald-600"
+                  : "text-gray-500"
               }`}
             >
-              🌐 All Zones ({metrics.globalTotalItems})
+              All ({metrics.globalTotalItems})
             </button>
+
             {metrics.uniqueZones.map((zoneName) => {
-              const count =
-                data.find((z) => z.showroom === zoneName)?.items?.length || 0;
+              const count = data
+                .filter((z) => (z.showroom || "").trim() === zoneName)
+                .reduce((acc, z) => acc + (z.items?.length || 0), 0);
+
               return (
                 <button
                   key={zoneName}
-                  onClick={() => handleTabChange(zoneName)}
-                  className={`px-4 py-2 text-xs md:text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
+                  onClick={() => {
+                    setActiveTab(zoneName);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1 text-sm ${
                     activeTab === zoneName
-                      ? "border-emerald-600 text-emerald-600 font-semibold"
-                      : "border-transparent text-gray-500 hover:text-gray-800"
+                      ? "text-emerald-600 border-b-2 border-emerald-600"
+                      : "text-gray-500"
                   }`}
                 >
-                  {zoneName === "Warehouse"
-                    ? `🏭 ${zoneName}`
-                    : `🏪 ${zoneName}`}{" "}
-                  ({count})
+                  {zoneName} ({count})
                 </button>
               );
             })}
           </div>
         )}
 
-        {/* ================= STATE HANDLING WRAPPERS ================= */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center bg-white rounded-2xl border border-gray-200/60 p-16 text-center">
-            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-            <span className="text-sm text-gray-400 font-medium">
-              Syncing distributed node databases...
-            </span>
-          </div>
-        )}
+        {/* LOADING */}
+        {loading && <p className="text-center">Loading...</p>}
 
+        {/* EMPTY */}
         {!loading && !paginatedData.hasData && (
-          <div className="bg-white rounded-2xl border border-gray-200/60 p-16 text-center max-w-md mx-auto">
-            <p className="text-gray-400 text-sm font-medium">
-              No inventory records match current scope parameters.
-            </p>
-          </div>
+          <p className="text-center text-gray-400">No stock found</p>
         )}
 
-        {/* ================= GRID CONTENT PANEL ================= */}
+        {/* GRID */}
         {!loading && paginatedData.hasData && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {paginatedData.items.map((item) => (
-                <div
-                  /* FIXED KEY EXPR: Combines location reference to guarantee uniqueness */
-                  key={`${item.zoneName}-${item.variantId}`}
-                  className="group flex sm:flex-col bg-white border border-gray-200/70 rounded-xl p-2.5 hover:shadow-md hover:border-gray-300 transition-all duration-200 gap-3 sm:gap-2.5"
-                >
-                  {/* DYNAMIC COMPACT WRAPPER */}
-                  <div className="relative aspect-square w-20 h-20 sm:w-full sm:h-40 shrink-0 overflow-hidden rounded-lg bg-gray-50 border border-gray-100">
-                    <img
-                      src={item.image || "/placeholder.png"}
-                      alt={item.productName}
-                      className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
-                    />
-                    {/* Floating Zone Tag */}
-                    {activeTab === "ALL" && (
-                      <span className="absolute top-1 left-1 bg-gray-900/80 text-white backdrop-blur-[2px] text-[9px] font-medium px-1.5 py-0.5 rounded-md tracking-wide hidden sm:inline-block">
-                        {item.zoneName}
-                      </span>
-                    )}
-                  </div>
+          <StockGrid items={paginatedData.items} activeTab={activeTab} />
+        )}
 
-                  {/* DETAILS BODY */}
-                  <div className="flex flex-col justify-between flex-1 min-w-0">
-                    <div>
-                      <h3 className="font-semibold text-xs sm:text-sm text-gray-800 line-clamp-1 group-hover:text-emerald-600 transition-colors">
-                        {item.productName}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-0.5">
-                        <span className="text-[11px] text-gray-500 font-medium">
-                          {item.variant}
-                        </span>
-                        {item.barcode && (
-                          <span className="text-[10px] text-gray-400 font-mono hidden sm:inline">
-                            • {item.barcode}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+        {/* PAGINATION */}
+        {!loading && paginatedData.totalPages > 1 && (
+          <div className="flex justify-between items-center pt-4 border-t">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="px-3 py-1 border rounded disabled:opacity-50"
+            >
+              Prev
+            </button>
 
-                    {/* PRICING AND BALANCES */}
-                    <div className="mt-2.5 flex items-center justify-between gap-2">
-                      <p className="font-bold text-gray-900 text-xs sm:text-sm">
-                        ৳ {item.price || 0}
-                      </p>
-                      <div
-                        className={`px-2.5 py-0.5 rounded-md border text-[11px] font-bold tracking-wide min-w-[32px] text-center shadow-inner ${getStockStyle(
-                          item.stock,
-                        )}`}
-                      >
-                        {item.stock}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <span>
+              {currentPage} / {paginatedData.totalPages}
+            </span>
 
-            {/* ================= COMPACT UI PAGINATION FOOTER ================= */}
-            {paginatedData.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-gray-200 pt-4 px-1">
-                <p className="text-xs text-gray-500">
-                  Showing{" "}
-                  <span className="font-medium text-gray-800">
-                    {Math.min(
-                      paginatedData.totalItems,
-                      (currentPage - 1) * ITEMS_PER_PAGE + 1,
-                    )}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium text-gray-800">
-                    {Math.min(
-                      paginatedData.totalItems,
-                      currentPage * ITEMS_PER_PAGE,
-                    )}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium text-gray-800">
-                    {paginatedData.totalItems}
-                  </span>{" "}
-                  items
-                </p>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 px-3 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-all"
-                  >
-                    Prev
-                  </button>
-
-                  <div className="flex items-center gap-1 text-xs text-gray-500 font-medium px-2">
-                    <span className="text-gray-800 font-bold">
-                      {currentPage}
-                    </span>{" "}
-                    / {paginatedData.totalPages}
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      setCurrentPage((p) =>
-                        Math.min(paginatedData.totalPages, p + 1),
-                      )
-                    }
-                    disabled={currentPage === paginatedData.totalPages}
-                    className="p-1.5 px-3 text-xs font-semibold rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-all"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              disabled={currentPage === paginatedData.totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="px-3 py-1 border rounded disabled:opacity-50"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>

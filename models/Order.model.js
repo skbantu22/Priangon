@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 import crypto from "crypto";
-// This forces Mongoose to clear the cached "Order" model
-// and re-read your new Order.model.js file.
 
 const OrderItemSchema = new mongoose.Schema(
   {
@@ -13,8 +11,6 @@ const OrderItemSchema = new mongoose.Schema(
     variantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ProductVariant",
-
-      required: false,
       default: null,
     },
     name: { type: String, default: "" },
@@ -30,13 +26,18 @@ const OrderItemSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const PaymentSchema = new mongoose.Schema(
+// ✅ NEW: Payment details schema (IMPORTANT FIX)
+const PaymentDetailSchema = new mongoose.Schema(
   {
     method: {
       type: String,
-      enum: ["cod", "online"], // ✅ Added "online" for future online payment integration
-      required: true,
+      enum: ["cod", "bkash", "nagad", "online"],
+      default: "cod",
     },
+
+    transactionNumber: { type: String, default: null },
+
+    paymentImage: { type: String, default: null }, // 👈 PAYMENT PROOF IMAGE
 
     paymentStatus: {
       type: String,
@@ -44,24 +45,6 @@ const PaymentSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    courier: {
-      status: {
-        type: String,
-        enum: ["pending", "created", "failed"],
-        default: "pending",
-      },
-      trackingCode: { type: String, default: "" },
-      consignmentId: { type: String, default: "" },
-    },
-
-    merchantInvoiceNumber: { type: String, default: "", index: true },
-    paymentId: { type: String, default: "" },
-    trxId: { type: String, default: "" },
-    valId: { type: String, default: "" },
-    amount: { type: Number, required: true, default: 0 },
-    currency: { type: String, default: "BDT" },
-    rawResponse: { type: Object, default: {} },
-    initiatedAt: { type: Date, default: Date.now },
     paidAt: { type: Date, default: null },
   },
   { _id: false },
@@ -74,8 +57,16 @@ const OrderSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     orderNumber: { type: String, unique: true, index: true },
 
+    // ================= CUSTOMER =================
     customer: {
       name: { type: String, default: "" },
       phone: { type: String, default: "" },
@@ -84,18 +75,53 @@ const OrderSchema = new mongoose.Schema(
       cityId: { type: String, default: "" },
     },
 
+    // ================= ITEMS =================
     items: { type: [OrderItemSchema], default: [] },
+
     subtotal: { type: Number, default: 0 },
     shippingFee: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     currency: { type: String, default: "BDT" },
 
+    // ================= COUPON =================
     coupon: {
       code: { type: String, default: "" },
       discountPercentage: { type: Number, default: 0 },
     },
 
+    // ================= GLOBAL NOTE (FIX) =================
+    note: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 500,
+    },
+
+    // ================= PAYMENT INFO (FIX) =================
+    paymentMethodSelected: {
+      type: String,
+      enum: ["cod", "bkash", "nagad", "online"],
+      default: "cod",
+      index: true,
+    },
+
+    payment: {
+      type: PaymentDetailSchema,
+      default: () => ({}),
+    },
+
+    payments: {
+      type: [PaymentDetailSchema],
+      default: [],
+    },
+
+    activePaymentIndex: {
+      type: Number,
+      default: 0,
+    },
+
+    // ================= STATUS =================
     status: {
       type: String,
       enum: [
@@ -113,20 +139,11 @@ const OrderSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
-
-    paymentMethodSelected: {
-      type: String,
-      enum: ["cod"],
-      default: "cod",
-      index: true,
-    },
-
-    payments: { type: [PaymentSchema], default: [] },
-    activePaymentIndex: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
 
+// ================= ORDER NUMBER =================
 OrderSchema.pre("validate", function () {
   if (!this.orderNumber) {
     const code = crypto.randomBytes(4).toString("hex").toUpperCase();

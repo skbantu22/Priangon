@@ -562,6 +562,7 @@ const Page = () => {
       <OrderDetailDrawer
         order={selectedOrderDetail}
         onClose={() => setSelectedOrderDetail(null)}
+        onUpdateStatus={(id, status) => handleSetStatus(id, status)}
       />
 
       {/* Courier */}

@@ -2,36 +2,30 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import Image from "next/image";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
-import { Truck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import z from "zod";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Form } from "@/components/ui/form";
 
-import imgPlaceholder from "@/public/assets/img-placeholder.webp";
 import { WEBSITE_SHOP } from "@/Route/Websiteroute";
 import useFetch from "@/hooks/useFetch";
 import { setCart } from "@/store/reducer/cartReducer";
 import { zSchema } from "@/lib/zodschema";
-import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 import { showToast } from "@/lib/showToast";
-import { Textarea } from "@/components/ui/textarea";
+
+import ShippingOptions from "@/components/ui/Application/website/checkout/ShippingOptions";
+import PaymentBox from "@/components/ui/Application/website/checkout/PaymentBox";
+import CouponBox from "@/components/ui/Application/website/checkout/CouponBox";
+import OrderSummary from "@/components/ui/Application/website/checkout/OrderSummary";
+import PaymentProofUpload from "@/components/ui/Application/website/checkout/PaymentProofUpload";
+import { Loader2 } from "lucide-react";
 
 const formatCurrency = (amount) =>
   Number(amount || 0).toLocaleString("en-BD", {
@@ -44,759 +38,301 @@ export default function CheckoutPage() {
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const cartStore = useSelector((store) => store.cartStore);
-  const authStore = useSelector((store) => store.authStore);
+  const cartStore = useSelector((state) => state.cartStore);
+  const authStore = useSelector((state) => state.authStore);
 
-  const products = Array.isArray(cartStore?.products) ? cartStore.products : [];
-  const liveProducts = Array.isArray(cartStore?.products)
-    ? cartStore.products
-    : [];
+  const userRole = authStore?.auth?.data?.user?.role;
 
-  const [verifiedOnce, setVerifiedOnce] = useState(false);
-  const [verifyError, setVerifyError] = useState("");
+  const canSeePaymentProof = userRole === "admin" || userRole === "moderator";
 
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [isCouponApplied, setIsCouponApplied] = useState(false);
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [couponDiscountAmount, setCouponDiscountAmount] = useState(0);
+  // ================= LOCAL CHECKOUT STATE (IMPORTANT FIX) =================
+  const [checkoutProducts, setCheckoutProducts] = useState([]);
 
+  useEffect(() => {
+    if (!cartStore?.products) return;
+
+    setCheckoutProducts(
+      cartStore.products.map((p) => ({
+        ...p,
+        quantity: p.quantity || 1,
+      })),
+    );
+  }, [cartStore?.products]);
+
+  const [paymentProof, setPaymentProof] = useState("");
   const [shippingMethod, setShippingMethod] = useState("inside_dhaka");
   const [payment, setPayment] = useState("cod");
   const [placingOrder, setPlacingOrder] = useState(false);
 
+  const [coupon, setCoupon] = useState(null);
+  const [discount, setDiscount] = useState(0);
+
+  const [transactionNumber, setTransactionNumber] = useState("");
+
+  // ================= PRICE =================
   const subtotal = useMemo(() => {
-    return liveProducts.reduce((acc, item) => {
-      const price = Number(item?.sellingPrice || 0);
-      const qty = Number(item?.quantity || 1);
-      return acc + price * qty;
+    return checkoutProducts.reduce((acc, item) => {
+      return (
+        acc + Number(item?.sellingPrice || 0) * Number(item?.quantity || 1)
+      );
     }, 0);
-  }, [liveProducts]);
+  }, [checkoutProducts]);
 
-  const shipping = useMemo(() => {
-    if (shippingMethod === "inside_dhaka") return 80;
-    if (shippingMethod === "outside_dhaka") return 150;
-    return 0;
-  }, [shippingMethod]);
+  const shipping = shippingMethod === "inside_dhaka" ? 80 : 150;
 
-  const total = useMemo(() => {
-    return Math.max(subtotal - couponDiscountAmount + shipping, 0);
-  }, [subtotal, couponDiscountAmount, shipping]);
+  const totalDiscount = discount + (coupon?.discountAmount || 0);
 
-  // --- META TRACKING HELPER ---
-  const getCookie = (name) => {
-    if (typeof document === "undefined") return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(";").shift();
-    return null;
+  const total = Math.max(subtotal + shipping - totalDiscount, 0);
+
+  // ================= HANDLERS (FIXED - NO REDUX) =================
+  const handleIncrease = (id) => {
+    setCheckoutProducts((prev) =>
+      prev.map((item) =>
+        item.productId === id
+          ? { ...item, quantity: (item.quantity || 1) + 1 }
+          : item,
+      ),
+    );
   };
-  // 1. InitiateCheckout Tracking (Runs once when products are ready)
-  useEffect(() => {
-    // Only run if cart is verified and has items
-    if (verifiedOnce && liveProducts.length > 0) {
-      const eventId = `ic_${Date.now()}`;
 
-      // Prepare shared data
-      const productIds = liveProducts.map((p) => String(p.productId));
-      const trackingData = {
-        content_ids: productIds,
-        content_type: "product",
-        value: subtotal,
-        currency: "BDT",
-        num_items: liveProducts.length,
-      };
+  const handleDecrease = (id) => {
+    setCheckoutProducts((prev) =>
+      prev
+        .map((item) =>
+          item.productId === id
+            ? { ...item, quantity: (item.quantity || 1) - 1 }
+            : item,
+        )
+        .filter((item) => item.quantity > 0),
+    );
+  };
 
-      // A. Browser Pixel (Client-Side)
-      if (typeof window !== "undefined" && window.fbq) {
-        window.fbq("track", "InitiateCheckout", trackingData, {
-          eventID: eventId,
-        });
-      }
+  const handleRemove = (id) => {
+    setCheckoutProducts((prev) => prev.filter((item) => item.productId !== id));
+  };
 
-      // B. Server CAPI (Conversion API)
-      axios
-        .post("/api/meta/capi", {
-          event_name: "InitiateCheckout",
-          event_id: eventId,
-          url: window.location.href,
-          phone: authStore?.auth?.phone || "",
-          full_name: authStore?.auth?.name || "",
-          address: authStore?.auth?.address || "",
-          district: authStore?.auth?.city || "",
-          user_agent: window.navigator.userAgent,
-          fbp: getCookie("_fbp"),
-          fbc: getCookie("_fbc"),
-          custom_data: trackingData,
-        })
-        .catch((err) => console.error("CAPI Error:", err));
-    }
-  }, [verifiedOnce, liveProducts.length]); // Dependencies are correct
-
-  const couponFormSchema = zSchema.pick({
-    code: true,
-    minShoppingAmount: true,
-  });
-
-  const couponForm = useForm({
-    resolver: zodResolver(couponFormSchema),
-    defaultValues: {
-      code: "",
-      minShoppingAmount: subtotal,
-    },
-  });
-
-  const orderFormSchema = zSchema
-    .pick({
-      name: true,
-      phone: true,
-      address: true,
-      city: true,
-    })
-    .extend({
-      userId: z.string().optional(),
-      note: z.string().optional(),
-    });
-
+  // ================= FORM =================
   const orderForm = useForm({
-    resolver: zodResolver(orderFormSchema),
+    resolver: zodResolver(
+      zSchema
+        .pick({
+          name: true,
+          phone: true,
+          address: true,
+          city: true,
+        })
+        .extend({
+          note: z.string().optional(),
+        }),
+    ),
     defaultValues: {
       name: authStore?.auth?.name || "",
       phone: authStore?.auth?.phone || "",
       address: authStore?.auth?.address || "",
-      city: authStore?.auth?.city || "", // <-- Add default value here
+      city: authStore?.auth?.city || "",
       note: "",
-      userId: authStore?.auth?._id || "",
     },
   });
 
-  useEffect(() => {
-    const auth = authStore?.auth;
-    if (auth) {
-      orderForm.setValue("userId", auth._id || "");
-      orderForm.setValue("name", auth.name || "");
-      orderForm.setValue("phone", auth.phone || "");
-      orderForm.setValue("address", auth.address || "");
-      orderForm.setValue("city", auth.city || ""); // <-- Add this line
-      // ✅ IMPORTANT: don't overwrite user's note if already typing
-      if (!orderForm.getValues("note")) {
-        orderForm.setValue("note", "");
-      }
-    }
-  }, [authStore, orderForm]);
-
-  useEffect(() => {
-    couponForm.setValue("minShoppingAmount", subtotal);
-  }, [subtotal, couponForm]);
-
-  const verifyBody = useMemo(() => ({ products }), [products]);
-  const shouldVerify = products.length > 0 && !verifiedOnce;
-
-  const { data: getVerifiedCartData } = useFetch(
-    shouldVerify ? "/api/cart-verification" : null,
+  // ================= CART VERIFY =================
+  const { data: verifyData } = useFetch(
+    checkoutProducts.length ? "/api/cart-verification" : null,
     "POST",
-    verifyBody,
+    { products: checkoutProducts },
   );
 
   useEffect(() => {
-    if (verifiedOnce) return;
+    if (!verifyData) return;
 
-    if (getVerifiedCartData?.success) {
-      const cartData = Array.isArray(getVerifiedCartData?.data)
-        ? getVerifiedCartData.data
-        : [];
-
-      // prevent overwriting cart with empty array accidentally
-      if (cartData.length > 0) {
-        dispatch(setCart(cartData));
-      }
-
-      setVerifiedOnce(true);
-      setVerifyError("");
-    } else if (getVerifiedCartData?.success === false) {
-      setVerifyError(
-        getVerifiedCartData?.message || "Cart verification failed",
-      );
-      setVerifiedOnce(true);
+    if (verifyData.success) {
+      dispatch(setCart(verifyData.data || []));
     }
-  }, [getVerifiedCartData, verifiedOnce, dispatch]);
+  }, [verifyData]);
 
-  const applyCoupon = async (values) => {
-    setCouponLoading(true);
-
+  // ================= COUPON =================
+  const applyCoupon = async (code) => {
     try {
-      const code = String(values.code || "")
-        .trim()
-        .toUpperCase();
-
-      const payload = {
-        code,
-        minShoppingAmount: subtotal,
-      };
-
-      console.log("Coupon apply payload:", payload);
-
-      const { data: response } = await axios.post("/api/coupon/apply", payload);
-
-      if (!response?.success) {
-        throw new Error(response?.message || "Failed to apply coupon");
-      }
-
-      const discountPercentage = Number(
-        response?.data?.discountPercentage || 0,
-      );
-      const discountAmount = (subtotal * discountPercentage) / 100;
-
-      setCouponDiscountAmount(discountAmount);
-      setIsCouponApplied(true);
-
-      setAppliedCoupon({
-        code,
-        discountPercentage,
-        discountAmount,
-      });
-
-      couponForm.reset({
-        code: "",
+      const { data } = await axios.post("/api/coupon/apply", {
+        code: code?.trim().toUpperCase(),
         minShoppingAmount: subtotal,
       });
 
-      showToast("success", response?.message || "Coupon applied successfully");
-    } catch (error) {
-      console.log("Coupon apply error:", error?.response?.data || error);
+      const discountAmount =
+        (subtotal * (data?.data?.discountPercentage || 0)) / 100;
 
-      showToast(
-        "error",
-        error?.response?.data?.message ||
-          error?.message ||
-          "Coupon apply failed",
-      );
-    } finally {
-      setCouponLoading(false);
+      setCoupon(data.data);
+      setDiscount(discountAmount);
+
+      showToast("success", "Coupon applied");
+    } catch (err) {
+      showToast("error", err?.response?.data?.message || "Coupon failed");
     }
   };
 
   const removeCoupon = () => {
-    setCouponDiscountAmount(0);
-    setIsCouponApplied(false);
-    setAppliedCoupon(null);
-
-    couponForm.reset({
-      code: "",
-      minShoppingAmount: subtotal,
-    });
-
-    showToast("success", "Coupon removed");
+    setCoupon(null);
+    setDiscount(0);
   };
 
+  // ================= ORDER =================
   const placeOrder = async (formData) => {
     setPlacingOrder(true);
-    const eventId = `pur_${Date.now()}`; // Unique ID for deduplication
+
+    const payload = {
+      method: payment,
+
+      userId: authStore?.auth?.data?.user?.id || null,
+
+      customer: {
+        ...formData,
+        cityId: shippingMethod === "inside_dhaka" ? "dhaka" : "other",
+      },
+
+      items: checkoutProducts.map((p) => ({
+        productId: p.productId,
+        variantId: p.variantId || p.productId,
+        quantity: Number(p.quantity || 1),
+        price: Number(p.sellingPrice || 0),
+      })),
+
+      coupon: coupon ? { code: coupon.code } : null,
+
+      // ✅ GLOBAL NOTE (IMPORTANT FIX)
+      note: formData.note || "",
+
+      // ✅ PAYMENT PROOF IMAGE
+      paymentProof: paymentProof || null,
+
+      // ✅ PAYMENT DETAILS (BKASH SUPPORT)
+      paymentDetails: {
+        method: payment, // cod / bkash / nagad etc
+        transactionNumber:
+          payment === "bkash" ? transactionNumber || null : null,
+      },
+    };
+    console.log("🔥 CHECKOUT PAYLOAD:", payload);
 
     try {
-      const payload = {
-        method: payment,
-        userId: authStore?.auth?._id || null,
-        customer: {
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          cityId: shippingMethod === "inside_dhaka" ? "dhaka" : "other",
-          note: formData.note || "", // ✅ add here
-        },
-        items: liveProducts.map((item) => ({
-          productId: item?.productId,
-          variantId: item.variantId || item.productId || item._id, // ✅ Backend needs this!
-          quantity: Number(item?.quantity || 1),
-          price: Number(item?.sellingPrice || 0),
-        })),
-        coupon: isCouponApplied ? { code: appliedCoupon.code } : null,
-      };
+      const { data } = await axios.post("/api/checkout", payload);
 
-      const { data: response } = await axios.post("/api/checkout", payload);
-      console.log("Checkout API response:", response);
+      if (!data.success) throw new Error(data.message);
 
-      // CREATE STEADFAST PARCEL
-      // try {
-      //   await axios.post("/api/courier/steadfast", {
-      //     invoice: response.orderId,
-
-      //     name: formData.name,
-      //     phone: formData.phone,
-
-      //     address: `${formData.address}, ${formData.city}`,
-
-      //     cod_amount: payment === "cod" ? total : 0, //
-
-      //     note: `Order ID: ${response.orderId}`,
-      //   });
-      // } catch (courierError) {
-      //   console.log("Steadfast Error:", courierError);
-      // }
-
-      if (!response?.success) throw new Error(response?.message);
-
-      // --- META PURCHASE TRACKING ---
-      // Browser
-      if (window.fbq) {
-        window.fbq(
-          "track",
-          "Purchase",
-          {
-            value: total,
-            currency: "BDT",
-            content_ids: liveProducts.map((p) => p.productId),
-            content_type: "product",
-          },
-          { eventID: eventId },
-        );
-      }
-
-      // Server (CAPI)
-      axios
-        .post("/api/meta/capi", {
-          event_name: "Purchase",
-          event_id: eventId,
-          url: window.location.href,
-          phone: formData.phone,
-          full_name: formData.name,
-          address: formData.address,
-          district: formData.city,
-          user_agent: window.navigator.userAgent,
-          fbp: getCookie("_fbp"),
-          fbc: getCookie("_fbc"),
-          custom_data: {
-            value: total,
-            currency: "BDT",
-            content_ids: liveProducts.map((p) => p.productId),
-            num_items: liveProducts.length,
-            order_id: response.orderId,
-          },
-        })
-        .catch(() => {});
-
-      showToast("success", "Order placed successfully");
       dispatch(setCart([]));
-      router.push(`/order/success?id=${response.orderId}`);
-    } catch (error) {
-      showToast("error", error.message || "Failed");
+      setCheckoutProducts([]);
+
+      router.push(`/order/success?id=${data.orderId}`);
+      showToast("success", "Order placed");
+    } catch (err) {
+      showToast("error", err.message);
     } finally {
       setPlacingOrder(false);
     }
   };
-  if (!liveProducts.length) {
+
+  // ================= EMPTY CART =================
+  if (!checkoutProducts.length) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4">
+      <div className="min-h-[70vh] flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-3xl font-semibold">Your cart is empty</h2>
-          <p className="mt-2 text-neutral-500">
-            Add some products to checkout.
-          </p>
-          <Button asChild className="mt-6 rounded-full">
-            <Link href={WEBSITE_SHOP}>Go to Shop</Link>
-          </Button>
+          <h2>Your cart is empty</h2>
+          <Link href={WEBSITE_SHOP}>Go to Shop</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-8 lg:px-6">
-        {!verifiedOnce ? (
-          <div className="mb-4 rounded-md border bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-            Verifying your cart...
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-black uppercase mb-6">Checkout</h1>
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* LEFT */}
+        <div className="w-full lg:w-[65%] space-y-5">
+          <div className="bg-white border p-5">
+            <h2 className="font-bold mb-3">Customer Info</h2>
+
+            <Form {...orderForm}>
+              <form
+                id="checkout-form"
+                onSubmit={orderForm.handleSubmit(placeOrder)}
+                className="space-y-3"
+              >
+                <Input {...orderForm.register("name")} placeholder="Name" />
+                <Input {...orderForm.register("phone")} placeholder="Phone" />
+                <Input
+                  {...orderForm.register("address")}
+                  placeholder="Address"
+                />
+                <Input {...orderForm.register("city")} placeholder="City" />
+                <Textarea {...orderForm.register("note")} placeholder="Note" />
+              </form>
+            </Form>
           </div>
-        ) : verifyError ? (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {verifyError}
+
+          <div className="bg-white border p-5">
+            <h2 className="font-bold mb-3">Shipping</h2>
+            <ShippingOptions
+              value={shippingMethod}
+              onChange={setShippingMethod}
+            />
           </div>
-        ) : null}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="space-y-6 lg:col-span-8">
-            <div className="rounded-lg border bg-white">
-              <div className="flex items-center gap-2 border-b px-5 py-4">
-                <div className="grid h-8 w-8 place-items-center rounded-md bg-neutral-100">
-                  <Truck size={16} />
-                </div>
-                <div>
-                  <p className="font-semibold">Shipping Address</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <div className="mt-5">
-                    <Form {...orderForm}>
-                      <form
-                        className="grid gap-5"
-                        id="checkout-form"
-                        onSubmit={orderForm.handleSubmit(placeOrder)}
-                      >
-                        <div className="mb-3">
-                          <Label>
-                            Full Name <span className="text-red-500">*</span>
-                          </Label>
-
-                          <div className="mt-3">
-                            <FormField
-                              control={orderForm.control}
-                              name="name"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Enter Your Name"
-                                      className="rounded-none border-gray-400"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label>
-                            Phone Number <span className="text-red-500">*</span>
-                          </Label>
-                          <div className="mt-3">
-                            <FormField
-                              control={orderForm.control}
-                              name="phone"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Enter Your Number"
-                                      className="rounded-none border-gray-400"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <Label>
-                            Address <span className="text-red-500">*</span>
-                          </Label>
-
-                          <div className="mt-3">
-                            <FormField
-                              control={orderForm.control}
-                              name="address"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Enter Your Address"
-                                      className="rounded-none border-gray-400"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <Label>
-                            City / District{" "}
-                            <span className="text-red-500">*</span>
-                          </Label>
-
-                          <div className="mt-3">
-                            <FormField
-                              control={orderForm.control}
-                              name="city"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="Enter your city name"
-                                      className="rounded-none border-gray-400"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <Label>Order Note (Optional)</Label>
-
-                          <div className="mt-3">
-                            <FormField
-                              control={orderForm.control}
-                              name="note"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="Write any special instruction (e.g. call before delivery)"
-                                      className="rounded-none border-gray-400"
-                                      {...field}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                      </form>
-                    </Form>
-                  </div>
-                </div>
-              </div>
+          {canSeePaymentProof && (
+            <div className="bg-white border p-5">
+              <h2 className="font-bold mb-3">Payment Proof</h2>
+              <PaymentProofUpload
+                value={paymentProof}
+                onChange={setPaymentProof}
+                disabled={placingOrder}
+              />
             </div>
-          </div>
-
-          <div className="lg:col-span-4">
-            <div className="rounded-lg border bg-white lg:sticky lg:top-6">
-              <div className="flex items-center justify-between border-b px-5 py-4">
-                <p className="font-semibold">Order Summary</p>
-                <Link
-                  href="/cart"
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Modify
-                </Link>
-              </div>
-
-              <div className="space-y-4 p-5">
-                {liveProducts.map((p) => {
-                  const qty = Number(p?.quantity || 1);
-                  const price = Number(p?.sellingPrice || 0);
-                  const lineTotal = price * qty;
-
-                  const img =
-                    typeof p?.media === "string" && p.media.trim()
-                      ? p.media
-                      : imgPlaceholder.src;
-
-                  return (
-                    <div
-                      key={`${p.productId}-${p.variantId}`}
-                      className="flex gap-3"
-                    >
-                      <div className="relative h-12 w-11 overflow-hidden rounded-md border bg-white">
-                        <Image
-                          src={img}
-                          alt={p?.name || "product"}
-                          fill
-                          className="object-contain"
-                          sizes="48px"
-                          unoptimized
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-medium">
-                          {p?.name}
-                        </p>
-                        <p className="text-xs text-neutral-500">
-                          {p?.size ? `Size: ${p.size}` : ""}
-                          {p?.color ? ` • ${p.color}` : ""}
-                          {` • Qty: ${qty}`}
-                        </p>
-                      </div>
-
-                      <div className="text-sm font-semibold">
-                        {formatCurrency(lineTotal)}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <Separator />
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-neutral-600">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
-
-                  {couponDiscountAmount > 0 && (
-                    <div className="flex justify-between text-blue-700">
-                      <span>Coupon Discount</span>
-                      <span>- {formatCurrency(couponDiscountAmount)}</span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between text-neutral-600">
-                    <span>
-                      Shipping (
-                      {shippingMethod === "inside_dhaka"
-                        ? "Inside Dhaka"
-                        : "Outside Dhaka"}
-                      )
-                    </span>
-
-                    <span>{formatCurrency(shipping)}</span>
-                  </div>
-
-                  <div className="flex justify-between border-t pt-2 font-semibold">
-                    <span>Total</span>
-                    <span className="text-lg">{formatCurrency(total)}</span>
-                  </div>
-                </div>
-
-                <div className="pt-3">
-                  {!isCouponApplied ? (
-                    <Form {...couponForm}>
-                      <form
-                        className="flex justify-between gap-3"
-                        onSubmit={couponForm.handleSubmit(applyCoupon)}
-                      >
-                        <div className="flex-1">
-                          <FormField
-                            control={couponForm.control}
-                            name="code"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input
-                                    placeholder="Enter coupon code"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="w-[100px]">
-                          <ButtonLoading
-                            type="submit"
-                            text="Apply"
-                            className="w-full"
-                            loading={couponLoading}
-                          />
-                        </div>
-                      </form>
-                    </Form>
-                  ) : (
-                    <div className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm">
-                      <span className="font-medium text-green-700">
-                        Coupon applied successfully
-                      </span>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={removeCoupon}
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3">
-                  <p className="mb-2 text-xs font-semibold">Shipping Method</p>
-
-                  <RadioGroup
-                    value={shippingMethod}
-                    onValueChange={setShippingMethod}
-                  >
-                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
-                      <RadioGroupItem value="inside_dhaka" className="mt-1" />
-                      <div className="flex-1">
-                        <span className="text-sm font-semibold">
-                          INSIDE DHAKA
-                        </span>
-                        <p className="text-xs text-neutral-500">
-                          WITHIN 2–3 WORKING DAYS
-                        </p>
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {formatCurrency(80)}
-                      </div>
-                    </label>
-
-                    <label className="flex cursor-pointer items-start gap-2 rounded-md border p-3">
-                      <RadioGroupItem value="outside_dhaka" />
-                      <div className="flex-1">
-                        <span className="text-sm font-semibold">
-                          OUTSIDE DHAKA
-                        </span>
-                        <p className="text-xs text-neutral-500">
-                          WITHIN 3–4 WORKING DAYS
-                        </p>
-                      </div>
-                      <div className="text-sm font-semibold">
-                        {formatCurrency(150)}
-                      </div>
-                    </label>
-                  </RadioGroup>
-                </div>
-
-                <div className="pt-1">
-                  <p className="mb-3 text-xs font-semibold">Payment Method</p>
-                  <RadioGroup
-                    value={payment}
-                    onValueChange={setPayment}
-                    className="space-y-2"
-                  >
-                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
-                      <RadioGroupItem value="cod" className="mt-1" />
-                      <div className="flex-1">
-                        <span className="text-sm font-semibold">
-                          Cash on Delivery
-                        </span>
-                        <p className="text-xs text-neutral-500">
-                          Pay when you receive.
-                        </p>
-                      </div>
-                    </label>
-                  </RadioGroup>
-                </div>
-
-                <Button
-                  className="h-12 w-full"
-                  form="checkout-form"
-                  disabled={!verifiedOnce || placingOrder}
-                >
-                  {placingOrder
-                    ? "Placing Order..."
-                    : `Proceed to Payment • ${formatCurrency(total)}`}
-                </Button>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-white p-3 lg:hidden">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">
-              Total: {formatCurrency(total)}
-            </p>
-            <Button
-              form="checkout-form"
-              className="h-10"
-              disabled={!verifiedOnce || placingOrder}
-            >
-              {placingOrder ? "Placing..." : "Confirm Order"}
-            </Button>
-          </div>
-        </div>
+        {/* RIGHT */}
+        <div className="w-full lg:w-[35%] space-y-5">
+          <OrderSummary
+            products={checkoutProducts}
+            subtotal={subtotal}
+            shipping={shipping}
+            discount={discount}
+            couponDiscount={coupon?.discountAmount || 0}
+            formatCurrency={formatCurrency}
+            onIncrease={handleIncrease}
+            onDecrease={handleDecrease}
+            onRemove={handleRemove}
+          />
 
-        <div className="h-16 lg:hidden" />
+          <PaymentBox
+            value={payment}
+            setValue={setPayment}
+            userRole={userRole}
+            shippingMethod={shippingMethod}
+            transactionNumber={transactionNumber}
+            setTransactionNumber={setTransactionNumber}
+          />
+
+          <CouponBox
+            coupon={coupon}
+            onApply={applyCoupon}
+            onRemove={removeCoupon}
+          />
+
+          <Button
+            form="checkout-form"
+            disabled={placingOrder}
+            className="w-full bg-black text-white font-black uppercase"
+          >
+            {placingOrder ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Placing...
+              </span>
+            ) : (
+              "Place Order"
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

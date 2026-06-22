@@ -17,6 +17,7 @@ const shippingMap = {
 };
 
 export async function POST(req) {
+  console.log("🔥 ORDER CREATE API HIT");
   const session = await mongoose.startSession();
 
   try {
@@ -24,8 +25,28 @@ export async function POST(req) {
     session.startTransaction();
 
     const body = await req.json();
-    const { customer, items, coupon, userId, note } = body;
 
+    console.log("📦 REQUEST BODY:", body);
+
+    const {
+      customer,
+      items,
+      coupon,
+      userId,
+      note,
+      paymentProof,
+      paymentDetails,
+    } = body;
+
+    const method = paymentDetails?.method || "cod";
+    const transactionNumber = paymentDetails?.transactionNumber || "";
+
+    if (method !== "cod" && !transactionNumber) {
+      return NextResponse.json(
+        { success: false, message: "Transaction number required" },
+        { status: 400 },
+      );
+    }
     // ================= VALIDATION =================
     if (!customer?.name || !customer?.phone) {
       return NextResponse.json(
@@ -137,27 +158,54 @@ export async function POST(req) {
       [
         {
           orderNumber,
+          createdBy: userId || null,
           note: note?.slice(0, 500) || "",
+
           userId: userId || null,
+
           customer: {
             ...customer,
             phone,
             cityId: city,
           },
+
           items: clean,
           subtotal,
           shippingFee,
           discount,
           total,
           coupon: couponData,
+
           status: "pending",
-          paymentMethodSelected: "cod",
+          paymentMethodSelected: method || "cod",
+
+          // ================= PAYMENT FIX =================
+          payment: {
+            method: method || "cod",
+            transactionNumber: transactionNumber || "",
+            paymentImage: paymentProof || "",
+            paymentStatus: method === "cod" ? "pending" : "pending",
+            paidAt: null,
+          },
+
+          // optional history (good for admin tracking)
+          payments: [
+            {
+              method: method || "cod",
+              transactionNumber: transactionNumber || "",
+              paymentImage: paymentProof || "",
+              amount: total,
+              paymentStatus: "pending",
+              initiatedAt: new Date(),
+            },
+          ],
         },
       ],
       { session },
     );
 
     const createdOrder = order[0];
+    console.log("✅ ORDER SAVED:", createdOrder);
 
     // ================= STOCK UPDATE =================
     for (const item of clean) {
