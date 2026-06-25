@@ -203,7 +203,6 @@ export default function CheckoutPage() {
       // ✅ PAYMENT PROOF IMAGE
       paymentProof: paymentProof || null,
 
-      // ✅ PAYMENT DETAILS (BKASH SUPPORT)
       paymentDetails: {
         method: payment, // cod / bkash / nagad etc
         transactionNumber:
@@ -248,7 +247,7 @@ export default function CheckoutPage() {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* LEFT */}
         <div className="w-full lg:w-[65%] space-y-5">
-          <div className="bg-white border p-5">
+          <div className="bg-white border-2 border-black p-5">
             <h2 className="font-bold mb-3">Customer Info</h2>
 
             <Form {...orderForm}>
@@ -257,19 +256,36 @@ export default function CheckoutPage() {
                 onSubmit={orderForm.handleSubmit(placeOrder)}
                 className="space-y-3"
               >
-                <Input {...orderForm.register("name")} placeholder="Name" />
-                <Input {...orderForm.register("phone")} placeholder="Phone" />
+                <Input
+                  {...orderForm.register("name")}
+                  placeholder="Name"
+                  className="rounded-none border border-gray-400"
+                />
+                <Input
+                  {...orderForm.register("phone")}
+                  placeholder="Phone"
+                  className="rounded-none border border-gray-400"
+                />
                 <Input
                   {...orderForm.register("address")}
                   placeholder="Address"
+                  className="rounded-none border border-gray-400"
                 />
-                <Input {...orderForm.register("city")} placeholder="City" />
-                <Textarea {...orderForm.register("note")} placeholder="Note" />
+                <Input
+                  {...orderForm.register("city")}
+                  placeholder="City"
+                  className="rounded-none border border-gray-400"
+                />
+                <Textarea
+                  {...orderForm.register("note")}
+                  placeholder="Note"
+                  className="rounded-none border border-gray-400"
+                />
               </form>
             </Form>
           </div>
 
-          <div className="bg-white border p-5">
+          <div className="bg-white border-2 border-black p-5">
             <h2 className="font-bold mb-3">Shipping</h2>
             <ShippingOptions
               value={shippingMethod}
@@ -321,7 +337,7 @@ export default function CheckoutPage() {
           <Button
             form="checkout-form"
             disabled={placingOrder}
-            className="w-full bg-black text-white font-black uppercase"
+            className="w-full bg-black text-white font-black uppercase rounded-none"
           >
             {placingOrder ? (
               <span className="flex items-center gap-2">

@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
+import { showToast } from "@/lib/showToast";
+import { toast } from "sonner";
 
 export default function AdvancedInventoryDashboard() {
   const [stock, setStock] = useState([]);
@@ -104,6 +106,27 @@ export default function AdvancedInventoryDashboard() {
       alert("Stock synchronization failed.");
     }
   };
+  const handleReturnStock = async (showroom, product, variant) => {
+    const qty = prompt("Return Quantity");
+
+    if (!qty || Number(qty) <= 0) return;
+
+    try {
+      await axios.post("/api/stock/return-to-warehouse", {
+        showroomId: showroom._id,
+        productId: product._id,
+        variantId: variant.variantId._id,
+        qty: Number(qty),
+      });
+
+      toast.success("Stock Returned Successfully");
+
+      loadDashboardData();
+    } catch (err) {
+      console.error(err);
+      alert("Return Failed");
+    }
+  };
 
   const handleSaveAll = async () => {
     const keys = Object.keys(editedStock).filter((k) => editedStock[k] !== "");
@@ -161,9 +184,6 @@ export default function AdvancedInventoryDashboard() {
         {/* High Contrast Deep Slate Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black text-[#f8fafc] p-6  border border-[#2d423e] shadow-md">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight font-sans text-white">
-              Inventory Allocation Engine
-            </h1>
             <p className="text-xs text-[#a3b899] font-medium mt-1">
               Live multi-showroom stock dispatch
             </p>
@@ -171,14 +191,14 @@ export default function AdvancedInventoryDashboard() {
           <div className="flex items-center gap-3 self-end sm:self-center">
             <button
               onClick={loadDashboardData}
-              className="bg-white text-[#f8fafc] border border-[#3e5954] text-xs font-bold px-4 py-2  hover:bg-[#39534e] transition-all"
+              className=" text-[#f8fafc] border border-[#3e5954] text-xs font-bold px-4 py-2  hover:bg-[#39534e] transition-all"
             >
               Refresh
             </button>
             <button
               onClick={handleSaveAll}
               disabled={!hasPendingChanges || isSaving}
-              className={`text-xs font-extrabold px-5 py-2 rounded-lg transition-all text-white shadow-sm ${
+              className={`text-xs font-extrabold px-5 py-2 rounded-lg transition-all text-black shadow-sm ${
                 !hasPendingChanges
                   ? "bg-green-500 cursor-not-allowed shadow-none border border-[#374f4b]"
                   : "bg-[#10b981] hover:bg-[#059669] border border-[#10b981]"
@@ -214,7 +234,7 @@ export default function AdvancedInventoryDashboard() {
                   {/* ACCORDION BAR */}
                   <div
                     onClick={() => toggleProduct(product._id)}
-                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-[#f8faf9] transition-colors select-none border-b border-[#e2e8f0]"
+                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer  transition-colors select-none border-b border-[#e2e8f0]"
                   >
                     <div className="flex items-center gap-4">
                       <span
@@ -261,9 +281,9 @@ export default function AdvancedInventoryDashboard() {
                           e.stopPropagation();
                           handleSyncProductFamily(product._id);
                         }}
-                        className="bg-green-600 text-black text-xs font-extrabold px-4 py-2 rounded-lg transition-colors shadow-sm"
+                        className=" bg-red-500 text-black text-xs font-extrabold px-4 py-2 rounded-lg transition-colors shadow-sm"
                       >
-                        Save Group
+                        Save
                       </button>
                     </div>
                   </div>
@@ -272,7 +292,7 @@ export default function AdvancedInventoryDashboard() {
                   {isExpanded && (
                     <div className="p-3 md:p-6 bg-[#f4f7f5]">
                       {/* Desktop Column Matrix */}
-                      <div className="hidden lg:block overflow-x-auto border border-[#cbd5e1] rounded-xl bg-green-600 shadow-inner">
+                      <div className="hidden lg:block overflow-x-auto border border-[#cbd5e1] rounded-xl bg-white shadow-inner">
                         <table className="w-full border-collapse text-left text-xs">
                           <thead>
                             <tr className="bg-[#1e2e2a] text-[#e2efe9] font-bold uppercase tracking-wider text-[11px] border-b border-[#14532d]">
@@ -296,7 +316,7 @@ export default function AdvancedInventoryDashboard() {
                             {variants.map((vItem) => (
                               <tr
                                 key={`row-variant-${vItem._id}`}
-                                className="hover:bg-[#f8faf9] transition-colors"
+                                className=" transition-colors"
                               >
                                 <td className="p-4 pl-5">
                                   <div className="flex items-center gap-3">
@@ -321,7 +341,7 @@ export default function AdvancedInventoryDashboard() {
                                 </td>
 
                                 {/* Colored Column: Main Warehouse */}
-                                <td className="p-4 text-center bg-green-600 font-semibold border-x border-[#d1fac7]/40">
+                                <td className="p-4 text-center  font-semibold border-x border-[#d1fac7]/40">
                                   <span
                                     className={`inline-block px-2.5 py-1 rounded-md font-extrabold text-[11px] ${vItem.stock > 0 ? "bg-[#d1fae5] text-[#065f46]" : "bg-[#fee2e2] text-[#991b1b]"}`}
                                   >
@@ -350,17 +370,15 @@ export default function AdvancedInventoryDashboard() {
                                       key={`cell-show-${vItem._id}-${showroom.showroom}`}
                                       className="p-4 bg-[#fbfdfb] border-l border-[#e2e8f0] text-center"
                                     >
-                                      <div className="flex items-center justify-center gap-4">
-                                        <span className="text-[#475569] text-[12px] font-medium">
-                                          Current:{" "}
-                                          <b className="text-[#0f172a] font-bold">
-                                            {currentStock}
-                                          </b>
+                                      <div className="flex items-center justify-center gap-2">
+                                        <span className="text-xs">
+                                          {currentStock}
                                         </span>
+
+                                        {/* Send To Showroom */}
                                         <input
                                           type="number"
-                                          min="0"
-                                          placeholder="0"
+                                          placeholder="+"
                                           value={pendingValue}
                                           onChange={(e) =>
                                             handleQtyChange(
@@ -369,12 +387,22 @@ export default function AdvancedInventoryDashboard() {
                                               e.target.value,
                                             )
                                           }
-                                          className={`border rounded-lg px-2.5 py-1 text-right w-20 focus:outline-none focus:ring-2 focus:ring-[#10b981]/30 text-xs font-bold transition-all ${
-                                            pendingValue !== ""
-                                              ? "border-[#10b981] bg-[#d1fae5] text-[#065f46] shadow-sm"
-                                              : "border-[#cbd5e1] bg-white text-[#0f172a]"
-                                          }`}
+                                          className="w-16 border rounded px-2 py-1"
                                         />
+
+                                        {/* Return To Warehouse */}
+                                        <button
+                                          onClick={() =>
+                                            handleReturnStock(
+                                              showroom,
+                                              product,
+                                              vItem,
+                                            )
+                                          }
+                                          className="bg-red-500 text-white px-2 py-1 rounded text-xs"
+                                        >
+                                          Return
+                                        </button>
                                       </div>
                                     </td>
                                   );

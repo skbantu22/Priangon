@@ -9,7 +9,7 @@ export default function ShippingOptions({ value, onChange }) {
         {/* Inside Dhaka */}
         <label
           htmlFor="inside"
-          className={`flex items-center p-4 border border-b-0 cursor-pointer ${value === "inside_dhaka" ? "border-black" : "border-gray-200"}`}
+          className={`flex items-center p-4 border cursor-pointer ${value === "inside_dhaka" ? "border-black" : "border-gray-400"}`}
         >
           <RadioGroupItem value="inside_dhaka" id="inside" className="mr-3" />
           <span className="flex items-center gap-3 font-medium">
@@ -34,7 +34,7 @@ export default function ShippingOptions({ value, onChange }) {
         {/* Outside Dhaka */}
         <label
           htmlFor="outside"
-          className={`flex items-center p-4 border cursor-pointer ${value === "outside_dhaka" ? "border-black" : "border-gray-200"}`}
+          className={`flex items-center p-4 border cursor-pointer ${value === "outside_dhaka" ? "border-black" : "border-gray-400"}`}
         >
           <RadioGroupItem value="outside_dhaka" id="outside" className="mr-3" />
           <span className="flex items-center gap-3 font-medium">

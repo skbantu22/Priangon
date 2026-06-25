@@ -7,6 +7,7 @@ import "@/models/Product.model";
 import "@/models/ProductVariant.model ";
 import "@/models/Showroom.model";
 import "@/models/Media.model";
+import "@/models/category.model";
 
 export async function GET(req) {
   try {

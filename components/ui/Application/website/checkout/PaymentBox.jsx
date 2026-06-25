@@ -20,7 +20,7 @@ export default function PaymentBox({
   }, [value, setTransactionNumber]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 border-b-2 border-black">
       <RadioGroup value={value} onValueChange={setValue}>
         {/* COD */}
         {!isOutsideDhaka && (

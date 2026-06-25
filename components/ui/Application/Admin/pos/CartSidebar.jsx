@@ -78,7 +78,7 @@ export default function CartSidebar({
               >
                 <div className="relative h-14 w-14 bg-white border border-gray-200">
                   <Image
-                    src={item.img || "/placeholder.png"}
+                    src={item.image || "/placeholder.png"}
                     fill
                     className="object-cover"
                     alt={item.name}

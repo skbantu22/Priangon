@@ -293,7 +293,7 @@ const Navbar = () => {
               {categories.map((item, index) => (
                 <Link
                   key={index}
-                  href={`/shop?category=${encodeURIComponent(item)}`}
+                  href={`/shop?category=${item.toLowerCase().replace(/\s+/g, "-")}`}
                   onClick={() => setOpenMenu(false)}
                   className="hover:text-pink-600 duration-150 py-0.5"
                 >

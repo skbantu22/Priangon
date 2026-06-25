@@ -5,15 +5,16 @@ import Link from "next/link";
 
 const categories = [
   {
-    title: "Eid Collection",
+    title: "New Collection",
     image: "/assets/images/saree4.png",
-    link: "shop?category=women",
+    link: "shop",
   },
 
   {
-    title: "Eid Jewelary Collection",
-    image: "/assets/images/women.webp",
-    link: "/shop?category=women",
+    title: "Popular Collection",
+    image: "/assets/images/saree4.png",
+
+    link: "/shop",
   },
 ];
 
