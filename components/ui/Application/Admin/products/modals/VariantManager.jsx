@@ -178,20 +178,48 @@ export default function VariantManager({
   // =============================
   // APPLY BULK SETTINGS
   // =============================
-  const handleApplyToAll = () => {
-    setVariantsList((prev) =>
-      prev.map((row) => ({
+  const handleApplyToAll = (data) => {
+    setVariantsList((prev) => {
+      const updated = prev.map((row) => ({
         ...row,
-        purchasePrice: bulkData.purchasePrice || row.purchasePrice,
-        sellingPrice: bulkData.sellingPrice || row.sellingPrice,
-        discountPercent: bulkData.discountPercent || row.discountPercent,
-        discountAmount: bulkData.discountAmount || row.discountAmount,
-        afterDiscount: bulkData.afterDiscount || row.afterDiscount,
-        openingStock: bulkData.openingStock || row.openingStock,
+        purchasePrice:
+          data.purchasePrice !== "" ? Number(data.purchasePrice) : row.mrp,
+
+        sellingPrice:
+          data.sellingPrice !== ""
+            ? Number(data.sellingPrice)
+            : row.sellingPrice,
+
+        discountPercent:
+          data.discountPercent !== ""
+            ? Number(data.discountPercent)
+            : row.discountPercent,
+
+        discountAmount:
+          data.discountAmount !== ""
+            ? Number(data.discountAmount)
+            : row.discountAmount,
+
+        afterDiscount:
+          data.afterDiscount !== ""
+            ? Number(data.afterDiscount)
+            : row.afterDiscount,
+
+        openingStock:
+          data.openingStock !== ""
+            ? Number(data.openingStock)
+            : row.openingStock,
+
         openingStockPurchasePrice:
-          bulkData.openingStockPurchasePrice || row.openingStockPurchasePrice,
-      })),
-    );
+          data.openingStockPurchasePrice !== ""
+            ? Number(data.openingStockPurchasePrice)
+            : row.openingStockPurchasePrice,
+      }));
+
+      console.log("Updated Variants:", updated);
+
+      return updated;
+    });
 
     showToast("success", "Applied to all variants");
   };

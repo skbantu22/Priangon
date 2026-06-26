@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
-import { showToast } from "@/lib/showToast";
 import { toast } from "sonner";
 
 export default function AdvancedInventoryDashboard() {
@@ -17,17 +16,32 @@ export default function AdvancedInventoryDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [warehouseRes, showroomRes] = await Promise.all([
+      const [warehouseRes, overviewRes, showroomRes] = await Promise.all([
         axios.get("/api/warehouse-stock"),
         axios.get("/api/stock/stock-overview"),
+        axios.get("/api/showrooms"),
       ]);
 
       const rawStock = warehouseRes.data.data || [];
       setStock(rawStock);
 
-      const overview = showroomRes.data.data || [];
-      const showroomData = overview.filter((x) => x.showroom !== "Warehouse");
-      setShowrooms(showroomData);
+      const rawShowrooms =
+        showroomRes.data.showrooms || showroomRes.data.data || [];
+      const overviewData = overviewRes.data.data || [];
+
+      // ✅ CRITICAL FIX: ডাটাবেজের 'name' ফিল্ডকে ম্যাপ করা এবং ওভারভিউ স্টক ইন্টিগ্রেট করা
+      const mergedShowrooms = rawShowrooms.map((sr) => {
+        const matchedOverview = overviewData.find(
+          (ov) => String(ov._id) === String(sr._id),
+        );
+        return {
+          ...sr,
+          name: sr.name || "Unknown Showroom",
+          items: matchedOverview ? matchedOverview.items : sr.items || [],
+        };
+      });
+
+      setShowrooms(mergedShowrooms);
 
       const initialExpanded = {};
       rawStock.forEach((item) => {
@@ -38,6 +52,7 @@ export default function AdvancedInventoryDashboard() {
       setExpandedProducts(initialExpanded);
     } catch (err) {
       console.error("Dashboard synchronization failed:", err);
+      toast.error("Failed to sync dashboard indices.");
     } finally {
       setLoading(false);
     }
@@ -54,10 +69,11 @@ export default function AdvancedInventoryDashboard() {
     }));
   };
 
-  const handleQtyChange = (variantStockId, showroomName, value) => {
+  // ✅ FIX: হ্যান্ডলারগুলোতে নামের বদলে ইউনিক `showroomId` ব্যবহার করা হয়েছে
+  const handleQtyChange = (variantStockId, showroomId, value) => {
     setEditedStock((prev) => ({
       ...prev,
-      [`${variantStockId}_${showroomName}`]: value,
+      [`${variantStockId}_${showroomId}`]: value,
     }));
   };
 
@@ -69,10 +85,10 @@ export default function AdvancedInventoryDashboard() {
 
     familyVariants.forEach((item) => {
       showrooms.forEach((s) => {
-        const key = `${item._id}_${s.showroom}`;
+        const key = `${item._id}_${s._id}`;
         if (editedStock[key] !== undefined && editedStock[key] !== "") {
           payloads.push({
-            showroomId: s._id || s.showroom,
+            showroomId: s._id,
             productId: item.productId?._id,
             variantId: item.variantId?._id,
             qty: Number(editedStock[key]),
@@ -82,7 +98,7 @@ export default function AdvancedInventoryDashboard() {
     });
 
     if (payloads.length === 0) {
-      alert("No changes detected within this product family.");
+      toast.error("No changes detected within this product family.");
       return;
     }
 
@@ -93,45 +109,44 @@ export default function AdvancedInventoryDashboard() {
       setEditedStock((prev) => {
         const copy = { ...prev };
         familyVariants.forEach((item) => {
-          showrooms.forEach((s) => delete copy[`${item._id}_${s.showroom}`]);
+          showrooms.forEach((s) => delete copy[`${item._id}_${s._id}`]);
         });
         return copy;
       });
-      alert(
-        "Successfully dispatched stock allocations for this product family.",
-      );
+      toast.success("Successfully dispatched stock allocations!");
       loadDashboardData();
     } catch (err) {
       console.error(err);
-      alert("Stock synchronization failed.");
+      toast.error("Stock synchronization failed.");
     }
   };
-  const handleReturnStock = async (showroom, product, variant) => {
-    const qty = prompt("Return Quantity");
 
+  const handleReturnStock = async (showroom, product, variant) => {
+    const qty = prompt(
+      `Enter Return Quantity for ${showroom.name || "Showroom"}:`,
+    );
     if (!qty || Number(qty) <= 0) return;
 
     try {
       await axios.post("/api/stock/return-to-warehouse", {
         showroomId: showroom._id,
         productId: product._id,
-        variantId: variant.variantId._id,
+        variantId: variant.variantId?._id,
         qty: Number(qty),
       });
 
       toast.success("Stock Returned Successfully");
-
       loadDashboardData();
     } catch (err) {
       console.error(err);
-      alert("Return Failed");
+      toast.error("Return Failed");
     }
   };
 
   const handleSaveAll = async () => {
     const keys = Object.keys(editedStock).filter((k) => editedStock[k] !== "");
     if (keys.length === 0) {
-      alert("No pending stock modifications found.");
+      toast.error("No pending stock modifications found.");
       return;
     }
 
@@ -140,11 +155,11 @@ export default function AdvancedInventoryDashboard() {
       const requests = [];
       stock.forEach((item) => {
         showrooms.forEach((s) => {
-          const key = `${item._id}_${s.showroom}`;
+          const key = `${item._id}_${s._id}`;
           if (editedStock[key] !== undefined && editedStock[key] !== "") {
             requests.push(
               axios.post("/api/stock/allocate-to-showroom", {
-                showroomId: s._id || s.showroom,
+                showroomId: s._id,
                 productId: item.productId?._id,
                 variantId: item.variantId?._id,
                 qty: Number(editedStock[key]),
@@ -156,11 +171,11 @@ export default function AdvancedInventoryDashboard() {
 
       await Promise.all(requests);
       setEditedStock({});
-      alert("All SKU balances successfully matched system-wide.");
+      toast.success("All SKU balances successfully matched system-wide.");
       loadDashboardData();
     } catch (err) {
       console.error(err);
-      alert("Global ledger batch update failed.");
+      toast.error("Global ledger batch update failed.");
     } finally {
       setIsSaving(false);
     }
@@ -176,14 +191,19 @@ export default function AdvancedInventoryDashboard() {
     return acc;
   }, {});
 
-  const hasPendingChanges = Object.keys(editedStock).length > 0;
+  const hasPendingChanges = Object.keys(editedStock).some(
+    (k) => editedStock[k] !== "",
+  );
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f4f2] text-[#1e293b] tracking-normal font-sans antialiased p-4 md:p-6 lg:p-8">
+    <div className="w-full min-h-screen bg-[#f0f4f2] text-[#1e293b] font-sans antialiased p-4 md:p-6 lg:p-8">
       <div className="max-w-[1600px] mx-auto space-y-6">
-        {/* High Contrast Deep Slate Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-black text-[#f8fafc] p-6  border border-[#2d423e] shadow-md">
+        {/* Top Control Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1e2e2a] text-[#f8fafc] p-6 rounded-xl border border-[#2d423e] shadow-md">
           <div>
+            <h1 className="text-xl font-black tracking-tight">
+              Advanced Inventory Matrix
+            </h1>
             <p className="text-xs text-[#a3b899] font-medium mt-1">
               Live multi-showroom stock dispatch
             </p>
@@ -191,30 +211,29 @@ export default function AdvancedInventoryDashboard() {
           <div className="flex items-center gap-3 self-end sm:self-center">
             <button
               onClick={loadDashboardData}
-              className=" text-[#f8fafc] border border-[#3e5954] text-xs font-bold px-4 py-2  hover:bg-[#39534e] transition-all"
+              className="text-[#f8fafc] border border-[#3e5954] text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#39534e] transition-all"
             >
-              Refresh
+              Refresh Data
             </button>
             <button
               onClick={handleSaveAll}
               disabled={!hasPendingChanges || isSaving}
-              className={`text-xs font-extrabold px-5 py-2 rounded-lg transition-all text-black shadow-sm ${
+              className={`text-xs font-extrabold px-5 py-2 rounded-lg transition-all text-white shadow-sm ${
                 !hasPendingChanges
-                  ? "bg-green-500 cursor-not-allowed shadow-none border border-[#374f4b]"
-                  : "bg-[#10b981] hover:bg-[#059669] border border-[#10b981]"
+                  ? "bg-gray-600 cursor-not-allowed opacity-50"
+                  : "bg-emerald-600 hover:bg-emerald-700 border border-emerald-500"
               }`}
             >
-              {isSaving ? "Saving Updates..." : "Commit Global Matrix"}
+              {isSaving ? "Saving..." : "Commit Global Matrix"}
             </button>
           </div>
         </div>
 
-        {/* LOADING SCREEN */}
         {loading ? (
           <div className="bg-white rounded-xl border border-[#cbd5e1] p-24 text-center shadow-sm">
             <div className="inline-block w-8 h-8 border-4 border-[#14532d] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-sm font-bold text-[#334155] tracking-wide">
-              Syncing product indices...
+            <p className="text-sm font-bold text-[#334155]">
+              Syncing indices...
             </p>
           </div>
         ) : (
@@ -229,50 +248,47 @@ export default function AdvancedInventoryDashboard() {
               return (
                 <div
                   key={`product-card-${product._id}`}
-                  className="bg-zinc-100 border border-[#cbd5e1] shadow-[0_4px_12px_rgba(0,0,0,0.02)] overflow-hidden"
+                  className="bg-white border border-[#cbd5e1] rounded-xl shadow-sm overflow-hidden"
                 >
-                  {/* ACCORDION BAR */}
+                  {/* Accordion Trigger Header */}
                   <div
                     onClick={() => toggleProduct(product._id)}
-                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer  transition-colors select-none border-b border-[#e2e8f0]"
+                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-[#e2e8f0]"
                   >
                     <div className="flex items-center gap-4">
                       <span
-                        className={`text-[#64748b] text-sm font-bold transition-transform duration-200 hidden md:inline-block ${isExpanded ? "rotate-90 text-[#14532d]" : ""}`}
+                        className={`text-[#64748b] text-sm font-bold transition-transform duration-200 ${isExpanded ? "rotate-90 text-emerald-700" : ""}`}
                       >
                         ➔
                       </span>
                       {product.media?.[0]?.secure_url && (
-                        <div className="w-12 h-16 relative flex-shrink-0 border border-[#cbd5e1] rounded-lg bg-[#f1f5f9] p-0.5">
+                        <div className="w-12 h-16 relative flex-shrink-0 border border-[#cbd5e1] rounded-lg bg-gray-100 overflow-hidden">
                           <Image
                             src={product.media[0].secure_url}
                             alt=""
                             fill
-                            className="object-cover rounded-md"
+                            className="object-cover"
                           />
                         </div>
                       )}
                       <div>
                         <div className="flex items-center gap-3 flex-wrap">
-                          <h2 className="text-base font-extrabold text-[#0f172a] tracking-tight">
+                          <h2 className="text-base font-extrabold text-[#0f172a]">
                             {product.name}
                           </h2>
-                          <span className="text-[11px] px-2.5 py-0.5 bg-[#e2efe9] text-[#14532d] rounded-md font-bold tracking-wide border border-[#cbdad2]">
-                            {variants.length} Variants Listed
+                          <span className="text-[11px] px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-md font-bold border border-emerald-200">
+                            {variants.length} Variants
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#64748b] mt-1 font-medium md:hidden">
-                          Tap to inspect columns
-                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between md:justify-end gap-6 border-t border-[#f1f5f9] pt-3 md:pt-0 md:border-none">
-                      <div className="text-left md:text-right bg-[#f1f5f3] px-4 py-2 rounded-lg border border-[#e2e8f0]">
-                        <span className="text-[10px] uppercase tracking-wider text-[#64748b] block font-extrabold">
-                          Depot Storage
+                    <div className="flex items-center justify-between md:justify-end gap-4">
+                      <div className="bg-gray-100 px-4 py-1.5 rounded-lg border border-gray-200 text-center">
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500 block font-bold">
+                          Warehouse Stock
                         </span>
-                        <span className="text-base font-black text-[#14532d]">
+                        <span className="text-sm font-black text-emerald-800">
                           {totalWarehouseStock} Pcs
                         </span>
                       </div>
@@ -281,77 +297,75 @@ export default function AdvancedInventoryDashboard() {
                           e.stopPropagation();
                           handleSyncProductFamily(product._id);
                         }}
-                        className=" bg-red-500 text-black text-xs font-extrabold px-4 py-2 rounded-lg transition-colors shadow-sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm"
                       >
-                        Save
+                        Save Family
                       </button>
                     </div>
                   </div>
 
-                  {/* SPECIFICATION MATRIX CHANNELS */}
+                  {/* Nested Inventory Matrix */}
                   {isExpanded && (
-                    <div className="p-3 md:p-6 bg-[#f4f7f5]">
-                      {/* Desktop Column Matrix */}
-                      <div className="hidden lg:block overflow-x-auto border border-[#cbd5e1] rounded-xl bg-white shadow-inner">
+                    <div className="p-4 bg-[#f8faf9]">
+                      {/* Desktop Grid Layout */}
+                      <div className="hidden lg:block overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
                         <table className="w-full border-collapse text-left text-xs">
                           <thead>
-                            <tr className="bg-[#1e2e2a] text-[#e2efe9] font-bold uppercase tracking-wider text-[11px] border-b border-[#14532d]">
-                              <th className="p-4 pl-5 font-extrabold">
+                            <tr className="bg-[#1e2e2a] text-[#e2efe9] text-[11px] font-bold uppercase tracking-wider">
+                              <th className="p-4 font-extrabold">
                                 SKU Layout Matrix
                               </th>
-                              <th className="p-4 text-center bg-[#283e39] font-extrabold w-[180px]">
+                              <th className="p-4 text-center bg-[#243732] font-extrabold w-[160px]">
                                 🏭 Main Warehouse
                               </th>
                               {showrooms.map((s) => (
                                 <th
-                                  key={`header-showroom-${s.showroom}`}
+                                  key={`header-showroom-${s._id}`}
                                   className="p-4 font-extrabold bg-[#223530] text-center border-l border-[#2d423e]"
                                 >
-                                  🏢 {s.showroom}
+                                  🏢 {s.name}
                                 </th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#e2e8f0] text-[#334155]">
+                          <tbody className="divide-y divide-gray-100">
                             {variants.map((vItem) => (
                               <tr
                                 key={`row-variant-${vItem._id}`}
-                                className=" transition-colors"
+                                className="hover:bg-gray-50/50 transition-all"
                               >
-                                <td className="p-4 pl-5">
-                                  <div className="flex items-center gap-3">
+                                <td className="p-4 font-bold text-gray-900">
+                                  <div className="flex items-center gap-2">
                                     {vItem.variantId?.media?.[0]
                                       ?.secure_url && (
-                                      <div className="w-8 h-8 relative flex-shrink-0 border border-[#e2e8f0] rounded bg-white overflow-hidden">
+                                      <div className="w-8 h-10 relative border rounded bg-white overflow-hidden">
                                         <Image
                                           src={
                                             vItem.variantId.media[0].secure_url
                                           }
                                           alt=""
                                           fill
-                                          className="object-contain"
+                                          className="object-cover"
                                         />
                                       </div>
                                     )}
-                                    <span className="font-extrabold text-[#0f172a] text-sm">
+                                    <span>
                                       {vItem.variantId?.color || "Standard"}{" "}
                                       &bull; {vItem.variantId?.size || "UNI"}
                                     </span>
                                   </div>
                                 </td>
 
-                                {/* Colored Column: Main Warehouse */}
-                                <td className="p-4 text-center  font-semibold border-x border-[#d1fac7]/40">
+                                <td className="p-4 text-center border-r border-gray-100">
                                   <span
-                                    className={`inline-block px-2.5 py-1 rounded-md font-extrabold text-[11px] ${vItem.stock > 0 ? "bg-[#d1fae5] text-[#065f46]" : "bg-[#fee2e2] text-[#991b1b]"}`}
+                                    className={`inline-block px-3 py-1 rounded-full font-bold text-xs ${vItem.stock > 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}
                                   >
-                                    {vItem.stock} items
+                                    {vItem.stock} pcs
                                   </span>
                                 </td>
 
-                                {/* Colored Columns: Dynamic Showrooms */}
                                 {showrooms.map((showroom) => {
-                                  const cellKey = `${vItem._id}_${showroom.showroom}`;
+                                  const cellKey = `${vItem._id}_${showroom._id}`;
                                   const currentStock =
                                     showroom.items?.find(
                                       (si) =>
@@ -367,30 +381,36 @@ export default function AdvancedInventoryDashboard() {
 
                                   return (
                                     <td
-                                      key={`cell-show-${vItem._id}-${showroom.showroom}`}
-                                      className="p-4 bg-[#fbfdfb] border-l border-[#e2e8f0] text-center"
+                                      key={`cell-show-${vItem._id}-${showroom._id}`}
+                                      className="p-3 border-l border-gray-100 text-center min-w-[200px]"
                                     >
                                       <div className="flex items-center justify-center gap-2">
-                                        <span className="text-xs">
-                                          {currentStock}
-                                        </span>
-
-                                        {/* Send To Showroom */}
+                                        <div className="text-left leading-tight pr-1">
+                                          <span className="text-[10px] text-gray-400 block font-semibold">
+                                            STOCK
+                                          </span>
+                                          <span className="text-xs font-bold text-gray-700">
+                                            {currentStock}
+                                          </span>
+                                        </div>
                                         <input
                                           type="number"
-                                          placeholder="+"
+                                          placeholder="0"
+                                          min="0"
                                           value={pendingValue}
                                           onChange={(e) =>
                                             handleQtyChange(
                                               vItem._id,
-                                              showroom.showroom,
+                                              showroom._id,
                                               e.target.value,
                                             )
                                           }
-                                          className="w-16 border rounded px-2 py-1"
+                                          className={`w-14 border rounded px-1.5 py-1 text-center font-bold text-xs transition-all ${
+                                            pendingValue !== ""
+                                              ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                              : "border-gray-300"
+                                          }`}
                                         />
-
-                                        {/* Return To Warehouse */}
                                         <button
                                           onClick={() =>
                                             handleReturnStock(
@@ -399,7 +419,7 @@ export default function AdvancedInventoryDashboard() {
                                               vItem,
                                             )
                                           }
-                                          className="bg-red-500 text-white px-2 py-1 rounded text-xs"
+                                          className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded font-bold text-[11px] transition-all"
                                         >
                                           Return
                                         </button>
@@ -413,28 +433,25 @@ export default function AdvancedInventoryDashboard() {
                         </table>
                       </div>
 
-                      {/* Mobile View Card Grid */}
+                      {/* Mobile View Layout */}
                       <div className="lg:hidden space-y-3">
                         {variants.map((vItem) => (
                           <div
                             key={`mob-variant-${vItem._id}`}
-                            className="bg-white p-4 rounded-xl border border-[#cbd5e1] shadow-sm space-y-3"
+                            className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3"
                           >
-                            <div className="flex items-center justify-between gap-2 border-b border-[#e2e8f0] pb-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <span className="font-extrabold text-[#0f172a] text-sm">
-                                  {vItem.variantId?.color || "Standard"} /{" "}
-                                  {vItem.variantId?.size || "UNI"}
-                                </span>
-                              </div>
-                              <span className="text-[12px] px-2.5 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] font-extrabold">
+                            <div className="flex items-center justify-between border-b pb-2">
+                              <span className="font-extrabold text-sm text-gray-900">
+                                {vItem.variantId?.color || "Standard"} /{" "}
+                                {vItem.variantId?.size || "UNI"}
+                              </span>
+                              <span className="text-xs px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold">
                                 WH: {vItem.stock}
                               </span>
                             </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {showrooms.map((showroom) => {
-                                const cellKey = `${vItem._id}_${showroom.showroom}`;
+                                const cellKey = `${vItem._id}_${showroom._id}`;
                                 const currentStock =
                                   showroom.items?.find(
                                     (si) =>
@@ -450,35 +467,48 @@ export default function AdvancedInventoryDashboard() {
 
                                 return (
                                   <div
-                                    key={`mob-cell-${vItem._id}-${showroom.showroom}`}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-[#f0f4f2] border border-[#d1dad6]"
+                                    key={`mob-cell-${vItem._id}-${showroom._id}`}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200"
                                   >
-                                    <div className="flex flex-col">
-                                      <span className="text-[12px] font-bold text-[#14532d]">
-                                        🏢 {showroom.showroom}
+                                    <div>
+                                      <span className="text-xs font-bold text-gray-800 block">
+                                        🏢 {showroom.name}
                                       </span>
-                                      <span className="text-[11px] text-[#475569] font-medium">
+                                      <span className="text-[11px] text-gray-500">
                                         In Store: {currentStock}
                                       </span>
                                     </div>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      placeholder="0"
-                                      value={pendingValue}
-                                      onChange={(e) =>
-                                        handleQtyChange(
-                                          vItem._id,
-                                          showroom.showroom,
-                                          e.target.value,
-                                        )
-                                      }
-                                      className={`border rounded-lg px-2.5 py-1 text-right w-20 text-xs font-bold transition-all ${
-                                        pendingValue !== ""
-                                          ? "border-[#10b981] bg-[#d1fae5] text-[#065f46]"
-                                          : "border-[#cbd5e1] bg-white"
-                                      }`}
-                                    />
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={pendingValue}
+                                        onChange={(e) =>
+                                          handleQtyChange(
+                                            vItem._id,
+                                            showroom._id,
+                                            e.target.value,
+                                          )
+                                        }
+                                        className={`border rounded px-2 py-1 text-center w-14 text-xs font-bold ${
+                                          pendingValue !== ""
+                                            ? "border-emerald-500 bg-emerald-50"
+                                            : "border-gray-300"
+                                        }`}
+                                      />
+                                      <button
+                                        onClick={() =>
+                                          handleReturnStock(
+                                            showroom,
+                                            product,
+                                            vItem,
+                                          )
+                                        }
+                                        className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-[11px] font-bold"
+                                      >
+                                        Return
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -491,12 +521,6 @@ export default function AdvancedInventoryDashboard() {
                 </div>
               );
             })}
-
-            {stock.length === 0 && (
-              <div className="bg-white rounded-xl border border-[#cbd5e1] p-20 text-center text-[#64748b] font-semibold italic">
-                No active records configured in ledger.
-              </div>
-            )}
           </div>
         )}
       </div>
