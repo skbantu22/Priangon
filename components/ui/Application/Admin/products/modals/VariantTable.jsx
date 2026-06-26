@@ -163,7 +163,7 @@ export default function VariantTable({
                 <td className="p-2 border-r border-zinc-200">
                   <Input
                     className="h-8 rounded-none border-zinc-400"
-                    value={variant.discountPercentage || ""}
+                    value={variant.discountPercentage ?? ""}
                     onChange={(e) =>
                       handleRowChange(
                         variant.id,
@@ -178,7 +178,7 @@ export default function VariantTable({
                 <td className="p-2 border-r border-zinc-200">
                   <Input
                     className="h-8 rounded-none border-zinc-400"
-                    value={variant.discountAmount || ""}
+                    value={variant.discountAmount ?? ""}
                     onChange={(e) =>
                       handleRowChange(
                         variant.id,
