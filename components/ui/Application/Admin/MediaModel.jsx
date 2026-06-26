@@ -109,6 +109,7 @@ const MediaModal = ({
                           selectedMedia={selectedMedia}
                           setSelectedMedia={setSelectedMedia}
                           isMultiple={isMultiple}
+                          setOpen={setOpen}
                         />
                       ))}
                     </React.Fragment>

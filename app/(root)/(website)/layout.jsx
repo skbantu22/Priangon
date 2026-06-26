@@ -13,6 +13,7 @@ import MetaPixel from "@/lib/MetaPixel";
 import { connectDB } from "@/lib/databaseconnection";
 // ✅ আপনার ইমপোর্ট করা মডেলের নাম অনুযায়ী এটি ব্যবহার করুন
 import FBTrackingSetting from "@/models/FbTrackingSetting.model";
+import AnnouncementBar from "@/components/ui/Application/website/AnnouncementBar";
 
 const jost = Jost({
   weight: ["400", "500", "600", "700", "800"],
@@ -47,6 +48,8 @@ const Layout = async ({ children }) => {
       <div className={jost.className}>
         {/* ✅ এখন plainSettings পাস করুন */}
         <MetaPixel settings={plainSettings} />
+
+        <AnnouncementBar />
 
         <Header />
         <main>{children}</main>

@@ -1,35 +1,118 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import AddVariantModal from "./AddVariantModal";
-import EditVariantModal from "./EditVariantModal";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { showToast } from "@/lib/showToast";
 
-export default function VariantManager({ productId }) {
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [editingVariant, setEditingVariant] = useState(null);
-  const [variants, setVariants] = useState([]);
-  const [loading, setLoading] = useState(false);
+import BulkSettings from "./BulkSettings";
+import ColorVideoManager from "./ColorVideoManager";
+import VariantTable from "./VariantTable";
 
-  // FETCH
+export default function VariantManager({
+  productId,
+  queryClient,
+  productMrp,
+  productSellingPrice,
+}) {
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedColors, setSelectedColors] = useState([]);
+  const [videoLinks, setVideoLinks] = useState({});
+  const [colorImages, setColorImages] = useState({});
+  const [variantsList, setVariantsList] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [colorPool, setColorPool] = useState([]);
+
+  const [bulkData, setBulkData] = useState({
+    purchasePrice: "",
+    sellingPrice: "",
+    discountPercent: "",
+    discountAmount: "",
+    afterDiscount: "",
+    openingStock: "",
+    openingStockPurchasePrice: "",
+  });
+
+  // =============================
+  // PRICE AUTO SET
+  // =============================
+  useEffect(() => {
+    const mrp = Number(productMrp || 0);
+    const sale = Number(productSellingPrice || 0);
+
+    const discountPercent =
+      mrp > 0 ? Math.round(((mrp - sale) / mrp) * 100) : 0;
+
+    const discountAmount = mrp - sale;
+
+    setBulkData((prev) => ({
+      ...prev,
+      purchasePrice: mrp,
+      sellingPrice: sale,
+      discountPercent,
+      discountAmount,
+      afterDiscount: sale,
+    }));
+  }, [productMrp, productSellingPrice]);
+
+  // =============================
+  // LOAD COLORS
+  // =============================
+  useEffect(() => {
+    fetchColors();
+  }, []);
+
+  const fetchColors = async () => {
+    try {
+      const { data } = await axios.get("/api/color");
+      if (data?.success) {
+        setColorPool(data.data);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // =============================
+  // LOAD VARIANTS FROM DB
+  // =============================
   const fetchVariants = useCallback(async () => {
     if (!productId) return;
 
     try {
-      setLoading(true);
-
       const { data } = await axios.get(
         `/api/product-variant/find?productId=${productId}`,
       );
 
       if (data?.success) {
-        setVariants(data.data);
+        const normalizedData = data.data.map((item) => {
+          const mrp = Number(item.mrp ?? 0);
+          const sellingPrice = Number(item.sellingPrice ?? 0);
+          const discountPercentage = Number(item.discountPercentage ?? 0);
+
+          // Calculate missing values if not stored in DB
+          const discountAmount =
+            item.discountAmount ??
+            Math.round((sellingPrice * discountPercentage) / 100);
+
+          const afterDiscount =
+            item.afterDiscount ?? Math.round(sellingPrice - discountAmount);
+
+          return {
+            ...item,
+            id: item._id || item.id,
+            mrp,
+            sellingPrice,
+            discountPercentage,
+            discountAmount,
+            afterDiscount,
+            stock: item.stock ?? 0,
+          };
+        });
+
+        setVariantsList(normalizedData);
       }
     } catch (error) {
-      console.log("Fetch variants error:", error);
-    } finally {
-      setLoading(false);
+      console.log("Load variants error:", error);
     }
   }, [productId]);
 
@@ -37,144 +120,207 @@ export default function VariantManager({ productId }) {
     fetchVariants();
   }, [fetchVariants]);
 
-  // DELETE
-  const deleteVariant = async (id) => {
-    try {
-      await axios.delete(`/api/product-variant/delete/${id}`);
+  // =============================
+  // GENERATE VARIANTS (UI ONLY)
+  // =============================
+  const handleGenerateVariants = () => {
+    if (!selectedSize || !selectedColors.length) {
+      showToast("error", "Select Size and Colors first!");
+      return;
+    }
 
-      setVariants((prev) => prev.filter((v) => v._id !== id));
+    for (const color of selectedColors) {
+      if (!colorImages[color] || colorImages[color].length === 0) {
+        showToast("error", `Upload image for color ${color}`);
+        return;
+      }
+    }
+
+    const mrp = Number(productMrp || 0);
+    const salePrice = Number(productSellingPrice || 0);
+
+    const discountAmount = mrp - salePrice;
+    const discountPercent =
+      mrp > 0 ? Math.round(((mrp - salePrice) / mrp) * 100) : 0;
+
+    const generated = selectedColors.map((color, index) => {
+      const imgs = colorImages[color] || [];
+
+      return {
+        id: `temp-${Date.now()}-${index}`, // explicit temporary tag
+        isNew: true,
+        sortIndex: index + 1,
+        sizeColor: `${selectedSize} - ${color}`,
+        color,
+        size: selectedSize,
+        sku: `SKU-${selectedSize}-${color
+          .replace(/\s+/g, "")
+          .toUpperCase()}-${Date.now().toString().slice(-4)}`,
+        barcode: Math.floor(10000000 + Math.random() * 90000000).toString(),
+        stock: 0,
+        variantImage: imgs[0]?.secure_url || imgs[0]?.url || "",
+        media: imgs,
+        purchasePrice: mrp,
+        sellingPrice: salePrice,
+        discountPercent,
+        discountAmount,
+        afterDiscount: salePrice,
+        openingStock: bulkData.openingStock || 0,
+        openingStockPurchasePrice: bulkData.openingStockPurchasePrice || 0,
+      };
+    });
+
+    // Merge existing persisted variants instead of replacing them wholesale
+    setVariantsList((prev) => [...prev, ...generated]);
+    showToast("success", "Variants Appended to Grid");
+  };
+
+  // =============================
+  // APPLY BULK SETTINGS
+  // =============================
+  const handleApplyToAll = () => {
+    setVariantsList((prev) =>
+      prev.map((row) => ({
+        ...row,
+        purchasePrice: bulkData.purchasePrice || row.purchasePrice,
+        sellingPrice: bulkData.sellingPrice || row.sellingPrice,
+        discountPercent: bulkData.discountPercent || row.discountPercent,
+        discountAmount: bulkData.discountAmount || row.discountAmount,
+        afterDiscount: bulkData.afterDiscount || row.afterDiscount,
+        openingStock: bulkData.openingStock || row.openingStock,
+        openingStockPurchasePrice:
+          bulkData.openingStockPurchasePrice || row.openingStockPurchasePrice,
+      })),
+    );
+
+    showToast("success", "Applied to all variants");
+  };
+
+  // =============================
+  // INLINE ACTIONS: DELETE VARIANT
+  // =============================
+  const handleDeleteVariant = async (variantId, isNew) => {
+    if (isNew || String(variantId).startsWith("temp-")) {
+      // Unsaved local variant: remove directly from UI state
+      setVariantsList((prev) => prev.filter((v) => v.id !== variantId));
+      showToast("success", "Unsaved variant removed");
+      return;
+    }
+
+    try {
+      // Persisted variant: delete from the database directly
+      const { data } = await axios.delete(
+        `/api/product-variant/delete/${variantId}`,
+      );
+      if (data?.success) {
+        showToast("success", "Variant deleted from database");
+        setVariantsList((prev) => prev.filter((v) => v.id !== variantId));
+      }
     } catch (error) {
-      console.log("Delete error:", error);
+      showToast("error", error?.response?.data?.message || "Deletion failed");
     }
   };
 
+  // =============================
+  // INLINE ACTIONS: REMOVE IMAGE
+  // =============================
+  const handleRemoveVariantImage = (variantId, mediaIdToRemove) => {
+    setVariantsList((prev) =>
+      prev.map((variant) => {
+        if (variant.id !== variantId) return variant;
+
+        const filteredMedia = (variant.media || []).filter(
+          (m) => m._id !== mediaIdToRemove,
+        );
+
+        return {
+          ...variant,
+          media: filteredMedia,
+          // Reassign primary image to next available file if primary was deleted
+          variantImage:
+            filteredMedia[0]?.secure_url || filteredMedia[0]?.url || "",
+        };
+      }),
+    );
+  };
+
+  // =============================
+  // SAVE / UPDATE LIFECYCLE
+  // =============================
+  const handleSaveVariants = async () => {
+    try {
+      setIsSaving(true);
+
+      // New variants (not yet saved)
+      const newVariants = variantsList.filter(
+        (v) => String(v.id).startsWith("temp-") || v.isNew,
+      );
+
+      // Existing variants (already in DB)
+      const existingVariants = variantsList.filter(
+        (v) => !String(v.id).startsWith("temp-") && !v.isNew,
+      );
+
+      // Create new variants
+      if (newVariants.length) {
+        await axios.post("/api/product-variant/create", {
+          productId,
+          variants: newVariants,
+          videos: videoLinks,
+        });
+      }
+
+      // Update existing variants
+      if (existingVariants.length) {
+        await axios.put("/api/product-variant/update", {
+          variants: existingVariants,
+        });
+      }
+
+      showToast("success", "Variants saved successfully!");
+
+      await fetchVariants();
+    } catch (error) {
+      showToast("error", error?.response?.data?.message || "Save failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  console.log("variantsList", variantsList);
+  console.log("Total Variants:", variantsList.length);
+
   return (
-    <div className="bg-white p-6 border space-y-4">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h2 className="font-black uppercase">Product Variants</h2>
+    <div className="space-y-6 mt-10 max-w-[1200px] mx-auto px-4">
+      <ColorVideoManager
+        selectedSize={selectedSize}
+        setSelectedSize={setSelectedSize}
+        selectedColors={selectedColors}
+        setSelectedColors={setSelectedColors}
+        videoLinks={videoLinks}
+        setVideoLinks={setVideoLinks}
+        colorImages={colorImages}
+        setColorImages={setColorImages}
+        colorPool={colorPool}
+        onGenerate={handleGenerateVariants}
+        queryClient={queryClient}
+      />
 
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center gap-2 bg-black text-white px-3 py-1 text-xs font-bold"
-        >
-          <Plus size={16} /> ADD
-        </button>
-      </div>
+      <BulkSettings
+        bulkData={bulkData}
+        setBulkData={setBulkData}
+        onApplyAll={handleApplyToAll}
+      />
 
-      {/* LOADING */}
-      {loading && <p className="text-sm text-gray-500">Loading...</p>}
-
-      {/* TABLE */}
-      <div className="overflow-x-auto">
-        <table className="w-full border text-sm">
-          <thead className="bg-black text-white">
-            <tr>
-              <th className="p-2">Images</th>
-              <th className="p-2">SKU</th>
-              <th className="p-2">Color</th>
-              <th className="p-2">Size</th>
-              <th className="p-2">Stock</th>
-              <th className="p-2">MRP</th>
-              <th className="p-2">Selling</th>
-              <th className="p-2">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {variants.length === 0 && !loading && (
-              <tr>
-                <td colSpan="8" className="p-4 text-center">
-                  No variants found
-                </td>
-              </tr>
-            )}
-
-            {variants.map((v) => (
-              <tr key={v._id} className="border-t">
-                {/* IMAGES */}
-                <td className="p-2">
-                  <div className="flex gap-1 overflow-x-auto max-w-[180px]">
-                    {(v?.media?.length ? v.media : []).map((img, i) => (
-                      <img
-                        key={i}
-                        src={img?.secure_url || "/placeholder.png"}
-                        alt="variant"
-                        className="w-10 h-10 object-cover border flex-shrink-0"
-                      />
-                    ))}
-
-                    {!v?.media?.length && (
-                      <span className="text-[10px] text-gray-400">
-                        No image
-                      </span>
-                    )}
-                  </div>
-                </td>
-
-                <td className="p-2">{v.sku}</td>
-                <td className="p-2">{v.color}</td>
-                <td className="p-2">{v.size}</td>
-                <td className="p-2">{v.stock}</td>
-                <td className="p-2">{v.mrp}</td>
-                <td className="p-2">{v.sellingPrice}</td>
-
-                <td className="p-2 flex gap-3">
-                  {/* EDIT */}
-                  <button
-                    onClick={() => setEditingVariant(v)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <Pencil size={18} />
-                  </button>
-
-                  {/* DELETE */}
-                  <button
-                    onClick={() => deleteVariant(v._id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ADD MODAL */}
-      {isAddOpen && (
-        <AddVariantModal
-          productId={productId}
-          close={() => {
-            setIsAddOpen(false);
-            fetchVariants();
-          }}
-        />
-      )}
-
-      {/* EDIT MODAL */}
-      {editingVariant && (
-        <EditVariantModal
-          isOpen={!!editingVariant}
-          setIsOpen={() => setEditingVariant(null)}
-          editingVariant={editingVariant}
-          setEditingVariant={setEditingVariant}
-          saveEditedVariant={async (updated) => {
-            try {
-              await axios.put(
-                `/api/product-variant/${editingVariant._id}`,
-                updated,
-              );
-
-              setEditingVariant(null);
-              fetchVariants();
-            } catch (err) {
-              console.log(err);
-            }
-          }}
-        />
-      )}
+      <VariantTable
+        variantsList={variantsList}
+        setVariantsList={setVariantsList}
+        colorImages={colorImages}
+        onSave={handleSaveVariants}
+        onDelete={handleDeleteVariant}
+        onRemoveImage={handleRemoveVariantImage}
+        isSaving={isSaving}
+        colorPool={colorPool}
+      />
     </div>
   );
 }

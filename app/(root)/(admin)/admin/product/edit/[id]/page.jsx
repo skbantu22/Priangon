@@ -32,6 +32,7 @@ import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
 import VariantManager from "@/components/ui/Application/Admin/products/modals/VariantManager";
+import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -141,7 +142,11 @@ const EditProduct = ({ params }) => {
 
       if (product?.media?.length) {
         setSelectedMedia(
-          product.media.map((m) => ({ _id: m._id, url: m.secure_url })),
+          product.media.map((m) => ({
+            _id: m._id,
+            url: m.secure_url || m.url,
+            secure_url: m.secure_url,
+          })),
         );
       }
     }
@@ -290,43 +295,13 @@ const EditProduct = ({ params }) => {
                       <ImageIcon className="w-4 h-4" /> Gallery
                     </CardTitle>
                   </CardHeader>
+
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                      {selectedMedia.map((m) => (
-                        <div
-                          key={m._id}
-                          className="relative aspect-[3/4] border-2 border-black"
-                        >
-                          <Image
-                            src={m.url}
-                            fill
-                            alt="Gallery"
-                            className="object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedMedia((p) =>
-                                p.filter((x) => x._id !== m._id),
-                              )
-                            }
-                            className="absolute top-1 right-1 bg-black text-white p-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setOpen(true)}
-                        className="aspect-[3/4] border-2 border-dashed border-black flex flex-col items-center justify-center gap-2 hover:bg-zinc-50"
-                      >
-                        <LayoutGrid className="w-6 h-6" />
-                        <span className="text-[10px] font-black uppercase">
-                          + EDIT
-                        </span>
-                      </button>
-                    </div>
+                    <UploadMedia
+                      isMultiple={true}
+                      selectedMedia={selectedMedia}
+                      setSelectedMedia={setSelectedMedia}
+                    />
                   </CardContent>
                 </Card>
               </div>
@@ -437,7 +412,11 @@ const EditProduct = ({ params }) => {
         isMultiple={true}
       />
 
-      <VariantManager productId={id} />
+      <VariantManager
+        productId={id}
+        productMrp={watchedMrp}
+        productSellingPrice={watchedSellingPrice}
+      />
     </div>
   );
 };

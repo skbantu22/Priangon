@@ -23,6 +23,7 @@ import ProductGallery from "@/components/ui/Application/website/productgalary";
 
 // মেটা ট্র্যাকিং ফাংশন ইমপোর্ট
 import { trackMetaEvent } from "@/lib/meta/metaTrack";
+import VoiceOrderButton from "@/components/ui/Application/Admin/VoiceOrderButton";
 
 const ProductDetails = ({
   product,
@@ -559,14 +560,14 @@ ${window.location.href}
                   {isOutOfStock ? "Out of Stock" : "Buy It Now"}
                 </button>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {/* CALL BUTTON */}
                   <button
                     type="button"
                     onClick={handleCallOrder}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-black border border-black font-bold uppercase text-[12px] tracking-widest py-3 hover:bg-black hover:text-white transition-all duration-300"
+                    className="w-full flex items-center justify-center gap-2 bg-white text-black border border-black font-semibold text-xs md:text-sm py-3  hover:bg-black hover:text-white transition-all duration-300"
                   >
-                    <Phone size={18} strokeWidth={2.2} />
+                    <Phone size={16} strokeWidth={2.2} />
                     Call For Order
                   </button>
 
@@ -574,12 +575,19 @@ ${window.location.href}
                   <button
                     type="button"
                     onClick={handleWhatsAppOrder}
-                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white border border-green-600 font-bold uppercase text-[12px] tracking-widest py-3 hover:bg-green-700 transition-all duration-300"
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white border border-green-600 font-semibold text-xs md:text-sm py-3  hover:bg-green-700 transition-all duration-300"
                   >
-                    <MessageCircle size={18} strokeWidth={2.2} />
+                    <MessageCircle size={16} strokeWidth={2.2} />
                     Order On WhatsApp
                   </button>
                 </div>
+                <VoiceOrderButton
+                  product={product}
+                  variantId={currentSlide?.variantId}
+                  color={selectedColor}
+                  size={selectedSize}
+                  quantity={quantity}
+                />
               </div>
             </div>
 

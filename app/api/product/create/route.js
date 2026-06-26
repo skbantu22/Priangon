@@ -40,6 +40,22 @@ export async function POST(request) {
         ? productData.subcategory
         : null;
 
+    // ✅ CLEAN + NORMALIZE NAME
+    const normalizedName = productData.name.trim();
+
+    // ❌ CHECK DUPLICATE PRODUCT NAME (case-insensitive)
+    const existingProduct = await ProductModel.findOne({
+      name: { $regex: new RegExp(`^${normalizedName}$`, "i") },
+    });
+
+    if (existingProduct) {
+      return response(
+        false,
+        409,
+        "Product name already exists. Please use a different name.",
+      );
+    }
+
     // ✅ Create product
     const newProduct = new ProductModel({
       name: productData.name,
@@ -64,7 +80,7 @@ export async function POST(request) {
 
     await newProduct.save();
 
-    // ✅ FIX: return created product
+    // ✅ Success response
     return response(true, 200, "Product added successfully.", newProduct);
   } catch (error) {
     console.log("PRODUCT CREATE ERROR:");

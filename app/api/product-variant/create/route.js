@@ -10,95 +10,107 @@ const generateSKU = (productId) => {
   return `SKU-${productId.toString().slice(-4)}-${rand}`;
 };
 
-// Barcode generator (12 digit)
+// barcode generator
 const generateBarcode = () => {
-  let code = "";
-  for (let i = 0; i < 12; i++) {
-    code += Math.floor(Math.random() * 10);
-  }
-  return code;
+  return String(Math.floor(10000000 + Math.random() * 90000000));
 };
 
 export async function POST(request) {
+  console.log("🔥 VARIANT CREATE API HIT");
+
   try {
     await connectDB();
+
     const payload = await request.json();
 
-    // 1. Product check
-    const product = await ProductModel.findById(payload.product).select(
-      "mrp sellingPrice",
-    );
+    const productId = payload.productId; // ✅ ONLY SOURCE OF TRUTH
+
+    const variants = Array.isArray(payload.variants) ? payload.variants : [];
+
+    if (!productId) {
+      return response(false, 400, "productId missing");
+    }
+
+    const product =
+      await ProductModel.findById(productId).select("mrp sellingPrice");
 
     if (!product) {
       return response(false, 404, "Product not found");
     }
 
-    // 2. Duplicate variant check
-    const existingVariant = await ProductVariantModel.findOne({
-      product: payload.product,
-      color: payload.color,
-      size: payload.size,
-    });
+    const createdVariants = [];
+    const productVariantIds = [];
 
-    if (existingVariant) {
-      return response(
-        false,
-        400,
-        "এই কালার এবং সাইজের ভ্যারিয়েন্ট ইতিমধ্যে যোগ করা হয়েছে।",
-      );
+    for (const item of variants) {
+      const existingVariant = await ProductVariantModel.findOne({
+        product: productId,
+        color: item.color || "",
+        size: item.size || "",
+      });
+
+      if (existingVariant) continue;
+
+      const stock = Math.max(0, Number(item.openingStock || 0));
+
+      const barcode = item.barcode?.trim()
+        ? item.barcode.trim()
+        : generateBarcode();
+
+      const variant = await ProductVariantModel.create({
+        product: productId,
+
+        color: item.color || "",
+        size: item.size || "",
+
+        sku: generateSKU(productId),
+        barcode,
+
+        mrp: product.mrp,
+        sellingPrice: Number(item.sellingPrice) || product.sellingPrice,
+
+        purchasePrice: Number(item.purchasePrice) || 0,
+        discountPercent: Number(item.discountPercent) || 0,
+        discountAmount: Number(item.discountAmount) || 0,
+        afterDiscount: Number(item.afterDiscount) || 0,
+
+        priceSource: "PRODUCT",
+
+        stock,
+        sold: 0,
+
+        media: item.media || [],
+        videos: item.videos || [],
+
+        isActive: item.isActive ?? true,
+      });
+
+      // warehouse stock
+      await WarehouseStock.create({
+        productId,
+        variantId: variant._id,
+        stock,
+        reservedStock: 0,
+      });
+
+      createdVariants.push(variant);
+      productVariantIds.push(variant._id);
     }
 
-    // 3. Stock sanitize
-    const initialStock = Math.max(0, Number(payload.stock) || 0);
+    // ✅ FIXED PRODUCT UPDATE
+    if (productVariantIds.length) {
+      await ProductModel.findByIdAndUpdate(productId, {
+        $addToSet: {
+          variants: { $each: productVariantIds },
+        },
+      });
+    }
 
-    // 4. Auto generate identifiers
-    const sku = generateSKU(payload.product);
-    const barcode = generateBarcode();
-
-    // 5. CREATE VARIANT (PRICE FROM PRODUCT + PRICE SOURCE SYSTEM)
-    const newProductVariant = await ProductVariantModel.create({
-      product: payload.product,
-      color: payload.color || "",
-      size: payload.size || "",
-
-      sku,
-      barcode,
-
-      // ✅ inherit product price
-      mrp: product.mrp,
-      sellingPrice: product.sellingPrice,
-
-      // ✅ IMPORTANT: price source system
-      priceSource: "PRODUCT",
-
-      stock: initialStock,
-      sold: 0,
-
-      media: payload.media || [],
-      isActive: payload.isActive ?? true,
-    });
-
-    // 6. Warehouse stock entry
-    await WarehouseStock.create({
-      productId: payload.product,
-      variantId: newProductVariant._id,
-      stock: initialStock,
-      reservedStock: 0,
-    });
-
-    // 7. Link variant to product
-    await ProductModel.findByIdAndUpdate(payload.product, {
-      $addToSet: { variants: newProductVariant._id },
-    });
-
-    return response(true, 201, "ভ্যারিয়েন্ট সফলভাবে তৈরি হয়েছে।", {
-      variantId: newProductVariant._id,
-      sku,
-      barcode,
-      priceSource: "PRODUCT",
+    return response(true, 201, "Variants created", {
+      count: createdVariants.length,
+      variants: createdVariants,
     });
   } catch (error) {
-    console.error("Error creating product variant:", error);
-    return catchError(error, "ভ্যারিয়েন্ট অ্যাড করতে সমস্যা হয়েছে।");
+    console.error("Create Variant Error:", error);
+    return catchError(error);
   }
 }

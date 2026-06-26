@@ -198,7 +198,10 @@ const AddProduct = () => {
         router.push(`/admin/product/edit/${createdProduct._id}`);
       }
     } catch (error) {
-      showToast("error", "Check required fields or connection");
+      const message =
+        error?.response?.data?.message || "Check required fields or connection";
+
+      showToast("error", message);
     } finally {
       setLoading(false);
     }
@@ -286,49 +289,12 @@ const AddProduct = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-                      {selectedMedia.map((m) => (
-                        <div
-                          key={m._id}
-                          className="relative aspect-[3/4] border-2 border-black bg-zinc-50"
-                        >
-                          <Image
-                            src={m.url || m.secure_url}
-                            fill
-                            alt="Gallery"
-                            className="object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedMedia((p) =>
-                                p.filter((x) => x._id !== m._id),
-                              )
-                            }
-                            className="absolute top-1 right-1 bg-black text-white p-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setOpen(true)}
-                        className="aspect-[3/4] border-2 border-dashed border-black flex flex-col items-center justify-center gap-2"
-                      >
-                        <LayoutGrid className="w-6 h-6" />
-                        <span className="text-[10px] font-black uppercase">
-                          + ADD
-                        </span>
-                      </button>
-                    </div>
                     <div className="flex justify-between items-center pt-4 border-t border-black/10">
-                      <p className="text-[10px] font-black uppercase opacity-50">
-                        Cloud Upload:
-                      </p>
                       <UploadMedia
                         isMultiple={true}
                         queryClient={queryClient}
+                        selectedMedia={selectedMedia}
+                        setSelectedMedia={setSelectedMedia}
                       />
                     </div>
                   </CardContent>
@@ -432,10 +398,11 @@ const AddProduct = () => {
                       <Ruler className="w-4 h-4" /> Size Chart
                     </CardTitle>
                   </CardHeader>
+
                   <CardContent className="p-5 space-y-4">
                     <FormField
                       control={form.control}
-                      name="sizeChart" // NOW EXPLICITLY DEFINED
+                      name="sizeChart"
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
@@ -450,11 +417,12 @@ const AddProduct = () => {
                                   alt="Size Chart"
                                   className="object-contain"
                                 />
+
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setSizeChartMedia(null);
-                                    field.onChange(""); // Clears value in form state
+                                    field.onChange(""); // clear form value
                                   }}
                                   className="absolute top-1 right-1 bg-black text-white p-1"
                                 >
@@ -462,15 +430,18 @@ const AddProduct = () => {
                                 </button>
                               </div>
                             ) : (
-                              <div
-                                onClick={() => setSizeChartOpen(true)}
-                                className="w-full h-32 border-2 border-dashed border-black flex flex-col items-center justify-center cursor-pointer gap-2 hover:bg-zinc-50 transition-colors"
-                              >
-                                <LayoutGrid className="w-5 h-5 opacity-40" />
-                                <span className="text-[10px] font-black uppercase">
-                                  Select Size Chart
-                                </span>
-                              </div>
+                              <UploadMedia
+                                queryClient={queryClient}
+                                selectedMedia={
+                                  sizeChartMedia ? [sizeChartMedia] : []
+                                }
+                                setSelectedMedia={(items) =>
+                                  setSizeChartMedia(
+                                    items?.length ? items[0] : null,
+                                  )
+                                }
+                                isMultiple={false}
+                              />
                             )}
                           </FormControl>
                           <FormMessage />
@@ -478,17 +449,7 @@ const AddProduct = () => {
                       )}
                     />
 
-                    {/* Quick Upload Option */}
-                    <div className="pt-4 border-t border-black/10">
-                      <p className="text-[9px] font-black uppercase opacity-40 mb-2 flex items-center gap-1">
-                        <UploadCloud className="w-3 h-3" /> Quick Upload New
-                        Chart
-                      </p>
-                      <UploadMedia
-                        isMultiple={false}
-                        queryClient={queryClient}
-                      />
-                    </div>
+                    {/* removed Select Size Chart + Quick Upload section */}
                   </CardContent>
                 </Card>
               </div>

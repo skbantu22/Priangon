@@ -24,6 +24,8 @@ export const ADMIN_PRODUCT_SHOW = "/admin/product";
 export const ADMIN_PRODUCT_EDIT = (id) =>
   id ? `/admin/product/edit/${id}` : "";
 
+export const ADMIN_PRODUCT_COLOR = "/admin/product/color";
+
 // Product Varient routes
 
 export const ADMIN_PRODUCT_VARIANT_ADD = "/admin/product-variant/add";

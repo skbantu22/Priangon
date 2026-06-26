@@ -6,74 +6,101 @@ export async function PUT(request) {
   try {
     await connectDB();
 
-    const payload = await request.json();
+    const { variants } = await request.json();
 
-    const {
-      _id,
-      product,
-      sku,
-      color,
-      size,
-      mrp,
-      sellingPrice,
-      stock,
-      media,
-      isActive,
-    } = payload;
-
-    if (!_id) {
-      return response(false, 400, "_id is required");
+    if (!Array.isArray(variants) || variants.length === 0) {
+      return response(false, 400, "Variants are required");
     }
 
-    // 🔥 1. Duplicate SKU check (important)
-    const existingSku = await ProductVariantModel.findOne({
-      sku,
-      _id: { $ne: _id },
-    });
+    const updatedVariants = [];
 
-    if (existingSku) {
-      return response(false, 400, "SKU already exists");
-    }
-
-    // 🔥 2. Duplicate color-size check
-    const existingVariant = await ProductVariantModel.findOne({
-      product,
-      color,
-      size,
-      _id: { $ne: _id },
-    });
-
-    if (existingVariant) {
-      return response(false, 400, "This color & size already exists");
-    }
-
-    // 🔥 3. Direct update (BEST PRACTICE)
-    const updated = await ProductVariantModel.findByIdAndUpdate(
-      _id,
-      {
+    for (const variant of variants) {
+      const {
+        _id,
+        id,
         product,
         sku,
         color,
         size,
-        mrp: Number(mrp) || 0,
-        sellingPrice: Number(sellingPrice) || 0,
-        stock: Math.max(0, Number(stock) || 0),
-        media: media || [],
-        isActive: !!isActive,
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
+        mrp,
+        sellingPrice,
+        stock,
+        media,
+        isActive,
+        barcode,
+        purchasePrice,
+        discountPercent,
+        discountAmount,
+        afterDiscount,
+        openingStock,
+      } = variant;
 
-    if (!updated) {
-      return response(false, 404, "Variant not found");
+      const variantId = _id || id;
+
+      if (!variantId) continue;
+
+      // Duplicate SKU check
+      if (sku) {
+        const existingSku = await ProductVariantModel.findOne({
+          sku,
+          _id: { $ne: variantId },
+        });
+
+        if (existingSku) {
+          return response(false, 400, `SKU already exists (${sku})`);
+        }
+      }
+
+      // Duplicate Color + Size check
+      const existingVariant = await ProductVariantModel.findOne({
+        product,
+        color,
+        size,
+        _id: { $ne: variantId },
+      });
+
+      if (existingVariant) {
+        return response(false, 400, `${color} + ${size} already exists`);
+      }
+
+      const updated = await ProductVariantModel.findByIdAndUpdate(
+        variantId,
+        {
+          product,
+          sku,
+          barcode,
+          color,
+          size,
+          mrp: Number(mrp || purchasePrice) || 0,
+          purchasePrice: Number(purchasePrice) || 0,
+          sellingPrice: Number(sellingPrice) || 0,
+          discountPercent: Number(discountPercent) || 0,
+          discountAmount: Number(discountAmount) || 0,
+          afterDiscount: Number(afterDiscount) || 0,
+          stock: Number(stock || openingStock) || 0,
+          openingStock: Number(openingStock) || 0,
+          media: media || [],
+          isActive: !!isActive,
+        },
+        {
+          new: true,
+          runValidators: true,
+        },
+      );
+
+      if (updated) {
+        updatedVariants.push(updated);
+      }
     }
 
-    return response(true, 200, "Variant updated successfully", updated);
+    return response(
+      true,
+      200,
+      "Variants updated successfully",
+      updatedVariants,
+    );
   } catch (error) {
-    console.error("UPDATE ERROR:", error);
+    console.error(error);
     return catchError(error, "Update failed");
   }
 }

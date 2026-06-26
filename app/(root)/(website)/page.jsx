@@ -14,39 +14,29 @@ const Featuredproducts = dynamic(
   () => import("@/components/ui/Application/website/Featuredproducts"),
   {
     loading: () => <div className="min-h-[200px]" />,
-  }
+  },
 );
 
-
-
-const Womenproducts = dynamic(() => import("@/components/ui/Application/website/women"), {
-  loading: () => <div className="min-h-[200px]" />,
-});
-
-
-
-
+const Womenproducts = dynamic(
+  () => import("@/components/ui/Application/website/women"),
+  {
+    loading: () => <div className="min-h-[200px]" />,
+  },
+);
 
 const Home = () => {
   return (
     <div>
       {/* ✅ LCP element should load first */}
-    
-       <EmblaSlider />
-      <ShowCategoryList />
-   
+
+      <EmblaSlider />
 
       <Featuredproducts />
- 
+      <ShowCategoryList />
 
-   <BottomCategoryList />
-    
-    
       <MenProducts />
-      
+
       <TrustSection />
-    
-    
     </div>
   );
 };
