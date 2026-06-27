@@ -22,33 +22,33 @@ export default function VariantManager({
   const [isSaving, setIsSaving] = useState(false);
   const [colorPool, setColorPool] = useState([]);
 
+  // Managed to match schema fields + UI tracking aids
   const [bulkData, setBulkData] = useState({
-    purchasePrice: "",
+    mrp: "",
     sellingPrice: "",
-    discountPercent: "",
-    discountAmount: "",
-    afterDiscount: "",
-    openingStock: "",
-    openingStockPurchasePrice: "",
+    discountPercentage: "",
+    discountAmount: "", // UI only helper
+    afterDiscount: "", // UI only helper
+    stock: "",
   });
 
   // =============================
-  // PRICE AUTO SET
+  // PRICE AUTO SET (SCHEMA SYNC)
   // =============================
   useEffect(() => {
     const mrp = Number(productMrp || 0);
     const sale = Number(productSellingPrice || 0);
 
-    const discountPercent =
+    const discountPercentage =
       mrp > 0 ? Math.round(((mrp - sale) / mrp) * 100) : 0;
 
     const discountAmount = mrp - sale;
 
     setBulkData((prev) => ({
       ...prev,
-      purchasePrice: mrp,
+      mrp: mrp,
       sellingPrice: sale,
-      discountPercent,
+      discountPercentage,
       discountAmount,
       afterDiscount: sale,
     }));
@@ -68,7 +68,7 @@ export default function VariantManager({
         setColorPool(data.data);
       }
     } catch (err) {
-      console.log(err);
+      console.error("Fetch colors error:", err);
     }
   };
 
@@ -89,13 +89,9 @@ export default function VariantManager({
           const sellingPrice = Number(item.sellingPrice ?? 0);
           const discountPercentage = Number(item.discountPercentage ?? 0);
 
-          // Calculate missing values if not stored in DB
-          const discountAmount =
-            item.discountAmount ??
-            Math.round((sellingPrice * discountPercentage) / 100);
-
-          const afterDiscount =
-            item.afterDiscount ?? Math.round(sellingPrice - discountAmount);
+          // Calculate virtual UI parameters dynamically
+          const discountAmount = mrp - sellingPrice;
+          const afterDiscount = sellingPrice;
 
           return {
             ...item,
@@ -106,13 +102,14 @@ export default function VariantManager({
             discountAmount,
             afterDiscount,
             stock: item.stock ?? 0,
+            priceSource: item.priceSource || "PRODUCT",
           };
         });
 
         setVariantsList(normalizedData);
       }
     } catch (error) {
-      console.log("Load variants error:", error);
+      console.error("Load variants error:", error);
     }
   }, [productId]);
 
@@ -147,96 +144,111 @@ export default function VariantManager({
       const imgs = colorImages[color] || [];
 
       return {
-        id: `temp-${Date.now()}-${index}`, // explicit temporary tag
+        id: `temp-${Date.now()}-${index}`,
         isNew: true,
-        sortIndex: index + 1,
-        sizeColor: `${selectedSize} - ${color}`,
+        product: productId,
         color,
         size: selectedSize,
         sku: `SKU-${selectedSize}-${color
           .replace(/\s+/g, "")
           .toUpperCase()}-${Date.now().toString().slice(-4)}`,
         barcode: Math.floor(10000000 + Math.random() * 90000000).toString(),
-        stock: 0,
-        variantImage: imgs[0]?.secure_url || imgs[0]?.url || "",
+        stock: Number(bulkData.stock) || 0,
         media: imgs,
-        purchasePrice: mrp,
+        mrp,
         sellingPrice: salePrice,
-        discountPercent,
+        priceSource: "PRODUCT",
+        isActive: true,
+
+        // UI Helpers kept local for grid display equations
+        discountPercentage: discountPercent,
         discountAmount,
         afterDiscount: salePrice,
-        openingStock: bulkData.openingStock || 0,
-        openingStockPurchasePrice: bulkData.openingStockPurchasePrice || 0,
       };
     });
 
-    // Merge existing persisted variants instead of replacing them wholesale
     setVariantsList((prev) => [...prev, ...generated]);
     showToast("success", "Variants Appended to Grid");
   };
 
   // =============================
-  // APPLY BULK SETTINGS
+  // APPLY BULK SETTINGS (FIXED FOR REACT RE-RENDER)
   // =============================
   const handleApplyToAll = (data) => {
     setVariantsList((prev) => {
-      const updated = prev.map((row) => ({
-        ...row,
-        purchasePrice:
-          data.purchasePrice !== "" ? Number(data.purchasePrice) : row.mrp,
+      const updated = prev.map((row) => {
+        // 1. Handle purchase/MRP pricing
+        const incomingMrp =
+          data.purchasePrice !== undefined && data.purchasePrice !== ""
+            ? data.purchasePrice
+            : data.mrp;
 
-        sellingPrice:
-          data.sellingPrice !== ""
-            ? Number(data.sellingPrice)
-            : row.sellingPrice,
+        // 2. SAFETY FIX FOR STOCK:
+        // This maps 'openingStock', 'stockCount', or 'stock' directly to your state.
+        const incomingStock =
+          data.stock !== undefined && data.stock !== ""
+            ? data.stock
+            : data.openingStock !== undefined && data.openingStock !== ""
+              ? data.openingStock
+              : data.stockCount;
 
-        discountPercent:
-          data.discountPercent !== ""
-            ? Number(data.discountPercent)
-            : row.discountPercent,
+        const updatedRow = {
+          ...row,
+          mrp:
+            incomingMrp !== undefined && incomingMrp !== ""
+              ? Number(incomingMrp)
+              : row.mrp,
+          sellingPrice:
+            data.sellingPrice !== "" && data.sellingPrice !== undefined
+              ? Number(data.sellingPrice)
+              : row.sellingPrice,
 
-        discountAmount:
-          data.discountAmount !== ""
-            ? Number(data.discountAmount)
-            : row.discountAmount,
+          // CRITICAL LINE: Assign the normalized stock configuration safely
+          stock:
+            incomingStock !== "" && incomingStock !== undefined
+              ? Number(incomingStock)
+              : row.stock,
 
-        afterDiscount:
-          data.afterDiscount !== ""
-            ? Number(data.afterDiscount)
-            : row.afterDiscount,
+          priceSource:
+            incomingMrp !== "" || data.sellingPrice !== ""
+              ? "CUSTOM"
+              : row.priceSource,
+        };
 
-        openingStock:
-          data.openingStock !== ""
-            ? Number(data.openingStock)
-            : row.openingStock,
+        // 3. Recalculate working UI fields for visual consistency
+        const calculatedMrp = Number(updatedRow.mrp) || 0;
+        const calculatedSelling = Number(updatedRow.sellingPrice) || 0;
 
-        openingStockPurchasePrice:
-          data.openingStockPurchasePrice !== ""
-            ? Number(data.openingStockPurchasePrice)
-            : row.openingStockPurchasePrice,
-      }));
+        updatedRow.discountAmount = calculatedMrp - calculatedSelling;
+        updatedRow.discountPercentage =
+          calculatedMrp > 0
+            ? Math.round(
+                ((calculatedMrp - calculatedSelling) / calculatedMrp) * 100,
+              )
+            : 0;
+        updatedRow.afterDiscount = calculatedSelling;
 
-      console.log("Updated Variants:", updated);
+        return updatedRow;
+      });
 
-      return updated;
+      return [...updated];
     });
 
-    showToast("success", "Applied to all variants");
+    if (typeof showToast === "function") {
+      showToast("success", "Applied to all variants");
+    }
   };
-
   // =============================
   // INLINE ACTIONS: DELETE VARIANT
   // =============================
   const handleDeleteVariant = async (variantId, isNew) => {
     if (isNew || String(variantId).startsWith("temp-")) {
-      // Unsaved local variant: remove directly from UI state
       setVariantsList((prev) => prev.filter((v) => v.id !== variantId));
       showToast("success", "Unsaved variant removed");
       return;
     }
 
     try {
-      // Persisted variant: delete from the database directly
       const { data } = await axios.delete(
         `/api/product-variant/delete/${variantId}`,
       );
@@ -264,9 +276,6 @@ export default function VariantManager({
         return {
           ...variant,
           media: filteredMedia,
-          // Reassign primary image to next available file if primary was deleted
-          variantImage:
-            filteredMedia[0]?.secure_url || filteredMedia[0]?.url || "",
         };
       }),
     );
@@ -279,21 +288,26 @@ export default function VariantManager({
     try {
       setIsSaving(true);
 
-      // New variants (not yet saved)
       const newVariants = variantsList.filter(
         (v) => String(v.id).startsWith("temp-") || v.isNew,
       );
 
-      // Existing variants (already in DB)
       const existingVariants = variantsList.filter(
         (v) => !String(v.id).startsWith("temp-") && !v.isNew,
       );
+
+      // Cleans UI parameters out of payload array right before transmission to matching schema fields
+      const sanitizePayload = (variantsArray) =>
+        variantsArray.map(
+          ({ discountAmount, afterDiscount, id, isNew, ...schemaFields }) =>
+            schemaFields,
+        );
 
       // Create new variants
       if (newVariants.length) {
         await axios.post("/api/product-variant/create", {
           productId,
-          variants: newVariants,
+          variants: sanitizePayload(newVariants),
           videos: videoLinks,
         });
       }
@@ -301,12 +315,11 @@ export default function VariantManager({
       // Update existing variants
       if (existingVariants.length) {
         await axios.put("/api/product-variant/update", {
-          variants: existingVariants,
+          variants: sanitizePayload(existingVariants),
         });
       }
 
       showToast("success", "Variants saved successfully!");
-
       await fetchVariants();
     } catch (error) {
       showToast("error", error?.response?.data?.message || "Save failed");
@@ -314,8 +327,6 @@ export default function VariantManager({
       setIsSaving(false);
     }
   };
-  console.log("variantsList", variantsList);
-  console.log("Total Variants:", variantsList.length);
 
   return (
     <div className="space-y-6 mt-10 max-w-[1200px] mx-auto px-4">

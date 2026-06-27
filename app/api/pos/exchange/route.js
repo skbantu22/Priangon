@@ -20,6 +20,7 @@ export async function POST(req) {
       returnedItems,
       newItems,
       createdBy,
+      paymentMethod, // 💡 ফ্রন্টএন্ড থেকে পেমেন্ট মেথড পাস করলে রিসিভ করার ব্যবস্থা রাখা হলো
     } = body;
 
     // =========================
@@ -27,6 +28,10 @@ export async function POST(req) {
     // =========================
     if (!originalOrderId) throw new Error("Original order required");
     if (!showroomId) throw new Error("Showroom required");
+    if (!returnedItems || returnedItems.length === 0)
+      throw new Error("Returned items required");
+    if (!newItems || newItems.length === 0)
+      throw new Error("New items required");
 
     // =========================
     // GET ORIGINAL ORDER
@@ -66,7 +71,9 @@ export async function POST(req) {
       }).session(session);
 
       if (!stockDoc || stockDoc.stock < item.qty) {
-        throw new Error("Insufficient stock for exchange item");
+        throw new Error(
+          `Insufficient stock for item: ${item.name || "Selected product"}`,
+        );
       }
 
       await ShowroomStock.updateOne(
@@ -85,9 +92,15 @@ export async function POST(req) {
     // =========================
     // CALCULATE AMOUNT DIFFERENCE
     // =========================
-    const returnedTotal = returnedItems.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const newTotal = newItems.reduce((sum, i) => sum + i.subtotal, 0);
+    // আইটেমের subtotal বা price * qty হিসেবে সেফটি ক্যালকুলেশন
+    const returnedTotal = returnedItems.reduce(
+      (sum, i) => sum + (i.subtotal || i.price * i.qty),
+      0,
+    );
+    const newTotal = newItems.reduce(
+      (sum, i) => sum + (i.subtotal || i.price * i.qty),
+      0,
+    );
 
     const difference = newTotal - returnedTotal;
 
@@ -95,12 +108,14 @@ export async function POST(req) {
     // GENERATE EXCHANGE INVOICE
     // =========================
     const seq = await getNextInvoiceNumber("exchange_invoice");
-
     const exchangeNumber = `EXC-${String(seq).padStart(6, "0")}`;
 
     // =========================
     // SAVE EXCHANGE ORDER
     // =========================
+    // 🛠️ মেইন ফিক্স: ফাইনাল পেয়েবল বা রিফান্ড অ্যামাউন্ট নির্ধারণ
+    const finalPayableTotal = difference > 0 ? difference : 0;
+
     const exchangeOrder = await Posorder.create(
       [
         {
@@ -109,7 +124,7 @@ export async function POST(req) {
           userId: createdBy || null,
           orderType: "exchange",
 
-          items: newItems,
+          items: newItems, // কাস্টমার এক্সচেঞ্জ করে এই আইটেমগুলো নিয়ে যাচ্ছে
 
           exchange: {
             isExchange: true,
@@ -123,8 +138,14 @@ export async function POST(req) {
             processedBy: createdBy || null,
           },
 
-          total: newTotal,
-          paymentMethod: difference > 0 ? "cash" : "adjusted",
+          // 👑 ফিক্স: রসিদ যাতে ভুল প্রোডাক্ট প্রাইস না দেখায়, তাই নিট এক্সচেঞ্জ ভ্যালুকে আসল টোটাল করা হলো
+          subTotal: newTotal,
+          discount: 0,
+          vat: 0,
+          total: finalPayableTotal, // 👈 এটি রসিদে 'Grand Total' বা 'Payable Amount' দেখাবে (যেমন: ৫০০ বা ০)
+
+          // যদি কাস্টমারকে এক্সট্রা পে করতে হয় তবে ফ্রন্টএন্ডের মেথড অথবা ক্যাশ, আর সমান বা কম হলে এডজাস্টেড
+          paymentMethod: difference > 0 ? paymentMethod || "cash" : "adjusted",
           status: "completed",
         },
       ],

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
-export default function VariantModal({ product, setOpenProduct, setCart }) {
+export default function VariantModal({ product, setOpenProduct, addToCart }) {
   const [selectedVariant, setSelectedVariant] = useState(
     product?.variants?.[0] || null,
   );
+
   const [qty, setQty] = useState(1);
 
   const handleAddToCart = () => {
@@ -16,37 +17,7 @@ export default function VariantModal({ product, setOpenProduct, setCart }) {
       return;
     }
 
-    setCart((prev) => {
-      const existing = prev.find(
-        (item) => item.variantId === selectedVariant._id,
-      );
-
-      if (existing) {
-        return prev.map((item) =>
-          item.variantId === selectedVariant._id
-            ? { ...item, qty: item.qty + qty }
-            : item,
-        );
-      }
-
-      return [
-        ...prev,
-        {
-          _id: `${product._id}-${selectedVariant._id}`,
-          productId: product._id,
-          variantId: selectedVariant._id,
-
-          name: product.name,
-          color: selectedVariant.color,
-          size: selectedVariant.size,
-
-          price: selectedVariant.sellingPrice,
-          qty,
-
-          image: product.media?.[0]?.secure_url || "/placeholder.png",
-        },
-      ];
-    });
+    addToCart(product, selectedVariant, qty);
 
     setOpenProduct(null);
   };
@@ -92,7 +63,7 @@ export default function VariantModal({ product, setOpenProduct, setCart }) {
             min="1"
             max={selectedVariant?.stock || 1}
             value={qty}
-            onChange={(e) => setQty(Number(e.target.value))}
+            onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
             className="w-full h-14 rounded-2xl border border-gray-200 px-4 text-lg font-semibold outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSelector } from "react-redux";
 import { showToast } from "@/lib/showToast";
 import ProductGallery from "@/components/ui/Application/Admin/pos/ProductGallery";
@@ -32,6 +32,9 @@ export default function POSPage() {
   const [discount, setDiscount] = useState(0);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // FOCUS LOCK & SCANNER REFS
+  const searchInputRef = useRef(null);
+
   // Calculations
   const subTotal = cart.reduce((s, item) => s + item.price * item.qty, 0);
 
@@ -48,19 +51,70 @@ export default function POSPage() {
       : Number(vat || 0);
 
   const total = afterDiscount + vatAmount;
-
   const totalQty = cart.reduce((s, item) => s + item.qty, 0);
 
   // --- Cart Helper Functions ---
-  const removeCartItem = (id) =>
-    setCart((prev) => prev.filter((item) => item._id !== id));
+  const addToCart = (product, variant, qty = 1) => {
+    if (!variant) return;
 
-  const increaseQty = (variantId) =>
+    if (variant.stock <= 0) {
+      showToast("❌ Out of stock! This item cannot be added.");
+      return;
+    }
+
+    setCart((prev) => {
+      const existing = prev.find((i) => i.variantId === variant._id);
+
+      if (existing) {
+        if (existing.qty + qty > variant.stock) {
+          showToast("Not enough stock ❌");
+          return prev;
+        }
+        return prev.map((i) =>
+          i.variantId === variant._id ? { ...i, qty: i.qty + qty } : i,
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          _id: `${product._id}-${variant._id}`,
+          productId: product._id,
+          variantId: variant._id,
+          name: product.name,
+          color: variant.color,
+          size: variant.size,
+          price: variant.sellingPrice,
+          qty,
+          image: product.media?.[0]?.secure_url || "/placeholder.png",
+        },
+      ];
+    });
+  };
+
+  const removeCartItem = (id) =>
     setCart((prev) =>
-      prev.map((item) =>
-        item.variantId === variantId ? { ...item, qty: item.qty + 1 } : item,
-      ),
+      prev.filter((item) => item.variantId !== id || item._id !== id),
     );
+
+  const increaseQty = (variantId) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.variantId === variantId) {
+          const parentProduct = products.find((p) => p._id === item.productId);
+          const vMeta = parentProduct?.variants?.find(
+            (v) => v._id === variantId,
+          );
+          if (vMeta && item.qty + 1 > vMeta.stock) {
+            showToast("Not enough stock ❌");
+            return item;
+          }
+          return { ...item, qty: item.qty + 1 };
+        }
+        return item;
+      }),
+    );
+  };
 
   const decreaseQty = (variantId) =>
     setCart((prev) =>
@@ -71,22 +125,25 @@ export default function POSPage() {
         .filter((item) => item.qty > 0),
     );
 
-  // ✅ FIX: Accept modalData sent up from CheckoutModal
+  // --- Checkout Function ---
   const handleCheckout = async (modalData = {}) => {
+    const dataClean =
+      modalData && typeof modalData === "object" && !modalData.target
+        ? modalData
+        : {};
+
     if (!cart.length) {
       showToast("Cart is empty");
       return;
     }
 
-    const showroomId =
-      user?.data?.user?.role === "admin"
-        ? selectedShowroomId
-        : user?.data?.user?.showroomId;
+    const currentUser = user?.data?.user || user?.user || user;
+    const userRole = currentUser?.role;
 
-    if (user?.data?.user?.role === "admin" && !showroomId) {
-      showToast("Select showroom");
-      return;
-    }
+    const showroomId =
+      userRole === "admin"
+        ? selectedShowroomId
+        : currentUser?.showroomId || selectedShowroomId;
 
     try {
       setCheckoutLoading(true);
@@ -95,48 +152,34 @@ export default function POSPage() {
         items: cart.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
-
-          productName: i.name || i.productName || "Unknown Product",
-
+          productName: i.name || "Unknown Product",
           image: i.image || "",
           color: i.color || "",
           size: i.size || "",
-
           qty: Number(i.qty),
-
           price: Number(i.price),
-
           subtotal: Number(i.price) * Number(i.qty),
         })),
-
         subTotal: Number(subTotal),
-
         discount: Number(discountAmount),
-
         vat: Number(vatAmount),
-
         total: Number(total),
-
-        showroomId,
-
-        createdBy: user?.data?.user?._id,
-
+        showroomId: showroomId,
+        createdBy: currentUser?._id,
+        userId: currentUser?._id,
         orderType: "pos",
-
-        customerName: modalData.customerName || "",
-        phone: modalData.phone || "",
-        address: modalData.address || "",
-
-        saleDate: modalData.saleDate || new Date().toISOString().split("T")[0],
-
-        payments: modalData.payments || [],
-
-        deliveryCharge: modalData.deliveryCharge || 0,
-
-        remark: modalData.remark || "",
-
-        soldBy: modalData.soldBy || "Guest",
+        customerName: dataClean.customerName || "Walk-in Customer",
+        phone: dataClean.phone || "",
+        address: dataClean.address || "",
+        saleDate: dataClean.saleDate || new Date().toISOString().split("T")[0],
+        payments: dataClean.payments || [
+          { method: "Cash", amount: Number(total) },
+        ],
+        deliveryCharge: Number(dataClean.deliveryCharge || 0),
+        remark: dataClean.remark || "",
+        soldBy: dataClean.soldBy || currentUser?.name || "POS Agent",
       };
+
       const res = await fetch("/api/showroom-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -152,6 +195,9 @@ export default function POSPage() {
         setDiscount(0);
         setVat(0);
         setSearch("");
+
+        // 🔥 ওর্ডার হওয়ার সাথে সাথেই নতুন স্টক ইনস্ট্যান্ট ফেচ করে স্ক্রিন আপডেট করবে
+        fetchProducts("", showroomId);
 
         if (data.order?._id) {
           window.open(`/admin/print/${data.order._id}`, "_blank");
@@ -169,13 +215,14 @@ export default function POSPage() {
 
   const handleExchange = async (data) => {
     try {
+      const currentUser = user?.data?.user || user?.user || user;
       const res = await fetch("/api/pos/exchange", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
           showroomId: selectedShowroomId,
-          createdBy: user?.data?.user?._id,
+          createdBy: currentUser?._id,
         }),
       });
 
@@ -183,11 +230,9 @@ export default function POSPage() {
 
       if (result.success) {
         showToast("Exchange completed successfully");
-
         setCart([]);
         setExchangeOpen(false);
         setExchangeData(null);
-
         fetchProducts("", selectedShowroomId);
       } else {
         showToast(result.message);
@@ -197,26 +242,35 @@ export default function POSPage() {
     }
   };
 
+  // --- Fetch Products Callback ---
   const fetchProducts = useCallback(
     async (q = "", showroomIdParam = "") => {
       if (!user) return;
 
       try {
         setLoading(true);
-
+        const currentUser = user?.data?.user || user?.user || user;
         const params = new URLSearchParams();
         if (q) params.set("q", q);
 
         const showroomId =
-          user?.data?.user?.role === "admin"
+          currentUser?.role === "admin"
             ? showroomIdParam
-            : user?.data?.user?.showroomId;
+            : currentUser?.showroomId;
 
-        if (showroomId) {
+        if (currentUser?.role === "admin" && !showroomIdParam) {
+          params.set("showroomId", "all");
+        } else if (showroomId) {
           params.set("showroomId", showroomId);
         }
 
+        // 💡 নো-ক্যাশ হেডার যুক্ত করা হলো যেন ব্রাউজার পুরাতন ডাটা ক্যাশ থেকে না দেখায়
         const res = await fetch(`/api/pos?${params.toString()}`, {
+          method: "GET",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
           cache: "no-store",
         });
 
@@ -264,7 +318,8 @@ export default function POSPage() {
 
   useEffect(() => {
     const fetchShowrooms = async () => {
-      if (user?.data?.user?.role !== "admin") return;
+      const currentUser = user?.data?.user || user?.user || user;
+      if (currentUser?.role !== "admin") return;
       const res = await fetch("/api/showrooms");
       const data = await res.json();
       setShowrooms(data.showrooms || []);
@@ -276,6 +331,42 @@ export default function POSPage() {
     if (user) fetchProducts("", selectedShowroomId);
   }, [user, selectedShowroomId, fetchProducts]);
 
+  // STATE CHANGE FOCUS EFFECT
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [cart, openProduct, products]);
+
+  // GLOBAL FOCUS LOCKER
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      const targetTagName = e.target.tagName.toLowerCase();
+
+      if (
+        targetTagName === "input" ||
+        targetTagName === "select" ||
+        targetTagName === "textarea" ||
+        e.target.closest("button") ||
+        e.target.closest("[role='dialog']") ||
+        e.target.closest(".modal")
+      ) {
+        return;
+      }
+
+      if (searchInputRef.current) {
+        requestAnimationFrame(() => {
+          searchInputRef.current.focus();
+        });
+      }
+    };
+
+    document.addEventListener("click", handleGlobalClick);
+    return () => {
+      document.removeEventListener("click", handleGlobalClick);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-screen bg-gray-50">
       <ProductGallery
@@ -284,6 +375,8 @@ export default function POSPage() {
         search={search}
         setSearch={setSearch}
         setOpenProduct={setOpenProduct}
+        addToCart={addToCart}
+        inputRef={searchInputRef}
       />
 
       <CartSidebar
@@ -311,7 +404,7 @@ export default function POSPage() {
         removeCartItem={removeCartItem}
         increaseQty={increaseQty}
         decreaseQty={decreaseQty}
-        handleCheckout={handleCheckout} // Passed cleanly to CartSidebar
+        handleCheckout={handleCheckout}
         checkoutLoading={checkoutLoading}
         handleExchange={handleExchange}
       />
@@ -320,7 +413,7 @@ export default function POSPage() {
         <VariantModal
           product={openProduct}
           setOpenProduct={setOpenProduct}
-          setCart={setCart}
+          addToCart={addToCart}
         />
       )}
     </div>

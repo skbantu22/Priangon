@@ -1,6 +1,7 @@
+"use border";
+
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import PaymentSection from "./PaymentSection";
 import CheckoutModal from "./CheckoutModal";
 import ExchangeModal from "./ExchangeModal";
 
@@ -29,18 +30,14 @@ export default function CartSidebar({
   setVatType,
   discountAmount,
   vatAmount,
-
   handleExchange,
 }) {
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [transactionId, setTransactionId] = useState("");
-  const [cardDigits, setCardDigits] = useState("");
-  const [bankTxnRef, setBankTxnRef] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExchangeMode, setIsExchangeMode] = useState(false);
-
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isExchangeOpen, setIsExchangeOpen] = useState(false);
+
+  // 💡 এক্সচেঞ্জের পর অ্যাডজাস্টেড নেট পেয়েবল অ্যামাউন্ট রাখার স্টেট
+  const [exchangeTotal, setExchangeTotal] = useState(0);
 
   useEffect(() => {
     setCart([]);
@@ -53,6 +50,12 @@ export default function CartSidebar({
       setter(isNaN(num) ? 0 : num);
     }
   };
+
+  const currentUser = user?.data?.user || user?.user || user;
+  const userRole = currentUser?.role;
+
+  const hideButtons =
+    userRole === "admin" && (!selectedShowroomId || selectedShowroomId === "");
 
   return (
     <div className="lg:col-span-4 bg-white p-6 border-l border-gray-100 shadow-xl flex flex-col justify-between min-h-screen">
@@ -124,7 +127,7 @@ export default function CartSidebar({
       </div>
 
       <div className="space-y-4">
-        {/* Discount & VAT Section - Square & Outline Styled */}
+        {/* Discount & VAT Section */}
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div className="space-y-1">
             <label className="text-[10px] uppercase font-bold text-green-600">
@@ -198,7 +201,7 @@ export default function CartSidebar({
           </div>
         </div>
 
-        {user?.data?.user?.role === "admin" && (
+        {userRole === "admin" && (
           <select
             className="w-full p-2.5 text-sm font-medium outline outline-1 outline-gray-300 focus:outline-green-500"
             value={selectedShowroomId}
@@ -213,49 +216,80 @@ export default function CartSidebar({
           </select>
         )}
 
-        <button
-          disabled={checkoutLoading || cart.length === 0}
-          onClick={() => setIsModalOpen(true)}
-          className="w-full bg-green-600 text-white py-4 font-black text-lg"
-        >
-          Complete Sale
-        </button>
+        {!hideButtons && (
+          <>
+            <button
+              disabled={checkoutLoading || cart.length === 0}
+              onClick={() => {
+                setIsExchangeMode(false);
+                setExchangeTotal(0); // রেগুলার সেলে এক্সচেঞ্জ টোটাল রিসেট
+                setIsModalOpen(true);
+              }}
+              className="w-full bg-green-600 text-white py-4 font-black text-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Complete Sale
+            </button>
 
-        <button
-          disabled={checkoutLoading || cart.length === 0}
-          onClick={() => setIsExchangeOpen(true)}
-          className="w-full bg-orange-500 text-white py-3 font-bold"
-        >
-          Exchange
-        </button>
+            <button
+              disabled={checkoutLoading}
+              onClick={() => setIsExchangeOpen(true)}
+              className="w-full bg-orange-500 text-white py-3 font-bold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Exchange
+            </button>
+          </>
+        )}
       </div>
 
       <CheckoutModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        total={total}
-        cashierName={user?.data?.user?.name}
+        // 🛠️ ফিক্স: এক্সচেঞ্জ মোড অন থাকলে এক্সচেঞ্জের অ্যাডজাস্টেড টোটাল পাস হবে, অন্যথায় রেগুলার কার্ট টোটাল
+        total={isExchangeMode ? exchangeTotal : total}
+        cashierName={currentUser?.name}
         isExchangeMode={isExchangeMode}
         cart={cart}
         onCheckout={(data) => {
           handleCheckout({
             ...data,
             isExchangeMode,
+            total: isExchangeMode ? exchangeTotal : total,
           });
-
           setIsModalOpen(false);
           setIsExchangeMode(false);
+          setExchangeTotal(0);
         }}
       />
 
       <ExchangeModal
         isOpen={isExchangeOpen}
         onClose={() => setIsExchangeOpen(false)}
-        showroomId={selectedShowroomId}
-        onExchange={(data) => {
-          handleExchange(data); // API call
+        showroomId={selectedShowroomId || currentUser?.showroomId}
+        currentPosCart={cart}
+        onOpenCheckout={(checkoutPayload) => {
+          // ১. এক্সচেঞ্জ মোড ট্রু করা হলো
+          setIsExchangeMode(true);
 
+          // 🛠️ ফিক্স লজিক: এক্সচেঞ্জ মডাল থেকে পাঠানো অ্যাডজাস্টমেন্ট ভ্যালু রিসিভ করা হচ্ছে
+          // আপনার ExchangeModal-এ যেই নামেই পাস করুক (total, difference, বা payableAmount), নিচে তা হ্যান্ডেল করা হয়েছে।
+          const finalAdjustmentAmount =
+            checkoutPayload?.total ??
+            checkoutPayload?.difference ??
+            checkoutPayload?.payableAmount ??
+            0;
+
+          setExchangeTotal(finalAdjustmentAmount);
+
+          if (
+            typeof handleExchange === "function" &&
+            checkoutPayload?.exchangeData
+          ) {
+            handleExchange(checkoutPayload.exchangeData);
+          }
+
+          // ২. এক্সচেঞ্জ মডাল অফ করে পেমেন্ট মডাল অন করা হলো
           setIsExchangeOpen(false);
+          setIsModalOpen(true);
         }}
       />
     </div>

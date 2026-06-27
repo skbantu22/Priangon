@@ -8,7 +8,8 @@ export default function StockGrid({ items = [] }) {
 
   // GROUP BY PRODUCT
   const grouped = items.reduce((acc, item) => {
-    const key = item.productId;
+    // Product + Showroom
+    const key = `${item.productId}-${item.zoneName}`;
 
     if (!acc[key]) {
       acc[key] = {
@@ -20,6 +21,7 @@ export default function StockGrid({ items = [] }) {
     }
 
     acc[key].variants.push(item);
+
     return acc;
   }, {});
 

@@ -7,6 +7,7 @@ export default function ExchangeModal({
   onClose,
   showroomId,
   onOpenCheckout,
+  currentPosCart = [], // 👈 ১. মেইন POS কার্ট রিসিভ করার প্রপস যোগ করা হয়েছে
 }) {
   const [orderNumber, setOrderNumber] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,58 @@ export default function ExchangeModal({
   // Product Search
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
+
+  // 👈 ২. মডাল ওপেন হলে মেইন কার্ট আইটেমগুলোকে অটোমেটিক এক্সচেঞ্জ ট্রিতে সিঙ্ক করার ইফেক্ট
+  useEffect(() => {
+    if (isOpen) {
+      if (currentPosCart && currentPosCart.length > 0) {
+        const preLoadedItems = currentPosCart.map((item) => {
+          const nestedProduct = item?.productId || {};
+          const nestedVariant = item?.variantId || {};
+
+          const targetProductId =
+            nestedProduct._id || item?.productId || item?._id;
+          const targetVariantId =
+            nestedVariant._id || item?.variantId || item?._id;
+
+          const availableStock = parseInt(
+            nestedVariant.showroomStock ||
+              nestedVariant.stock ||
+              item?.maxStock ||
+              item?.stock ||
+              99, // সেফটি ব্যাকআপ স্টক
+          );
+
+          const parsedPrice = parseFloat(
+            nestedVariant.sellingPrice ||
+              nestedVariant.price ||
+              item?.price ||
+              0,
+          );
+
+          const itemQty = parseInt(item.qty || 1);
+
+          return {
+            productId: targetProductId,
+            variantId: targetVariantId,
+            name: nestedProduct.name || item?.name || "Catalog Product",
+            color: nestedVariant.color || item?.color || "N/A",
+            size: nestedVariant.size || item?.size || "Standard",
+            price: parsedPrice,
+            qty: itemQty,
+            maxStock: availableStock,
+            subtotal: itemQty * parsedPrice,
+          };
+        });
+
+        console.log(
+          "Synced current POS cart items directly to exchange tray:",
+          preLoadedItems,
+        );
+        setNewItems(preLoadedItems);
+      }
+    }
+  }, [isOpen, currentPosCart]);
 
   // Reset modal on close
   useEffect(() => {
@@ -93,12 +146,7 @@ export default function ExchangeModal({
       }
 
       const data = await res.json();
-
-      console.log("PRODUCT API RESPONSE:", data);
-
-      // Handle multiple response formats safely
       const result = data.items || data.data || data || [];
-
       setProducts(Array.isArray(result) ? result : []);
     } catch (err) {
       console.error("Search error:", err);
@@ -107,17 +155,15 @@ export default function ExchangeModal({
   };
 
   // ==========================================
-  // TOGGLE RETURNED ITEMS
+  // TOGGLE RETURNED ITEMS (With Safe Deep Checking)
   // ==========================================
   const toggleReturnItem = (item) => {
     const itemUniqueId = item.variantId?._id || item.variantId || item._id;
-    const exists = returnedItems.find(
-      (i) => (i.variantId || i._id) === itemUniqueId,
-    );
+    const exists = returnedItems.find((i) => i.variantId === itemUniqueId);
 
     if (exists) {
       setReturnedItems(
-        returnedItems.filter((i) => (i.variantId || i._id) !== itemUniqueId),
+        returnedItems.filter((i) => i.variantId !== itemUniqueId),
       );
     } else {
       const cleanReturnItem = {
@@ -125,15 +171,33 @@ export default function ExchangeModal({
         variantId: itemUniqueId,
         name: item.name || item.productName || "Unknown Item",
         price: parseFloat(item.price || item.sellingPrice || 0),
-        qty: parseInt(item.qty || 1),
+        qty: parseInt(item.qty || 1), // অরিজিনাল কেনা কোয়ান্টিটি বা ডিফল্ট ১
+        maxQty: parseInt(item.qty || 1), // ম্যাক্সিমাম রিটার্ন লিমিট সেভ রাখা হলো
         subtotal: parseFloat(item.subtotal || item.price * item.qty || 0),
       };
       setReturnedItems([...returnedItems, cleanReturnItem]);
     }
   };
 
+  // রিটার্ন আইটেমের কোয়ান্টিটি কমানো/বাড়ানো যদি কাস্টমার আংশিক রিটার্ন করতে চায়
+  const updateReturnQty = (variantId, newQty) => {
+    const val = parseInt(newQty) || 1;
+    setReturnedItems((prev) =>
+      prev.map((item) => {
+        if (item.variantId === variantId) {
+          if (val > item.maxQty) {
+            alert(`Cannot return more than purchased qty (${item.maxQty}) ❌`);
+            return item;
+          }
+          return { ...item, qty: val, subtotal: val * item.price };
+        }
+        return item;
+      }),
+    );
+  };
+
   // ==========================================
-  // FIXED NEW CART SYSTEM (Handles Fallback Mappings)
+  // FIXED NEW CART SYSTEM (Handles Stock Validation)
   // ==========================================
   const addToCart = (stockItem) => {
     const nestedProduct = stockItem?.productId || {};
@@ -141,16 +205,26 @@ export default function ExchangeModal({
 
     const targetProductId =
       nestedProduct._id || stockItem?.productId || stockItem?._id;
-    const targetVariantId = nestedVariant._id || stockItem?.variantId;
+
+    // 🛠️ ফিক্সড: আইডি ফ্ল্যাট বা নেস্টেড যাই হোক রিড করবে সেফলি
+    const targetVariantId =
+      nestedVariant._id || stockItem?.variantId || stockItem?._id;
+
+    const availableStock = parseInt(
+      nestedVariant.showroomStock ||
+        nestedVariant.stock ||
+        stockItem?.stock ||
+        99, // ব্যাকআপ স্টক ভ্যালু যাতে এপিআই এর ভুলের জন্য ব্লক না হয়
+    );
 
     if (!targetVariantId) {
-      console.error(
-        "Missing configuration parsing variant properties! Payload:",
-        stockItem,
-      );
-      alert(
-        "Cannot add item: Variant identifier properties are missing from system data maps.",
-      );
+      console.error("Missing variant properties!", stockItem);
+      alert("Cannot add item: Variant identifier properties are missing.");
+      return;
+    }
+
+    if (availableStock <= 0) {
+      alert("This item is completely out of stock in this showroom! ❌");
       return;
     }
 
@@ -160,6 +234,12 @@ export default function ExchangeModal({
 
     if (existsIndex > -1) {
       const updated = [...newItems];
+      if (updated[existsIndex].qty + 1 > availableStock) {
+        alert(
+          `Not enough stock available! Only ${availableStock} pcs in stock.`,
+        );
+        return;
+      }
       updated[existsIndex].qty += 1;
       updated[existsIndex].subtotal =
         updated[existsIndex].qty * updated[existsIndex].price;
@@ -184,6 +264,7 @@ export default function ExchangeModal({
           size: nestedVariant.size || stockItem?.size || "Standard",
           price: parsedPrice,
           qty: 1,
+          maxStock: availableStock, // ভ্যালিডেশনের জন্য স্টক ট্র্যাকিং
           subtotal: parsedPrice,
         },
       ]);
@@ -193,7 +274,12 @@ export default function ExchangeModal({
   const updateCartQty = (index, newQty) => {
     const val = parseInt(newQty) || 1;
     if (val < 1) return;
+
     const updated = [...newItems];
+    if (val > updated[index].maxStock) {
+      alert(`Only ${updated[index].maxStock} pcs available in stock ❌`);
+      return;
+    }
     updated[index].qty = val;
     updated[index].subtotal = val * updated[index].price;
     setNewItems(updated);
@@ -229,8 +315,20 @@ export default function ExchangeModal({
       exchangeData: {
         originalOrderId: originalOrder._id,
         reason: reason.trim() || "Size/Color Exchange",
-        returnedItems,
-        newItems,
+        returnedItems: returnedItems.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          qty: i.qty,
+          price: i.price,
+          subtotal: i.subtotal,
+        })),
+        newItems: newItems.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          qty: i.qty,
+          price: i.price,
+          subtotal: i.subtotal,
+        })),
       },
       cart: newItems,
     });
@@ -239,11 +337,18 @@ export default function ExchangeModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9998] p-4">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
       <div className="bg-white w-full max-w-7xl shadow-2xl rounded-none flex flex-col max-h-[92vh]">
         {/* HEADER */}
-        <div className="bg-orange-500 text-white p-4 text-center font-bold text-xl flex-shrink-0">
+        <div className="bg-orange-500 text-white p-4 text-center font-bold text-xl flex-shrink-0 relative">
           🔄 Showroom Product Exchange Terminal
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 hover:text-gray-200 transition text-lg"
+          >
+            ✕
+          </button>
         </div>
 
         {/* BODY CONTAINER */}
@@ -286,7 +391,7 @@ export default function ExchangeModal({
                     const uniqueId =
                       item.variantId?._id || item.variantId || item._id;
                     const isChecked = returnedItems.some(
-                      (r) => (r.variantId || r._id) === uniqueId,
+                      (r) => r.variantId === uniqueId,
                     );
                     return (
                       <label
@@ -308,8 +413,8 @@ export default function ExchangeModal({
                             {item.name || item.productName}
                           </div>
                           <div className="text-gray-500">
-                            {item.qty} Qty x {item.price || item.sellingPrice}{" "}
-                            TK
+                            Bought Qty: {item.qty} x{" "}
+                            {item.price || item.sellingPrice} TK
                           </div>
                         </div>
                         <span className="text-xs font-bold text-gray-900">
@@ -340,7 +445,7 @@ export default function ExchangeModal({
                     key={i}
                     className="flex justify-between items-center bg-red-50 border border-red-200 p-2.5 text-xs"
                   >
-                    <div>
+                    <div className="flex-1">
                       <div className="font-semibold text-red-900">
                         {item.name}
                       </div>
@@ -348,8 +453,23 @@ export default function ExchangeModal({
                         Unit Cost: {item.price} TK
                       </div>
                     </div>
-                    <div className="text-right font-bold text-red-700">
-                      -{item.subtotal} TK
+
+                    {/* রিটার্ন কোয়ান্টিটি ইনপুট এডজাস্টমেন্ট */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500">Qty:</span>
+                      <input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) =>
+                          updateReturnQty(item.variantId, e.target.value)
+                        }
+                        max={item.maxQty}
+                        min="1"
+                        className="w-12 border p-0.5 text-center font-bold bg-white"
+                      />
+                      <div className="text-right font-bold text-red-700 w-16">
+                        -{item.subtotal} ৳
+                      </div>
                     </div>
                   </div>
                 ))
@@ -392,26 +512,37 @@ export default function ExchangeModal({
                 {products.map((stockItem, i) => {
                   const coreProduct = stockItem.productId || {};
                   const variantData = stockItem.variantId || {};
+                  const currentStock =
+                    variantData.showroomStock ||
+                    variantData.stock ||
+                    stockItem.stock ||
+                    0;
 
                   return (
                     <div
                       key={i}
-                      className="p-1.5 border-b border-gray-100 last:border-0"
+                      className="p-1.5 border-b border-gray-100 last:border-0 flex justify-between items-center"
                     >
-                      <div className="font-bold text-xs text-gray-800">
-                        {coreProduct.name || "Catalog Product"}
+                      <div>
+                        <div className="font-bold text-xs text-gray-800">
+                          {coreProduct.name || "Catalog Product"}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          Color: {variantData.color || "N/A"} | Size:{" "}
+                          {variantData.size || "Free"} | Stock:{" "}
+                          <span className="font-bold text-green-600">
+                            {currentStock}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        <button
-                          type="button"
-                          onClick={() => addToCart(stockItem)}
-                          className="bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white transition text-[11px] font-medium px-2 py-0.5 text-blue-700"
-                        >
-                          + {variantData.color || "No Color"} /{" "}
-                          {variantData.size || "FreeSize"} (
-                          {variantData.sellingPrice || variantData.price || 0}৳)
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(stockItem)}
+                        className="bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white transition text-[11px] font-medium px-2 py-1 text-blue-700"
+                      >
+                        + Add (
+                        {variantData.sellingPrice || variantData.price || 0}৳)
+                      </button>
                     </div>
                   );
                 })}
@@ -451,6 +582,7 @@ export default function ExchangeModal({
                             value={item.qty}
                             onChange={(e) => updateCartQty(i, e.target.value)}
                             className="w-14 border p-1 text-center font-bold text-sm rounded-none"
+                            max={item.maxStock}
                             min="1"
                           />
                         </td>
