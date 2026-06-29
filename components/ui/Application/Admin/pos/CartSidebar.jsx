@@ -36,8 +36,11 @@ export default function CartSidebar({
   const [isExchangeMode, setIsExchangeMode] = useState(false);
   const [isExchangeOpen, setIsExchangeOpen] = useState(false);
 
-  // 💡 এক্সচেঞ্জের পর অ্যাডজাস্টেড নেট পেয়েবল অ্যামাউন্ট রাখার স্টেট
+  // 💡 এক্সচেঞ্জের পর অ্যাডজাস্টেড নেট পেয়েবল অ্যামাউন্ট রাখার স্টেট
   const [exchangeTotal, setExchangeTotal] = useState(0);
+
+  // 👑 মেইন ফিক্স: এক্সচেঞ্জ মডাল থেকে আসা সম্পূর্ণ অবজেক্টটি ধরে রাখার জন্য ক্যাশ স্টেট
+  const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
 
   useEffect(() => {
     setCart([]);
@@ -222,7 +225,8 @@ export default function CartSidebar({
               disabled={checkoutLoading || cart.length === 0}
               onClick={() => {
                 setIsExchangeMode(false);
-                setExchangeTotal(0); // রেগুলার সেলে এক্সচেঞ্জ টোটাল রিসেট
+                setExchangeTotal(0);
+                setExchangePayloadCache(null);
                 setIsModalOpen(true);
               }}
               className="w-full bg-green-600 text-white py-4 font-black text-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -243,21 +247,57 @@ export default function CartSidebar({
 
       <CheckoutModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        // 🛠️ ফিক্স: এক্সচেঞ্জ মোড অন থাকলে এক্সচেঞ্জের অ্যাডজাস্টেড টোটাল পাস হবে, অন্যথায় রেগুলার কার্ট টোটাল
+        onClose={() => {
+          setIsModalOpen(false);
+          setIsExchangeMode(false);
+          setExchangePayloadCache(null);
+        }}
         total={isExchangeMode ? exchangeTotal : total}
         cashierName={currentUser?.name}
         isExchangeMode={isExchangeMode}
         cart={cart}
-        onCheckout={(data) => {
-          handleCheckout({
-            ...data,
-            isExchangeMode,
-            total: isExchangeMode ? exchangeTotal : total,
-          });
+        onCheckout={(modalFormData) => {
+          // 👑 ওরিজিনাল আইডি ট্র্যাকিং ফিক্স: মডাল ও ক্যাশ থেকে সমস্ত সম্ভাব্য আইডি ট্র্যাকিং প্রোপার্টি ফিল্টার করা
+          const detectedOriginalOrderId =
+            exchangePayloadCache?.originalOrderId ||
+            exchangePayloadCache?.orderId ||
+            exchangePayloadCache?.oldOrderId ||
+            exchangePayloadCache?.exchangeData?.originalOrderId ||
+            exchangePayloadCache?.exchangeData?.orderId ||
+            exchangePayloadCache?.exchangeData?._id ||
+            null;
+
+          const detectedReturnedItems =
+            exchangePayloadCache?.returnedItems ||
+            exchangePayloadCache?.exchangeData?.returnedItems ||
+            [];
+
+          const detectedReason =
+            exchangePayloadCache?.reason ||
+            exchangePayloadCache?.exchangeData?.reason ||
+            "Product Exchange";
+
+          const finalPayload = isExchangeMode
+            ? {
+                ...exchangePayloadCache,
+                ...modalFormData,
+                originalOrderId: detectedOriginalOrderId, // ব্যাকএন্ড রিকোয়ার্ড ফিল্ড নিশ্চিত করা হলো
+                returnedItems: detectedReturnedItems, // ব্যাকএন্ড রিকোয়ার্ড ফিল্ড নিশ্চিত করা হলো
+                reason: detectedReason,
+                isExchangeMode: true,
+                total: exchangeTotal,
+              }
+            : {
+                ...modalFormData,
+                isExchangeMode: false,
+                total: total,
+              };
+
+          handleCheckout(finalPayload);
           setIsModalOpen(false);
           setIsExchangeMode(false);
           setExchangeTotal(0);
+          setExchangePayloadCache(null);
         }}
       />
 
@@ -267,11 +307,8 @@ export default function CartSidebar({
         showroomId={selectedShowroomId || currentUser?.showroomId}
         currentPosCart={cart}
         onOpenCheckout={(checkoutPayload) => {
-          // ১. এক্সচেঞ্জ মোড ট্রু করা হলো
           setIsExchangeMode(true);
 
-          // 🛠️ ফিক্স লজিক: এক্সচেঞ্জ মডাল থেকে পাঠানো অ্যাডজাস্টমেন্ট ভ্যালু রিসিভ করা হচ্ছে
-          // আপনার ExchangeModal-এ যেই নামেই পাস করুক (total, difference, বা payableAmount), নিচে তা হ্যান্ডেল করা হয়েছে।
           const finalAdjustmentAmount =
             checkoutPayload?.total ??
             checkoutPayload?.difference ??
@@ -280,6 +317,9 @@ export default function CartSidebar({
 
           setExchangeTotal(finalAdjustmentAmount);
 
+          // এক্সচেঞ্জের পুরো অবজেক্ট ডেটা ক্যাশ স্টেটে স্টোর করা হচ্ছে
+          setExchangePayloadCache(checkoutPayload);
+
           if (
             typeof handleExchange === "function" &&
             checkoutPayload?.exchangeData
@@ -287,7 +327,6 @@ export default function CartSidebar({
             handleExchange(checkoutPayload.exchangeData);
           }
 
-          // ২. এক্সচেঞ্জ মডাল অফ করে পেমেন্ট মডাল অন করা হলো
           setIsExchangeOpen(false);
           setIsModalOpen(true);
         }}

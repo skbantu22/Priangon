@@ -165,6 +165,7 @@ export async function POST(req) {
       difference,
     });
   } catch (error) {
+    console.log(error);
     await session.abortTransaction().catch(() => {});
     session.endSession();
 

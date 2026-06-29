@@ -125,7 +125,7 @@ export default function POSPage() {
         .filter((item) => item.qty > 0),
     );
 
-  // --- Checkout Function ---
+  // --- 🛠️ Complete Standard/Exchange Checkout Handler ---
   const handleCheckout = async (modalData = {}) => {
     const dataClean =
       modalData && typeof modalData === "object" && !modalData.target
@@ -148,7 +148,34 @@ export default function POSPage() {
     try {
       setCheckoutLoading(true);
 
+      // 🔄 চেকআউট রিকোয়েস্টে এক্সচেঞ্জ মোড সক্রিয় আছে কি না তা ডিটেক্ট করা
+      const isExchange = dataClean.isExchangeMode || false;
+      const finalBillAmount = isExchange
+        ? Number(dataClean.total || 0)
+        : Number(total);
+
       const payload = {
+        // এক্সচেঞ্জ এপিআই এর রিকোয়েস্ট স্ট্রাকচার ম্যাপিং
+        showroomId: showroomId,
+        originalOrderId:
+          dataClean.originalOrderId || originalOrder?._id || null,
+        reason: dataClean.reason || "Product Exchange",
+        returnedItems: dataClean.returnedItems || [],
+        createdBy: currentUser?._id,
+        paymentMethod: dataClean.paymentMethod || "cash",
+
+        // কমন সেলস আইটেমস
+        newItems: cart.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          productName: i.name || "Unknown Product",
+          image: i.image || "",
+          color: i.color || "",
+          size: i.size || "",
+          qty: Number(i.qty),
+          price: Number(i.price),
+          subtotal: Number(i.price) * Number(i.qty),
+        })),
         items: cart.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
@@ -161,26 +188,32 @@ export default function POSPage() {
           subtotal: Number(i.price) * Number(i.qty),
         })),
         subTotal: Number(subTotal),
-        discount: Number(discountAmount),
-        vat: Number(vatAmount),
-        total: Number(total),
-        showroomId: showroomId,
-        createdBy: currentUser?._id,
+        discount: isExchange ? 0 : Number(discountAmount),
+        vat: isExchange ? 0 : Number(vatAmount),
+        total: finalBillAmount,
         userId: currentUser?._id,
-        orderType: "pos",
+        orderType: isExchange ? "exchange" : "pos",
         customerName: dataClean.customerName || "Walk-in Customer",
         phone: dataClean.phone || "",
         address: dataClean.address || "",
         saleDate: dataClean.saleDate || new Date().toISOString().split("T")[0],
         payments: dataClean.payments || [
-          { method: "Cash", amount: Number(total) },
+          {
+            method: dataClean.paymentMethod || "Cash",
+            amount: finalBillAmount,
+          },
         ],
         deliveryCharge: Number(dataClean.deliveryCharge || 0),
         remark: dataClean.remark || "",
         soldBy: dataClean.soldBy || currentUser?.name || "POS Agent",
       };
 
-      const res = await fetch("/api/showroom-orders", {
+      // 👑 ফিক্স ১: মোড অনুযায়ী সঠিক এন্ডপয়েন্ট সিলেক্ট করা
+      const targetApiUrl = isExchange
+        ? "/api/pos/exchange"
+        : "/api/showroom-orders";
+
+      const res = await fetch(targetApiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -189,18 +222,27 @@ export default function POSPage() {
       const data = await res.json();
 
       if (data.success) {
-        showToast("Order created successfully ✅");
+        showToast(
+          isExchange
+            ? "Exchange completed successfully ✅"
+            : "Order created successfully ✅",
+        );
 
+        // স্টেট রিসেট
         setCart([]);
         setDiscount(0);
         setVat(0);
         setSearch("");
+        setExchangeOpen(false);
+        setExchangeData(null);
 
-        // 🔥 ওর্ডার হওয়ার সাথে সাথেই নতুন স্টক ইনস্ট্যান্ট ফেচ করে স্ক্রিন আপডেট করবে
+        // স্টক রিফ্রেশ
         fetchProducts("", showroomId);
 
-        if (data.order?._id) {
-          window.open(`/admin/print/${data.order._id}`, "_blank");
+        // 👑 ফিক্স ২: ডাটাবেজে জেনারেট হওয়া সঠিক আইডি নিয়ে রসিদ ট্যাব ওপেন করা
+        const printOrderId = data.exchangeOrder?._id || data.order?._id;
+        if (printOrderId) {
+          window.open(`/admin/print/${printOrderId}`, "_blank");
         }
       } else {
         showToast(data.message || "Checkout failed ❌");
@@ -264,7 +306,6 @@ export default function POSPage() {
           params.set("showroomId", showroomId);
         }
 
-        // 💡 নো-ক্যাশ হেডার যুক্ত করা হলো যেন ব্রাউজার পুরাতন ডাটা ক্যাশ থেকে না দেখায়
         const res = await fetch(`/api/pos?${params.toString()}`, {
           method: "GET",
           headers: {
@@ -331,14 +372,12 @@ export default function POSPage() {
     if (user) fetchProducts("", selectedShowroomId);
   }, [user, selectedShowroomId, fetchProducts]);
 
-  // STATE CHANGE FOCUS EFFECT
   useEffect(() => {
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [cart, openProduct, products]);
 
-  // GLOBAL FOCUS LOCKER
   useEffect(() => {
     const handleGlobalClick = (e) => {
       const targetTagName = e.target.tagName.toLowerCase();
