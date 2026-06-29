@@ -23,6 +23,9 @@ export async function POST(request) {
 
     const payload = await request.json();
 
+    console.log("========== VARIANT CREATE ==========");
+    console.log(JSON.stringify(payload, null, 2));
+
     const productId = payload.productId; // ✅ ONLY SOURCE OF TRUTH
 
     const variants = Array.isArray(payload.variants) ? payload.variants : [];
@@ -42,6 +45,9 @@ export async function POST(request) {
     const productVariantIds = [];
 
     for (const item of variants) {
+      console.log("ITEM:", item);
+      console.log("openingStock =", item.openingStock);
+      console.log("stock =", item.stock);
       const existingVariant = await ProductVariantModel.findOne({
         product: productId,
         color: item.color || "",
@@ -49,8 +55,9 @@ export async function POST(request) {
       });
 
       if (existingVariant) continue;
+      const stock = Math.max(0, Number(item.stock || 0));
 
-      const stock = Math.max(0, Number(item.openingStock || 0));
+      console.log("FINAL STOCK =", stock);
 
       const barcode = item.barcode?.trim()
         ? item.barcode.trim()
