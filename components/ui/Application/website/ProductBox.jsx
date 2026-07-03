@@ -167,7 +167,7 @@ const ProductBox = ({ product, userId, refreshWishlist, allVariants = [] }) => {
 
         {/* VARIANT THUMBNAILS */}
         <div className="flex justify-center gap-2 mt-4">
-          {variants?.map((variant, i) => {
+          {variants?.slice(0, 6).map((variant, i) => {
             const img =
               variant?.media?.[0]?.secure_url ||
               product?.media?.[0]?.secure_url;
