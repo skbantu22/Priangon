@@ -2,6 +2,8 @@ import { connectDB } from "@/lib/databaseconnection";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import "@/models/ProductVariant.model ";
 import "@/models/Product.model";
+import "@/models/category.model";
+
 import "@/models/WarehouseStock.model";
 
 export async function GET(req) {
@@ -24,11 +26,17 @@ export async function GET(req) {
 
       .populate({
         path: "productId",
-        select: "name media",
-        populate: {
-          path: "media",
-          select: "secure_url",
-        },
+        select: "name media category",
+        populate: [
+          {
+            path: "media",
+            select: "secure_url",
+          },
+          {
+            path: "category",
+            select: "name",
+          },
+        ],
       })
 
       .populate({
