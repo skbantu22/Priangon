@@ -427,13 +427,15 @@ ${window.location.href}
               )}
 
               <div className="mt-4">
-                <h3 className="text-xs md:text-lg font-medium mb-2 text-gray-900 ">
-                  Size:
+                <h3 className="text-sm md:text-lg font-semibold mb-3 text-gray-900">
+                  Size
                 </h3>
-                <div className="flex flex-wrap items-center gap-2 md:gap-3 ">
+
+                <div className="flex flex-wrap gap-2">
                   {dynamicSizes.length > 0 ? (
                     dynamicSizes.map((item) => {
                       const isSelected = selectedSize === item.size;
+
                       return (
                         <button
                           key={item.size}
@@ -443,45 +445,51 @@ ${window.location.href}
                             handleVariantSelection(null, item.size)
                           }
                           className={`
-                            relative flex items-center justify-center 
-                            min-w-[30px] h-[25px] md:h-[40px] px-4
-                            text-sm transition-all duration-200 
-                            ${
-                              isSelected
-                                ? "border border-black rounded-full text-black shadow-[0_4px_12px_rgba(0,0,0,0.1)] scale-105"
-                                : "border border-gray-500 text-gray-500 rounded-full hover:text-black"
-                            }
-                            ${item.stock === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}
-                          `}
+              relative
+              min-w-[52px]
+              sm:min-w-[60px]
+              h-10
+              md:h-11
+              px-3
+              md:px-4
+              border
+              text-xs
+              sm:text-sm
+              font-medium
+              transition-all
+              duration-200
+              flex
+              items-center
+              justify-center
+              ${
+                isSelected
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-black hover:text-black"
+              }
+              ${
+                item.stock === 0
+                  ? "opacity-40 cursor-not-allowed"
+                  : "cursor-pointer"
+              }
+            `}
                         >
-                          <span
-                            className={
-                              isSelected ? "font-semibold" : "font-normal"
-                            }
-                          >
-                            {item.label}
-                          </span>
+                          {item.label}
+
                           {item.stock === 0 && (
                             <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <span className="w-full h-[1px] bg-gray-400"></span>
+                              <span className="w-full h-[1px] bg-gray-500"></span>
                             </span>
                           )}
                         </button>
                       );
                     })
                   ) : (
-                    <div className="flex flex-wrap items-center gap-6">
-                      <button
-                        type="button"
-                        disabled
-                        className="relative flex items-center justify-center min-w-[30px] h-[25px] px-1 text-sm transition-all duration-200 border border-gray-500 text-gray-500 rounded-full opacity-60"
-                      >
-                        <span className="opacity-0">-</span>
-                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <span className="w-3 h-[1px] bg-gray-400"></span>
-                        </span>
-                      </button>
-                    </div>
+                    <button
+                      disabled
+                      className="min-w-[60px] h-10 border border-gray-300 text-gray-400 text-sm"
+                    >
+                      N/A
+                    </button>
                   )}
                 </div>
               </div>

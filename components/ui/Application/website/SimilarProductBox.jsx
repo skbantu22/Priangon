@@ -102,6 +102,10 @@ const SimilarProductBox = ({
 
   if (!product) return null;
 
+  console.log("PRODUCT:", product);
+  console.log("ALL VARIANTS:", allVariants);
+  console.log("FINAL VARIANTS:", variants);
+
   return (
     <div className="group bg-white w-full py-2">
       {/* IMAGE */}
@@ -178,36 +182,38 @@ const SimilarProductBox = ({
 
         {/* VARIANT THUMBNAILS */}
         <div className="flex justify-center gap-2 mt-3 pb-2">
-          {variants?.map((variant, i) => {
-            const img =
-              variant?.media?.[0]?.secure_url ||
-              product?.media?.[0]?.secure_url;
-            if (!img) return null;
+          {(Array.isArray(variants) ? variants.slice(0, 4) : []).map(
+            (variant, i) => {
+              const img =
+                variant?.media?.[0]?.secure_url || variant?.image || null;
 
-            return (
-              <button
-                key={variant._id || i}
-                onClick={() => {
-                  setActiveImage(img);
-                  // ঐচ্ছিক: ভ্যারিয়েন্ট দেখার ইভেন্টও ট্র্যাক করতে পারেন
-                }}
-                onMouseEnter={() => setActiveImage(img)}
-                className={`h-6 w-6 flex items-center justify-center border overflow-hidden transition-all ${
-                  activeImage === img
-                    ? "opacity-100 border-2 border-[#f26522]"
-                    : "opacity-60 hover:opacity-100 border border-gray-300"
-                }`}
-              >
-                <Image
-                  src={img}
-                  alt={variant?.name || "variant"}
-                  width={24}
-                  height={24}
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            );
-          })}
+              if (!img) return null;
+
+              return (
+                <button
+                  key={variant._id || i}
+                  onClick={() => {
+                    setActiveImage(img);
+                    // ঐচ্ছিক: ভ্যারিয়েন্ট দেখার ইভেন্টও ট্র্যাক করতে পারেন
+                  }}
+                  onMouseEnter={() => setActiveImage(img)}
+                  className={`h-6 w-6 flex items-center justify-center border overflow-hidden transition-all ${
+                    activeImage === img
+                      ? "opacity-100 border-2 border-[#f26522]"
+                      : "opacity-60 hover:opacity-100 border border-gray-300"
+                  }`}
+                >
+                  <Image
+                    src={img}
+                    alt={variant?.name || "variant"}
+                    width={24}
+                    height={24}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              );
+            },
+          )}
         </div>
       </div>
     </div>

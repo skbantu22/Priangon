@@ -122,7 +122,7 @@ const Navbar = () => {
           {/* Desktop */}
           <div className="hidden lg:flex items-center gap-10">
             <nav className="flex items-center gap-8 text-[13px] font-semibold uppercase tracking-wide">
-              <Link href="#">Our Products</Link>
+              <Link href="/shop">Our Products</Link>
               <Link href="#">New Arrival</Link>
               <Link href="#">Videos</Link>
               <Link href="#">Reviews</Link>
