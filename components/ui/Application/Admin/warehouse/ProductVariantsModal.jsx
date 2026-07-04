@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import VariantRow from "@/components/ui/Application/Admin/warehouse/VariantRow";
@@ -9,16 +9,49 @@ import EditStockModal from "@/components/ui/Application/Admin/warehouse/EditStoc
 export default function ProductModal({ product, onClose, refresh }) {
   const [editItem, setEditItem] = useState(null);
 
-  if (!product) return null;
+  // ✅ সরাসরি প্রপস দিয়ে ইনিশিয়াজ করছি যেন ইনিশিয়াল রেন্ডারেই ডেটা থাকে
+  const [productData, setProductData] = useState(product);
 
-  const variants = product?.variants || [];
+  useEffect(() => {
+    if (product) {
+      setProductData(JSON.parse(JSON.stringify(product)));
+    }
+  }, [product]);
 
-  const totalStock = variants.reduce((sum, item) => sum + (item.stock || 0), 0);
+  // 👑 হুক ৪ এবং ৫: এগুলোকে আমরা আর্লি রিটার্নের উপরে নিয়ে এসেছি যেন রিয়্যাক্ট সবসময় হুকগুলো খুঁজে পায়
+  const variants = productData?.variants || [];
 
-  const totalReserved = variants.reduce(
-    (sum, item) => sum + (item.reservedStock || 0),
-    0,
+  // ✅ LIVE CALCULATION
+  const totalStock = useMemo(
+    () => variants.reduce((sum, v) => sum + (v.stock || 0), 0),
+    [variants],
   );
+
+  const totalReserved = useMemo(
+    () => variants.reduce((sum, v) => sum + (v.reservedStock || 0), 0),
+    [variants],
+  );
+
+  // ✅ AFTER STOCK UPDATE REFRESH HANDLER (FORCE REFERENCE UPDATE)
+  const handleRefresh = async () => {
+    if (!refresh) return;
+
+    const allUpdatedProducts = await refresh();
+
+    if (allUpdatedProducts && Array.isArray(allUpdatedProducts)) {
+      const currentProductId = productData?._id || productData?.productId?._id;
+      const latestProduct = allUpdatedProducts.find(
+        (p) => (p._id || p.productId?._id) === currentProductId,
+      );
+
+      if (latestProduct) {
+        setProductData(JSON.parse(JSON.stringify(latestProduct)));
+      }
+    }
+  };
+
+  // 👑 FIX: সমস্ত হুকের নিচে আর্লি রিটার্ন (Early Return) প্লেস করা হয়েছে
+  if (!productData) return null;
 
   return (
     <>
@@ -27,9 +60,14 @@ export default function ProductModal({ product, onClose, refresh }) {
           {/* HEADER */}
           <div className="flex justify-between items-center border-b px-6 py-4">
             <div>
-              <h2 className="text-2xl font-bold">{product.name}</h2>
+              <h2 className="text-2xl font-bold">
+                {productData.name || productData.productId?.name}
+              </h2>
               <p className="text-gray-500 text-sm">
-                Category: {product.category}
+                Category:{" "}
+                {productData.category ||
+                  productData.productId?.category ||
+                  "N/A"}
               </p>
             </div>
 
@@ -62,13 +100,20 @@ export default function ProductModal({ product, onClose, refresh }) {
 
           {/* VARIANTS */}
           <div className="overflow-y-auto max-h-[500px]">
-            {variants.map((variant) => (
-              <VariantRow
-                key={variant._id}
-                item={variant}
-                onEdit={() => setEditItem(variant)}
-              />
-            ))}
+            {variants.map((variant) => {
+              return (
+                <VariantRow
+                  key={variant._id}
+                  item={variant}
+                  onEdit={() =>
+                    setEditItem({
+                      ...variant,
+                      productId: productData.productId || productData,
+                    })
+                  }
+                />
+              );
+            })}
           </div>
         </div>
       </div>
@@ -77,7 +122,7 @@ export default function ProductModal({ product, onClose, refresh }) {
       {editItem && (
         <EditStockModal
           item={editItem}
-          refresh={refresh}
+          refresh={handleRefresh}
           onClose={() => setEditItem(null)}
         />
       )}

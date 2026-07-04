@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 
 import WarehouseHeader from "@/components/ui/Application/Admin/warehouse/WarehouseHeader";
@@ -19,47 +19,51 @@ export default function WarehousePage() {
 
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // ================= LOAD STOCK =================
-  const loadStock = async () => {
+  // ================= LOAD STOCK (FIXED WITH RETURN) =================
+  const loadStock = useCallback(async () => {
     try {
       setLoading(true);
 
       const res = await axios.get("/api/warehouse-stock");
+      const freshData = res.data?.data || [];
 
-      setData(res.data?.data || []);
+      // ১. পেজের পেছনের মেইন গ্রিড আপডেট করার জন্য
+      setData([...freshData]);
+
+      // 👑 ২. নতুন ডেটা রিটার্ন করা হচ্ছে যেন ProductModal এটি পড়তে পারে (সবচেয়ে গুরুত্বপূর্ণ পরিবর্তন)
+      return freshData;
     } catch (err) {
       console.error("Stock load failed:", err);
+      return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // ================= LOAD HISTORY =================
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       const res = await axios.get("/api/inventory/history");
-
-      setHistory(res.data?.data || []);
+      setHistory([...(res.data?.data || [])]);
     } catch (err) {
       console.error("History load failed:", err);
     }
-  };
+  }, []);
 
   // Initial load
   useEffect(() => {
     loadStock();
-  }, []);
+  }, [loadStock]);
 
   // Load history when tab changes
   useEffect(() => {
     if (tab === "history") {
       loadHistory();
     }
-  }, [tab]);
+  }, [tab, loadHistory]);
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
-      {/* HEADER */}
       <WarehouseHeader
         data={data}
         tab={tab}
@@ -70,7 +74,6 @@ export default function WarehousePage() {
         setActiveCategory={setActiveCategory}
       />
 
-      {/* STOCK */}
       {tab === "stock" && (
         <ProductGrid
           data={data}
@@ -81,14 +84,12 @@ export default function WarehousePage() {
         />
       )}
 
-      {/* HISTORY */}
       {tab === "history" && <HistoryTab history={history} />}
 
-      {/* PRODUCT MODAL */}
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
-          refresh={loadStock}
+          refresh={loadStock} // 👈 এই ফাংশনটি এখন রিটার্ন করা ফ্রেশ ডেটা মোডালে পাঠিয়ে দেবে
           onClose={() => setSelectedProduct(null)}
         />
       )}

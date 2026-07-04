@@ -3,6 +3,7 @@ import WarehouseStock from "@/models/WarehouseStock.model";
 import "@/models/ProductVariant.model ";
 import "@/models/Product.model";
 import "@/models/category.model";
+import "@/models/Media.model";
 
 import "@/models/WarehouseStock.model";
 
