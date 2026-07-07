@@ -408,6 +408,61 @@ const Datatable = ({
             </Link>
           </Tooltip>
         )}
+
+        {deleteType === "SD" && (
+          <Tooltip title="Delete All">
+            <IconButton
+              disabled={
+                !table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()
+              }
+              onClick={() =>
+                handleDelete(
+                  table
+                    .getSelectedRowModel()
+                    .rows.map((row) => row.original._id),
+                  "SD",
+                )
+              }
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+
+        {deleteType === "PD" && (
+          <>
+            <Tooltip title="Restore Data">
+              <IconButton
+                disabled={
+                  !table.getIsSomeRowsSelected() &&
+                  !table.getIsAllRowsSelected()
+                }
+                onClick={() =>
+                  handleDelete(
+                    table
+                      .getSelectedRowModel()
+                      .rows.map((row) => row.original._id),
+                    "RSD",
+                  )
+                }
+              >
+                <RestoreFromTrashIcon />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Permanently Delete Data">
+              <IconButton
+                disabled={
+                  !table.getIsSomeRowsSelected() &&
+                  !table.getIsAllRowsSelected()
+                }
+                onClick={() => handleDelete()}
+              >
+                <DeleteForeverIcon />
+              </IconButton>
+            </Tooltip>
+          </>
+        )}
       </>
     ),
 
