@@ -11,7 +11,6 @@ const userSchema = new mongoose.Schema(
 
     showroomId: {
       type: mongoose.Schema.Types.ObjectId,
-
       ref: "Showroom",
 
       required: function () {
@@ -39,6 +38,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       select: false,
+    },
+
+    // Used to invalidate old JWT tokens after password change
+    tokenVersion: {
+      type: Number,
+      default: 0,
     },
 
     avatar: {
