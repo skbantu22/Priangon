@@ -148,23 +148,44 @@ export default function POSPage() {
     try {
       setCheckoutLoading(true);
 
-      // 🔄 চেকআউট রিকোয়েস্টে এক্সচেঞ্জ মোড সক্রিয় আছে কি না তা ডিটেক্ট করা
       const isExchange = dataClean.isExchangeMode || false;
       const finalBillAmount = isExchange
         ? Number(dataClean.total || 0)
         : Number(total);
 
+      // =========================
+      // 🔥 CLEAN PAYMENTS LOGIC
+      // =========================
+      const formattedPayments =
+        dataClean.payments && dataClean.payments.length > 0
+          ? dataClean.payments.map((p) => ({
+              type: p.type,
+              option: p.option || "",
+              amount: Number(p.amount),
+            }))
+          : [
+              {
+                type: "Cash",
+                option: "",
+                amount: finalBillAmount,
+              },
+            ];
+
       const payload = {
-        // এক্সচেঞ্জ এপিআই এর রিকোয়েস্ট স্ট্রাকচার ম্যাপিং
-        showroomId: showroomId,
+        showroomId,
+
         originalOrderId:
           dataClean.originalOrderId || originalOrder?._id || null,
+
         reason: dataClean.reason || "Product Exchange",
         returnedItems: dataClean.returnedItems || [],
         createdBy: currentUser?._id,
-        paymentMethod: dataClean.paymentMethod || "cash",
 
-        // কমন সেলস আইটেমস
+        // ❌ paymentMethod removed (IMPORTANT FIX)
+
+        // =========================
+        // ITEMS
+        // =========================
         newItems: cart.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
@@ -176,6 +197,7 @@ export default function POSPage() {
           price: Number(i.price),
           subtotal: Number(i.price) * Number(i.qty),
         })),
+
         items: cart.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
@@ -187,28 +209,36 @@ export default function POSPage() {
           price: Number(i.price),
           subtotal: Number(i.price) * Number(i.qty),
         })),
+
+        // =========================
+        // BILL
+        // =========================
         subTotal: Number(subTotal),
         discount: isExchange ? 0 : Number(discountAmount),
         vat: isExchange ? 0 : Number(vatAmount),
         total: finalBillAmount,
+
         userId: currentUser?._id,
         orderType: isExchange ? "exchange" : "pos",
+
         customerName: dataClean.customerName || "Walk-in Customer",
         phone: dataClean.phone || "",
         address: dataClean.address || "",
         saleDate: dataClean.saleDate || new Date().toISOString().split("T")[0],
-        payments: dataClean.payments || [
-          {
-            method: dataClean.paymentMethod || "Cash",
-            amount: finalBillAmount,
-          },
-        ],
+
+        // =========================
+        // 🔥 FIXED PAYMENTS (IMPORTANT)
+        // =========================
+        payments: formattedPayments,
+
         deliveryCharge: Number(dataClean.deliveryCharge || 0),
         remark: dataClean.remark || "",
         soldBy: dataClean.soldBy || currentUser?.name || "POS Agent",
       };
 
-      // 👑 ফিক্স ১: মোড অনুযায়ী সঠিক এন্ডপয়েন্ট সিলেক্ট করা
+      // =========================
+      // API ROUTE
+      // =========================
       const targetApiUrl = isExchange
         ? "/api/pos/exchange"
         : "/api/showroom-orders";
@@ -228,7 +258,6 @@ export default function POSPage() {
             : "Order created successfully ✅",
         );
 
-        // স্টেট রিসেট
         setCart([]);
         setDiscount(0);
         setVat(0);
@@ -236,10 +265,8 @@ export default function POSPage() {
         setExchangeOpen(false);
         setExchangeData(null);
 
-        // স্টক রিফ্রেশ
         fetchProducts("", showroomId);
 
-        // 👑 ফিক্স ২: ডাটাবেজে জেনারেট হওয়া সঠিক আইডি নিয়ে রসিদ ট্যাব ওপেন করা
         const printOrderId = data.exchangeOrder?._id || data.order?._id;
         if (printOrderId) {
           window.open(`/admin/print/${printOrderId}`, "_blank");

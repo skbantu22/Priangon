@@ -78,7 +78,11 @@ export async function GET(req) {
       })
       .populate({
         path: "variantId",
-        select: "color size barcode sku sellingPrice",
+        select: "color size barcode sku sellingPrice media",
+        populate: {
+          path: "media",
+          select: "secure_url",
+        },
       })
       .lean();
 

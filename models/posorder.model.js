@@ -8,36 +8,46 @@ const POSOrderSchema = new mongoose.Schema(
     orderNumber: {
       type: String,
       required: true,
+      unique: true,
+      index: true,
+      trim: true,
     },
 
     showroomId: {
       type: String,
       required: true,
+      index: true,
+      trim: true,
     },
 
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+      index: true,
     },
 
     // =========================
-    // ITEMS (ORIGINAL SALE)
+    // ITEMS
     // =========================
     items: [
       {
         productId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Product",
+          required: true,
+          index: true,
         },
 
         variantId: {
           type: mongoose.Schema.Types.ObjectId,
+          required: true,
         },
 
         productName: {
           type: String,
           required: true,
+          trim: true,
         },
 
         image: String,
@@ -47,16 +57,19 @@ const POSOrderSchema = new mongoose.Schema(
         qty: {
           type: Number,
           required: true,
+          min: 1,
         },
 
         price: {
           type: Number,
           required: true,
+          min: 0,
         },
 
         subtotal: {
           type: Number,
           required: true,
+          min: 0,
         },
       },
     ],
@@ -67,27 +80,36 @@ const POSOrderSchema = new mongoose.Schema(
     subTotal: {
       type: Number,
       required: true,
+      min: 0,
     },
 
     discount: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     vat: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     total: {
       type: Number,
       required: true,
+      min: 0,
     },
 
     // =========================
     // CUSTOMER INFO
     // =========================
-    customerName: String,
+    customerName: {
+      type: String,
+      default: "Walk-in Customer",
+      trim: true,
+    },
+
     phone: String,
     address: String,
 
@@ -97,24 +119,29 @@ const POSOrderSchema = new mongoose.Schema(
     },
 
     remark: String,
-
     soldBy: String,
 
     // =========================
-    // PAYMENT INFO
+    // PAYMENT SYSTEM
     // =========================
-    paymentMethod: {
-      type: String,
-      default: "cash",
-    },
-
     payments: [
       {
         type: {
-          type: String, // Cash / bKash / Card / Bank
+          type: String,
+          enum: ["Cash", "Mobile Banking", "Card", "Bank"],
+          required: true,
         },
-        option: String, // transaction id / reference
-        amount: Number,
+
+        option: {
+          type: String,
+          default: "",
+        },
+
+        amount: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
 
@@ -131,15 +158,18 @@ const POSOrderSchema = new mongoose.Schema(
       type: String,
       enum: ["completed", "cancelled", "refunded"],
       default: "completed",
+      index: true,
     },
 
     orderType: {
       type: String,
+      enum: ["pos", "exchange"],
       default: "pos",
+      index: true,
     },
 
     // =========================
-    // 🔥 EXCHANGE SYSTEM (REAL POS)
+    // EXCHANGE SYSTEM
     // =========================
     exchange: {
       isExchange: {

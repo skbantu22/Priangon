@@ -28,6 +28,7 @@ export default function StockOverviewPage() {
       );
 
       const result = await res.json();
+      console.log("STOCK OVERVIEW RESULT:", result);
 
       if (result.success) {
         setData(result.data || []);

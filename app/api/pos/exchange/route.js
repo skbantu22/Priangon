@@ -5,10 +5,11 @@ import ShowroomStock from "@/models/ShowroomStock";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 
 export async function POST(req) {
+  await connectDB();
+
   const session = await mongoose.startSession();
 
   try {
-    await connectDB();
     session.startTransaction();
 
     const body = await req.json();
@@ -20,7 +21,7 @@ export async function POST(req) {
       returnedItems,
       newItems,
       createdBy,
-      paymentMethod, // 💡 ফ্রন্টএন্ড থেকে পেমেন্ট মেথড পাস করলে রিসিভ করার ব্যবস্থা রাখা হলো
+      payments,
     } = body;
 
     // =========================
@@ -28,13 +29,11 @@ export async function POST(req) {
     // =========================
     if (!originalOrderId) throw new Error("Original order required");
     if (!showroomId) throw new Error("Showroom required");
-    if (!returnedItems || returnedItems.length === 0)
-      throw new Error("Returned items required");
-    if (!newItems || newItems.length === 0)
-      throw new Error("New items required");
+    if (!returnedItems?.length) throw new Error("Returned items required");
+    if (!newItems?.length) throw new Error("New items required");
 
     // =========================
-    // GET ORIGINAL ORDER
+    // ORIGINAL ORDER
     // =========================
     const originalOrder =
       await Posorder.findById(originalOrderId).session(session);
@@ -44,9 +43,21 @@ export async function POST(req) {
     }
 
     // =========================
-    // 1. RETURN OLD ITEMS (STOCK +)
+    // RETURN STOCK
     // =========================
     for (const item of returnedItems) {
+      const stockDoc = await ShowroomStock.findOne({
+        showroomId,
+        productId: item.productId,
+        variantId: item.variantId,
+      }).session(session);
+
+      if (!stockDoc) {
+        throw new Error("Returned stock not found");
+      }
+
+      const field = stockDoc.stock !== undefined ? "stock" : "showroomStock";
+
       await ShowroomStock.updateOne(
         {
           showroomId,
@@ -54,14 +65,16 @@ export async function POST(req) {
           variantId: item.variantId,
         },
         {
-          $inc: { stock: item.qty },
+          $inc: {
+            [field]: Number(item.qty),
+          },
         },
         { session },
       );
     }
 
     // =========================
-    // 2. DEDUCT NEW ITEMS (STOCK -)
+    // DEDUCT NEW STOCK
     // =========================
     for (const item of newItems) {
       const stockDoc = await ShowroomStock.findOne({
@@ -70,10 +83,16 @@ export async function POST(req) {
         variantId: item.variantId,
       }).session(session);
 
-      if (!stockDoc || stockDoc.stock < item.qty) {
-        throw new Error(
-          `Insufficient stock for item: ${item.name || "Selected product"}`,
-        );
+      if (!stockDoc) {
+        throw new Error("Stock not found");
+      }
+
+      const field = stockDoc.stock !== undefined ? "stock" : "showroomStock";
+
+      const currentStock = Number(stockDoc[field] || 0);
+
+      if (currentStock < item.qty) {
+        throw new Error(`${item.productName} has insufficient stock`);
       }
 
       await ShowroomStock.updateOne(
@@ -83,79 +102,112 @@ export async function POST(req) {
           variantId: item.variantId,
         },
         {
-          $inc: { stock: -item.qty },
+          $inc: {
+            [field]: -Number(item.qty),
+          },
         },
         { session },
       );
     }
 
     // =========================
-    // CALCULATE AMOUNT DIFFERENCE
+    // CALCULATE
     // =========================
-    // আইটেমের subtotal বা price * qty হিসেবে সেফটি ক্যালকুলেশন
     const returnedTotal = returnedItems.reduce(
-      (sum, i) => sum + (i.subtotal || i.price * i.qty),
+      (sum, i) => sum + Number(i.subtotal || i.price * i.qty),
       0,
     );
+
     const newTotal = newItems.reduce(
-      (sum, i) => sum + (i.subtotal || i.price * i.qty),
+      (sum, i) => sum + Number(i.subtotal || i.price * i.qty),
       0,
     );
 
     const difference = newTotal - returnedTotal;
 
+    const payable = difference > 0 ? difference : 0;
+
     // =========================
-    // GENERATE EXCHANGE INVOICE
+    // PAYMENT ARRAY
+    // =========================
+    const cleanPayments =
+      payable > 0
+        ? payments?.length
+          ? payments.map((p) => ({
+              type: p.type,
+              option: p.option || "",
+              amount: Number(p.amount),
+            }))
+          : [
+              {
+                type: "Cash",
+                option: "",
+                amount: payable,
+              },
+            ]
+        : [];
+
+    // =========================
+    // EXCHANGE NUMBER
     // =========================
     const seq = await getNextInvoiceNumber("exchange_invoice");
+
     const exchangeNumber = `EXC-${String(seq).padStart(6, "0")}`;
 
     // =========================
-    // SAVE EXCHANGE ORDER
+    // SAVE ORDER
     // =========================
-    // 🛠️ মেইন ফিক্স: ফাইনাল পেয়েবল বা রিফান্ড অ্যামাউন্ট নির্ধারণ
-    const finalPayableTotal = difference > 0 ? difference : 0;
-
     const exchangeOrder = await Posorder.create(
       [
         {
           orderNumber: exchangeNumber,
+
           showroomId,
+
           userId: createdBy || null,
+
           orderType: "exchange",
 
-          items: newItems, // কাস্টমার এক্সচেঞ্জ করে এই আইটেমগুলো নিয়ে যাচ্ছে
+          status: "completed",
+
+          items: newItems,
+
+          subTotal: newTotal,
+
+          discount: 0,
+
+          vat: 0,
+
+          total: payable,
+
+          payments: cleanPayments,
 
           exchange: {
             isExchange: true,
+
             originalOrderId,
+
             reason,
+
             returnedItems,
+
             newItems,
+
             refundAmount: difference < 0 ? Math.abs(difference) : 0,
+
             extraPaid: difference > 0 ? difference : 0,
+
             exchangeDate: new Date(),
+
             processedBy: createdBy || null,
           },
-
-          // 👑 ফিক্স: রসিদ যাতে ভুল প্রোডাক্ট প্রাইস না দেখায়, তাই নিট এক্সচেঞ্জ ভ্যালুকে আসল টোটাল করা হলো
-          subTotal: newTotal,
-          discount: 0,
-          vat: 0,
-          total: finalPayableTotal, // 👈 এটি রসিদে 'Grand Total' বা 'Payable Amount' দেখাবে (যেমন: ৫০০ বা ০)
-
-          // যদি কাস্টমারকে এক্সট্রা পে করতে হয় তবে ফ্রন্টএন্ডের মেথড অথবা ক্যাশ, আর সমান বা কম হলে এডজাস্টেড
-          paymentMethod: difference > 0 ? paymentMethod || "cash" : "adjusted",
-          status: "completed",
         },
       ],
       { session },
     );
 
-    // =========================
-    // COMMIT TRANSACTION
-    // =========================
     await session.commitTransaction();
+
     session.endSession();
 
     return Response.json({
@@ -166,7 +218,11 @@ export async function POST(req) {
     });
   } catch (error) {
     console.log(error);
-    await session.abortTransaction().catch(() => {});
+
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+
     session.endSession();
 
     return Response.json(
@@ -174,7 +230,9 @@ export async function POST(req) {
         success: false,
         message: error.message,
       },
-      { status: 400 },
+      {
+        status: 400,
+      },
     );
   }
 }
