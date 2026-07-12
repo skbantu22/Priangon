@@ -3,9 +3,10 @@
 import { FaWhatsapp } from "react-icons/fa";
 
 export default function WhatsAppButton({
-  phone = "8801619421979",
+  phone = "8801706126663",
   message = "Hello",
-  bottom = "bottom-20",
+  bottom = "bottom-28",
+  mdBottom = "md:bottom-24",
   right = "right-6",
 }) {
   return (
@@ -17,13 +18,14 @@ export default function WhatsAppButton({
       className={`
         fixed
         ${bottom}
+        ${mdBottom}
         ${right}
         z-50
         flex
-        h-12
-        w-12
-        md:h-15
-        md:w-15
+        h-14
+        w-14
+        md:h-16
+        md:w-16
         items-center
         justify-center
         rounded-full
@@ -36,7 +38,7 @@ export default function WhatsAppButton({
         hover:shadow-2xl
       `}
     >
-      <FaWhatsapp className="h-8 w-8 md:h-8 md:w-8" />
+      <FaWhatsapp className="h-8 w-8" />
     </a>
   );
 }

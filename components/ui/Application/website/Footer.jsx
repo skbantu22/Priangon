@@ -133,7 +133,7 @@ export default function MobileFooter() {
           <p className="text-gray-500 text-[13px] leading-relaxed">
             Copyright © 2026{" "}
             <span className="text-red-600 font-bold uppercase">Priangon</span>{" "}
-            all reserved SKb Antu.
+            all reserved Mini Thailand Shop.
             <br />
             Powered by{" "}
             <span className="text-red-600 font-bold uppercase">

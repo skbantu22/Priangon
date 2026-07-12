@@ -78,7 +78,7 @@ const Navbar = () => {
     "flex flex-col items-center justify-center gap-1 text-black hover:text-gray-500 cursor-pointer";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 ">
       <div className="mx-auto max-w-[1400px] px-4 lg:px-8">
         <div className="flex h-14 lg:h-20 items-center justify-between">
           {/* Mobile Menu */}

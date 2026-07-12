@@ -3,8 +3,8 @@
 import { FaFacebookMessenger } from "react-icons/fa";
 
 export default function MessengerButton({
-  pageUsername = "YOUR_PAGE_USERNAME",
-  bottom = "bottom-38",
+  pageUsername = "minithailand2022",
+  bottom = "bottom-42",
   right = "right-6",
 }) {
   return (
@@ -19,8 +19,8 @@ export default function MessengerButton({
         ${right}
         z-50
         flex
-        h-12
-        w-12
+        h-13
+        w-13
         md:h-15
         md:w-15
         items-center

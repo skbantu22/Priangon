@@ -7,12 +7,17 @@ import {
 } from "@/components/ui/dialog";
 import React, { useState } from "react";
 import { Button } from "../../button";
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  QueryClient,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
 import loadingIcon from "@/public/assets/loading.svg";
 import Image from "next/image";
 import axios from "axios";
 import ModalMediaBlock from "./ModalMediaBlock";
 import { showToast } from "@/lib/showToast";
+import UploadMedia from "./uploadmedia";
 
 const MediaModal = ({
   open,
@@ -85,6 +90,22 @@ const MediaModal = ({
               Media Selection Library
             </DialogTitle>
           </DialogHeader>
+
+          <div className="flex items-center justify-between border-b pb-3 mb-3">
+            <div>
+              <h2 className="text-sm font-bold uppercase">Media Library</h2>
+              <p className="text-xs text-gray-500">
+                Upload new image or select existing media
+              </p>
+            </div>
+
+            <UploadMedia
+              queryClient={QueryClient}
+              selectedMedia={selectedMedia}
+              setSelectedMedia={setSelectedMedia}
+              isMultiple={isMultiple}
+            />
+          </div>
 
           {/* Scrolling Content Area */}
           <div className="flex-1 overflow-auto py-4 px-1">

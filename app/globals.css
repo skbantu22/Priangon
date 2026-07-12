@@ -250,3 +250,8 @@
     display: none !important;
   }
 }
+
+#crisp-chatbox {
+  bottom: 10px !important;
+  right: 20px !important;
+}
