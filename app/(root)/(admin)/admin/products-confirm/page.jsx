@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
 import { toast } from "sonner";
+import { Search } from "lucide-react";
 
 export default function AdvancedInventoryDashboard() {
   const [stock, setStock] = useState([]);
@@ -12,6 +13,8 @@ export default function AdvancedInventoryDashboard() {
   const [expandedProducts, setExpandedProducts] = useState({});
   const [editedStock, setEditedStock] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const normalize = (text = "") => text.toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -184,12 +187,37 @@ export default function AdvancedInventoryDashboard() {
   const groupedStock = stock.reduce((acc, current) => {
     const pId = current.productId?._id;
     if (!pId) return acc;
+
     if (!acc[pId]) {
-      acc[pId] = { product: current.productId, variants: [] };
+      acc[pId] = {
+        product: current.productId,
+        variants: [],
+      };
     }
+
     acc[pId].variants.push(current);
     return acc;
   }, {});
+
+  const filteredProducts = Object.values(groupedStock).filter(
+    ({ product, variants }) => {
+      if (!searchTerm) return true;
+
+      const keyword = normalize(searchTerm);
+
+      const productMatch = normalize(product?.name).includes(keyword);
+
+      const variantMatch = variants.some((v) => {
+        return (
+          normalize(v.variantId?.sku).includes(keyword) ||
+          normalize(v.variantId?.color).includes(keyword) ||
+          normalize(v.variantId?.size).includes(keyword)
+        );
+      });
+
+      return productMatch || variantMatch;
+    },
+  );
 
   const hasPendingChanges = Object.keys(editedStock).some(
     (k) => editedStock[k] !== "",
@@ -207,6 +235,21 @@ export default function AdvancedInventoryDashboard() {
             <p className="text-xs text-[#a3b899] font-medium mt-1">
               Live multi-showroom stock dispatch
             </p>
+          </div>
+
+          <div className="relative w-full sm:w-96">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+
+            <input
+              type="text"
+              placeholder="Search Product / SKU / Color / Size..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg bg-white text-black border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
           <div className="flex items-center gap-3 self-end sm:self-center">
             <button
@@ -238,7 +281,7 @@ export default function AdvancedInventoryDashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {Object.values(groupedStock).map(({ product, variants }) => {
+            {filteredProducts.map(({ product, variants }) => {
               const isExpanded = !!expandedProducts[product._id];
               const totalWarehouseStock = variants.reduce(
                 (acc, curr) => acc + curr.stock,
@@ -299,7 +342,7 @@ export default function AdvancedInventoryDashboard() {
                         }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm"
                       >
-                        Save Family
+                        Save
                       </button>
                     </div>
                   </div>
