@@ -26,6 +26,7 @@ export default function AdvancedInventoryDashboard() {
       ]);
 
       const rawStock = warehouseRes.data.data || [];
+
       setStock(rawStock);
 
       const rawShowrooms =
@@ -199,25 +200,35 @@ export default function AdvancedInventoryDashboard() {
     return acc;
   }, {});
 
-  const filteredProducts = Object.values(groupedStock).filter(
-    ({ product, variants }) => {
-      if (!searchTerm) return true;
+  const filteredProducts = Object.values(groupedStock)
+    .map(({ product, variants }) => {
+      if (!searchTerm) {
+        return { product, variants };
+      }
 
       const keyword = normalize(searchTerm);
 
-      const productMatch = normalize(product?.name).includes(keyword);
+      // Product name search → সব variant দেখাবে
+      if (normalize(product?.name).includes(keyword)) {
+        return { product, variants };
+      }
 
-      const variantMatch = variants.some((v) => {
+      // Variant search → শুধু matched variant রাখবে
+      const matchedVariants = variants.filter((v) => {
         return (
+          normalize(v.variantId?.barcode).includes(keyword) ||
           normalize(v.variantId?.sku).includes(keyword) ||
           normalize(v.variantId?.color).includes(keyword) ||
           normalize(v.variantId?.size).includes(keyword)
         );
       });
 
-      return productMatch || variantMatch;
-    },
-  );
+      return {
+        product,
+        variants: matchedVariants,
+      };
+    })
+    .filter(({ variants }) => variants.length > 0);
 
   const hasPendingChanges = Object.keys(editedStock).some(
     (k) => editedStock[k] !== "",

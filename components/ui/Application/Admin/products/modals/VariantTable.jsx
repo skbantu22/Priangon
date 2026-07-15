@@ -256,8 +256,7 @@ export default function VariantTable({
                 <td className="p-2 border-l border-zinc-200 text-center">
                   <button
                     type="button"
-                    // onClick={() => onDelete?.(variant.id, variant.isNew)}
-
+                    onClick={() => onDelete?.(variant.id, variant.isNew)}
                     className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-[11px] rounded"
                   >
                     Delete

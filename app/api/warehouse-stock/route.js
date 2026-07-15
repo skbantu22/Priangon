@@ -42,7 +42,7 @@ export async function GET(req) {
 
       .populate({
         path: "variantId",
-        select: "color size sku stock media",
+        select: "color size sku barcode  stock media",
         populate: {
           path: "media",
           select: "secure_url",
