@@ -1,9 +1,9 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { response } from "@/lib/helperfunction";
 
-import ProductVariantModel from "@/models/ProductVariant.model";
+import ProductVariantModel from "@/models/ProductVariant.model ";
 import WarehouseStock from "@/models/WarehouseStock.model";
-import ShowroomStock from "@/models/ShowroomStock.model"; // থাকলে
+import ShowroomStock from "@/models/ShowroomStock"; // থাকলে
 
 export async function DELETE(request, { params }) {
   try {
