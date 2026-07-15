@@ -464,7 +464,14 @@ const Datatable = ({
                   !table.getIsSomeRowsSelected() &&
                   !table.getIsAllRowsSelected()
                 }
-                onClick={() => handleDelete()}
+                onClick={() =>
+                  handleDelete(
+                    table
+                      .getSelectedRowModel()
+                      .rows.map((row) => row.original._id),
+                    "PD",
+                  )
+                }
               >
                 <DeleteForeverIcon />
               </IconButton>
