@@ -149,6 +149,10 @@ const Datatable = ({
 
   // ✅ handle delete method
   const handleDelete = (ids, dt) => {
+    console.trace("HANDLE DELETE TRACE");
+
+    console.log("handleDelete", ids, dt);
+
     let c;
 
     if (dt === "PD") {
@@ -394,18 +398,22 @@ const Datatable = ({
         <MRT_ToggleDensePaddingButton table={table} />
 
         {deleteType !== "PD" && (
-          <Tooltip title="Recycle Bin">
-            <Link href={trashView}>
-              <IconButton
-                sx={{
-                  bgcolor: "#f0fdf4",
-                  border: "1px solid #dcfce7",
-                  ml: 1,
-                }}
-              >
-                <RecyclingIcon />
-              </IconButton>
-            </Link>
+          <Tooltip title="Permanently Delete Data">
+            <IconButton
+              disabled={
+                !table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()
+              }
+              onClick={() =>
+                handleDelete(
+                  table
+                    .getSelectedRowModel()
+                    .rows.map((row) => row.original._id),
+                  "PD",
+                )
+              }
+            >
+              <DeleteForeverIcon />
+            </IconButton>
           </Tooltip>
         )}
 
