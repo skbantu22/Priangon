@@ -53,6 +53,7 @@ const Layout = async ({ children }) => {
 
         <Header />
         <main>{children}</main>
+        
         <ToastContainer />
         <Footer />
         <MobileBottomNav />
