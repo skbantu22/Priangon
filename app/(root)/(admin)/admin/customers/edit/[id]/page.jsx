@@ -40,6 +40,7 @@ export default function EditCustomer({ params }) {
   const [loading, setLoading] = useState(false);
 
   const { data: userData } = useFetch(`/api/customers/get/${id}`);
+  const { data: showroomData } = useFetch("/api/showrooms");
 
   // 🔥 FULL USER SCHEMA
   const formSchema = z.object({
@@ -67,7 +68,8 @@ export default function EditCustomer({ params }) {
       address: "",
       city: "",
       role: "user",
-      showroomId: "main",
+      showroomId: "",
+
       isEmailVerified: false,
     },
   });
@@ -84,8 +86,8 @@ export default function EditCustomer({ params }) {
         phone: user.phone || "",
         address: user.address || "",
         city: user.city || "",
-        role: user.role || "user",
-        showroomId: user.showroomId || "main",
+        role: user.role || "customer",
+        showroomId: user.showroomId || "",
         isEmailVerified: user.isEmailVerified || false,
       });
     }
@@ -195,11 +197,16 @@ export default function EditCustomer({ params }) {
                     <FormLabel>Showroom</FormLabel>
                     <FormControl>
                       <select {...field} className="w-full border p-2 rounded">
-                        <option value="main">Main</option>
-                        <option value="uttara">Uttara</option>
-                        <option value="mirpur">Mirpur</option>
+                        <option value="">Select Showroom</option>
+
+                        {showroomData?.showrooms?.map((showroom) => (
+                          <option key={showroom._id} value={showroom._id}>
+                            {showroom.name}
+                          </option>
+                        ))}
                       </select>
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />

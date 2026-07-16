@@ -63,7 +63,7 @@ export async function GET(req) {
       })
       .populate({
         path: "variants",
-        select: "color size sku barcode mrp sellingPrice",
+        select: "color size sku barcode mrp sellingPrice  media",
       })
       .lean();
 
@@ -78,6 +78,13 @@ export async function GET(req) {
         return {
           ...variant,
           showroomStock: stockValue, // স্টক ০ হলেও ভ্যালু ০ হিসেবেই পাস হবে, ভ্যারিয়েন্ট ডিলিট হবে না
+
+          image:
+            Array.isArray(variant.media) && variant.media.length > 0
+              ? typeof variant.media[0] === "string"
+                ? variant.media[0]
+                : variant.media[0]?.secure_url || ""
+              : "",
         };
       });
 

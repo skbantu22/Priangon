@@ -357,6 +357,9 @@ export default function POSPage() {
             sku: v.sku || "",
             mrp: v.mrp || 0,
             sellingPrice: v.sellingPrice || product.sellingPrice || 0,
+
+            // ✅ Variant Image
+            image: v.image || "/placeholder.png",
           }));
 
           const totalStock = productVariants.reduce(
