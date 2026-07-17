@@ -89,22 +89,25 @@ export default function PrintReceipt({ order }) {
   const totalInWords = numberToWords(Math.round(totalAmount));
 
   // Date & Time formatting from the custom Server payload date configs
-  const rawDateTarget = order.saleDate || order.createdAt;
-  const orderDate = rawDateTarget
-    ? new Date(rawDateTarget).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "14 Jun 2026";
+  const saleDate = order.saleDate ? new Date(order.saleDate) : new Date();
+  const createdTime = order.createdAt ? new Date(order.createdAt) : saleDate;
 
-  const orderTime = rawDateTarget
-    ? new Date(rawDateTarget).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })
-    : "04:51 AM";
+  const orderDate = saleDate.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  const orderTime = createdTime.toLocaleTimeString("en-US", {
+    timeZone: "Asia/Dhaka",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  console.log("ORDER =", order);
+  console.log("createdAt =", order.createdAt);
+  console.log("saleDate =", order.saleDate);
 
   return (
     <div

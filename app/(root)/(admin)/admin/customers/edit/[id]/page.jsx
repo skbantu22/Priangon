@@ -67,7 +67,8 @@ export default function EditCustomer({ params }) {
       phone: "",
       address: "",
       city: "",
-      role: "user",
+        role: "customer", // ✅
+
       showroomId: "",
 
       isEmailVerified: false,

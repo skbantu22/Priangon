@@ -118,6 +118,7 @@ export default function CartSidebar({
                   </div>
                 </div>
                 <button
+                  data-no-focus
                   onClick={() => removeCartItem(item.variantId)}
                   className="text-gray-300 hover:text-red-500 p-1"
                 >

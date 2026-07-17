@@ -57,6 +57,15 @@ export default function ExchangeModal({
             productId: targetProductId,
             variantId: targetVariantId,
             name: nestedProduct.name || item?.name || "Catalog Product",
+
+            image:
+              nestedVariant?.media?.[0]?.secure_url ||
+              nestedVariant?.media?.[0]?.url ||
+              nestedProduct?.media?.[0]?.secure_url ||
+              nestedProduct?.media?.[0]?.url ||
+              item.image ||
+              "",
+
             color: nestedVariant.color || item?.color || "N/A",
             size: nestedVariant.size || item?.size || "Standard",
             price: parsedPrice,
@@ -73,7 +82,7 @@ export default function ExchangeModal({
         setNewItems(preLoadedItems);
       }
     }
-  }, [isOpen, currentPosCart]);
+  }, [isOpen]);
 
   // Reset modal on close
   useEffect(() => {
@@ -168,11 +177,23 @@ export default function ExchangeModal({
     } else {
       const cleanReturnItem = {
         productId: item.productId?._id || item.productId,
+
         variantId: itemUniqueId,
+
         name: item.name || item.productName || "Unknown Item",
+
+        image: item.image || "",
+
+        color: item.color || "",
+
+        size: item.size || "",
+
         price: parseFloat(item.price || item.sellingPrice || 0),
-        qty: parseInt(item.qty || 1), // অরিজিনাল কেনা কোয়ান্টিটি বা ডিফল্ট ১
-        maxQty: parseInt(item.qty || 1), // ম্যাক্সিমাম রিটার্ন লিমিট সেভ রাখা হলো
+
+        qty: parseInt(item.qty || 1),
+
+        maxQty: parseInt(item.qty || 1),
+
         subtotal: parseFloat(item.subtotal || item.price * item.qty || 0),
       };
       setReturnedItems([...returnedItems, cleanReturnItem]);
@@ -260,11 +281,19 @@ export default function ExchangeModal({
           productId: targetProductId,
           variantId: targetVariantId,
           name: nameString,
-          color: nestedVariant.color || stockItem?.color || "N/A",
-          size: nestedVariant.size || stockItem?.size || "Standard",
+
+          image:
+            nestedVariant?.media?.[0]?.secure_url ||
+            nestedVariant?.media?.[0]?.url ||
+            coreProduct?.media?.[0]?.secure_url ||
+            coreProduct?.media?.[0]?.url ||
+            "",
+
+          color: nestedVariant.color || "",
+          size: nestedVariant.size || "",
           price: parsedPrice,
           qty: 1,
-          maxStock: availableStock, // ভ্যালিডেশনের জন্য স্টক ট্র্যাকিং
+          maxStock: availableStock,
           subtotal: parsedPrice,
         },
       ]);
@@ -318,15 +347,38 @@ export default function ExchangeModal({
         returnedItems: returnedItems.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
+
+          productName: i.name,
+
+          image: i.image || "",
+
+          color: i.color,
+
+          size: i.size,
+
           qty: i.qty,
+
           price: i.price,
+
           subtotal: i.subtotal,
         })),
+
         newItems: newItems.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
+
+          productName: i.name,
+
+          image: i.image || "",
+
+          color: i.color,
+
+          size: i.size,
+
           qty: i.qty,
+
           price: i.price,
+
           subtotal: i.subtotal,
         })),
       },

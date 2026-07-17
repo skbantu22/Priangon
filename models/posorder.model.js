@@ -14,10 +14,10 @@ const POSOrderSchema = new mongoose.Schema(
     },
 
     showroomId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Showroom",
       required: true,
       index: true,
-      trim: true,
     },
 
     userId: {
@@ -171,40 +171,96 @@ const POSOrderSchema = new mongoose.Schema(
     // =========================
     // EXCHANGE SYSTEM
     // =========================
+    // =========================
+    // EXCHANGE SYSTEM
+    // =========================
     exchange: {
       isExchange: {
         type: Boolean,
         default: false,
       },
 
-      reason: String,
+      reason: {
+        type: String,
+        default: "",
+      },
 
       originalOrderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "POSOrder",
       },
 
+      // যে showroom থেকে original sale হয়েছিল
+      originalShowroomId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Showroom",
+      },
+
+      // যে showroom থেকে exchange করা হয়েছে
+      exchangeShowroomId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Showroom",
+      },
+
       returnedItems: [
         {
-          productId: mongoose.Schema.Types.ObjectId,
-          variantId: mongoose.Schema.Types.ObjectId,
+          productId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+          },
+
+          variantId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "ProductVariant",
+          },
+
           productName: String,
+
           qty: Number,
+
           price: Number,
+
           subtotal: Number,
         },
       ],
 
       newItems: [
         {
-          productId: mongoose.Schema.Types.ObjectId,
-          variantId: mongoose.Schema.Types.ObjectId,
+          productId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+          },
+
+          variantId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "ProductVariant",
+          },
+
           productName: String,
+
           qty: Number,
+
           price: Number,
+
           subtotal: Number,
         },
       ],
+
+      // Exchange হিসাব
+      returnedTotal: {
+        type: Number,
+        default: 0,
+      },
+
+      newTotal: {
+        type: Number,
+        default: 0,
+      },
+
+      difference: {
+        type: Number,
+        default: 0,
+      },
 
       refundAmount: {
         type: Number,
@@ -224,6 +280,7 @@ const POSOrderSchema = new mongoose.Schema(
       processedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+        default: null,
       },
     },
   },

@@ -167,8 +167,8 @@ export default function CheckoutModal({
                     }
                     className="border p-2 rounded-none text-sm w-full"
                   >
-                    <option>Mobile Banking</option>
                     <option>Cash</option>
+                    <option>Mobile Banking</option>
                     <option>Card</option>
                     <option>Bank</option>
                   </select>

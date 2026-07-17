@@ -92,10 +92,9 @@ export default function POSPage() {
     });
   };
 
-  const removeCartItem = (id) =>
-    setCart((prev) =>
-      prev.filter((item) => item.variantId !== id || item._id !== id),
-    );
+  const removeCartItem = (variantId) => {
+    setCart((prev) => prev.filter((item) => item.variantId !== variantId));
+  };
 
   const increaseQty = (variantId) => {
     setCart((prev) =>
@@ -132,41 +131,113 @@ export default function POSPage() {
         ? modalData
         : {};
 
-    if (!cart.length) {
+    const isExchange = dataClean.isExchangeMode || false;
+
+    const exchange = dataClean.exchangeData || {};
+
+    if (!isExchange && !cart.length) {
       showToast("Cart is empty");
       return;
     }
 
     const currentUser = user?.data?.user || user?.user || user;
-    const userRole = currentUser?.role;
 
     const showroomId =
-      userRole === "admin"
+      currentUser?.role === "admin"
         ? selectedShowroomId
         : currentUser?.showroomId || selectedShowroomId;
 
     try {
       setCheckoutLoading(true);
 
-      const isExchange = dataClean.isExchangeMode || false;
-      const finalBillAmount = isExchange
-        ? Number(dataClean.total || 0)
-        : Number(total);
+      // ==========================
+      // NORMAL CART ITEMS
+      // ==========================
 
-      // =========================
-      // 🔥 CLEAN PAYMENTS LOGIC
-      // =========================
+      const normalItems = cart.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId,
+
+        productName: i.name || "Unknown Product",
+
+        image: i.image || "",
+
+        color: i.color || "",
+
+        size: i.size || "",
+
+        qty: Number(i.qty),
+
+        price: Number(i.price),
+
+        subtotal: Number(i.price) * Number(i.qty),
+      }));
+
+      // ==========================
+      // EXCHANGE NEW ITEMS
+      // ==========================
+
+      const exchangeItems = (exchange.newItems || [])
+        .filter((i) => i && Number(i.qty) > 0 && Number(i.price) >= 0)
+        .map((i) => ({
+          productId: i.productId,
+
+          variantId: i.variantId,
+
+          productName: i.productName || i.name || "Unknown Product",
+
+          image: i.image || "",
+
+          color: i.color || "",
+
+          size: i.size || "",
+
+          qty: Number(i.qty),
+
+          price: Number(i.price),
+
+          subtotal: Number(i.price) * Number(i.qty),
+        }));
+
+      console.log("========== EXCHANGE DEBUG ==========");
+      console.log("IS EXCHANGE:", isExchange);
+
+      console.log("OLD RETURN ITEMS:", exchange.returnedItems);
+
+      console.log("NEW ITEMS BEFORE MAP:", exchange.newItems);
+
+      console.log("FINAL NEW ITEMS:", exchangeItems);
+
+      console.log("====================================");
+
+      const orderItems = isExchange ? exchangeItems : normalItems;
+
+      const exchangeNewTotal = orderItems.reduce(
+        (sum, item) => sum + Number(item.subtotal || 0),
+        0,
+      );
+
+      const finalBillAmount = isExchange ? exchangeNewTotal : Number(total);
+
+      // ==========================
+      // PAYMENTS
+      // ==========================
+
       const formattedPayments =
-        dataClean.payments && dataClean.payments.length > 0
+        dataClean.payments?.length > 0
           ? dataClean.payments.map((p) => ({
               type: p.type,
+
               option: p.option || "",
-              amount: Number(p.amount),
+
+              amount: Number(p.amount || 0),
             }))
           : [
               {
                 type: "Cash",
+
                 option: "",
+
                 amount: finalBillAmount,
               },
             ];
@@ -174,109 +245,123 @@ export default function POSPage() {
       const payload = {
         showroomId,
 
-        originalOrderId:
-          dataClean.originalOrderId || originalOrder?._id || null,
-
-        reason: dataClean.reason || "Product Exchange",
-        returnedItems: dataClean.returnedItems || [],
         createdBy: currentUser?._id,
 
-        // ❌ paymentMethod removed (IMPORTANT FIX)
-
-        // =========================
-        // ITEMS
-        // =========================
-        newItems: cart.map((i) => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          productName: i.name || "Unknown Product",
-          image: i.image || "",
-          color: i.color || "",
-          size: i.size || "",
-          qty: Number(i.qty),
-          price: Number(i.price),
-          subtotal: Number(i.price) * Number(i.qty),
-        })),
-
-        items: cart.map((i) => ({
-          productId: i.productId,
-          variantId: i.variantId,
-          productName: i.name || "Unknown Product",
-          image: i.image || "",
-          color: i.color || "",
-          size: i.size || "",
-          qty: Number(i.qty),
-          price: Number(i.price),
-          subtotal: Number(i.price) * Number(i.qty),
-        })),
-
-        // =========================
-        // BILL
-        // =========================
-        subTotal: Number(subTotal),
-        discount: isExchange ? 0 : Number(discountAmount),
-        vat: isExchange ? 0 : Number(vatAmount),
-        total: finalBillAmount,
-
-        userId: currentUser?._id,
         orderType: isExchange ? "exchange" : "pos",
 
         customerName: dataClean.customerName || "Walk-in Customer",
-        phone: dataClean.phone || "",
-        address: dataClean.address || "",
-        saleDate: dataClean.saleDate || new Date().toISOString().split("T")[0],
 
-        // =========================
-        // 🔥 FIXED PAYMENTS (IMPORTANT)
-        // =========================
+        phone: dataClean.phone || "",
+
+        address: dataClean.address || "",
+
+        saleDate: dataClean.saleDate || new Date().toISOString(),
+
+        subTotal: finalBillAmount,
+
+        discount: isExchange ? 0 : Number(discountAmount),
+
+        vat: isExchange ? 0 : Number(vatAmount),
+
+        total: finalBillAmount,
+
         payments: formattedPayments,
 
         deliveryCharge: Number(dataClean.deliveryCharge || 0),
+
         remark: dataClean.remark || "",
+
         soldBy: dataClean.soldBy || currentUser?.name || "POS Agent",
+
+        items: orderItems,
+
+        newItems: orderItems,
       };
 
-      // =========================
-      // API ROUTE
-      // =========================
-      const targetApiUrl = isExchange
-        ? "/api/pos/exchange"
-        : "/api/showroom-orders";
+      // ==========================
+      // EXCHANGE DATA
+      // ==========================
 
-      const res = await fetch(targetApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      if (isExchange) {
+        payload.originalOrderId = exchange.originalOrderId;
+
+        payload.reason = exchange.reason || "Product Exchange";
+
+        payload.returnedItems = (exchange.returnedItems || []).map((i) => ({
+          productId: i.productId,
+
+          variantId: i.variantId,
+
+          productName: i.productName || i.name || "Unknown Product",
+
+          qty: Number(i.qty || 0),
+
+          price: Number(i.price || 0),
+
+          subtotal: Number(i.price || 0) * Number(i.qty || 0),
+        }));
+
+        payload.newItems = exchangeItems;
+
+        payload.items = exchangeItems;
+      }
+
+      console.log("========== FINAL PAYLOAD ==========");
+
+      console.log(JSON.stringify(payload, null, 2));
+
+      console.log("====================================");
+
+      const res = await fetch(
+        isExchange ? "/api/pos/exchange" : "/api/showroom-orders",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify(payload),
+        },
+      );
 
       const data = await res.json();
 
-      if (data.success) {
-        showToast(
-          isExchange
-            ? "Exchange completed successfully ✅"
-            : "Order created successfully ✅",
-        );
+      if (!data.success) {
+        showToast(data.message || "Checkout failed");
 
-        setCart([]);
-        setDiscount(0);
-        setVat(0);
-        setSearch("");
-        setExchangeOpen(false);
-        setExchangeData(null);
+        return;
+      }
 
-        fetchProducts("", showroomId);
+      showToast(
+        isExchange
+          ? "Exchange completed successfully ✅"
+          : "Order created successfully ✅",
+      );
 
-        const printOrderId = data.exchangeOrder?._id || data.order?._id;
-        if (printOrderId) {
-          window.open(`/admin/print/${printOrderId}`, "_blank");
-        }
-      } else {
-        showToast(data.message || "Checkout failed ❌");
+      setCart([]);
+
+      setDiscount(0);
+
+      setVat(0);
+
+      setSearch("");
+
+      setExchangeOpen(false);
+
+      setExchangeData(null);
+
+      fetchProducts("", showroomId);
+
+      const printId = data.exchangeOrder?._id || data.order?._id;
+
+      if (printId) {
+        window.open(`/admin/print/${printId}`, "_blank");
       }
     } catch (err) {
       console.error("CHECKOUT ERROR:", err);
-      showToast("Server error ❌");
+
+      showToast("Server Error");
     } finally {
       setCheckoutLoading(false);
     }
@@ -403,39 +488,32 @@ export default function POSPage() {
   }, [user, selectedShowroomId, fetchProducts]);
 
   useEffect(() => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [cart, openProduct, products]);
-
-  useEffect(() => {
     const handleGlobalClick = (e) => {
       const targetTagName = e.target.tagName.toLowerCase();
-
+      // এগুলোতে focus নিবে না
       if (
         targetTagName === "input" ||
         targetTagName === "select" ||
         targetTagName === "textarea" ||
         e.target.closest("button") ||
+        e.target.closest("[data-no-focus]") ||
         e.target.closest("[role='dialog']") ||
         e.target.closest(".modal")
       ) {
         return;
       }
 
-      if (searchInputRef.current) {
-        requestAnimationFrame(() => {
-          searchInputRef.current.focus();
-        });
-      }
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
     };
 
-    document.addEventListener("click", handleGlobalClick);
+    document.addEventListener("pointerdown", handleGlobalClick);
+
     return () => {
-      document.removeEventListener("click", handleGlobalClick);
+      document.removeEventListener("pointerdown", handleGlobalClick);
     };
   }, []);
-
   return (
     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-screen bg-gray-50">
       <ProductGallery

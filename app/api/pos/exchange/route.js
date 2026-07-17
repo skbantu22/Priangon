@@ -22,6 +22,13 @@ export async function POST(req) {
       newItems,
       createdBy,
       payments,
+
+      customerName = "Walk-in Customer",
+      phone = "",
+      address = "",
+      saleDate = new Date(),
+      soldBy = "",
+      remark = "",
     } = body;
 
     // =========================
@@ -45,18 +52,32 @@ export async function POST(req) {
     // =========================
     // RETURN STOCK
     // =========================
+    // =========================
+    // RETURN STOCK (ANY SHOWROOM)
+    // =========================
     for (const item of returnedItems) {
-      const stockDoc = await ShowroomStock.findOne({
+      let stockDoc = await ShowroomStock.findOne({
         showroomId,
         productId: item.productId,
         variantId: item.variantId,
       }).session(session);
 
+      // যদি এই showroom-এ stock row না থাকে তাহলে create করো
       if (!stockDoc) {
-        throw new Error("Returned stock not found");
-      }
+        const created = await ShowroomStock.create(
+          [
+            {
+              showroomId,
+              productId: item.productId,
+              variantId: item.variantId,
+              stock: 0,
+            },
+          ],
+          { session },
+        );
 
-      const field = stockDoc.stock !== undefined ? "stock" : "showroomStock";
+        stockDoc = created[0];
+      }
 
       await ShowroomStock.updateOne(
         {
@@ -66,13 +87,16 @@ export async function POST(req) {
         },
         {
           $inc: {
-            [field]: Number(item.qty),
+            stock: Number(item.qty),
           },
         },
         { session },
       );
     }
 
+    // =========================
+    // DEDUCT NEW STOCK
+    // =========================
     // =========================
     // DEDUCT NEW STOCK
     // =========================
@@ -84,15 +108,15 @@ export async function POST(req) {
       }).session(session);
 
       if (!stockDoc) {
-        throw new Error("Stock not found");
+        throw new Error(
+          `${item.productName || "Product"} stock not found in this showroom`,
+        );
       }
 
-      const field = stockDoc.stock !== undefined ? "stock" : "showroomStock";
-
-      const currentStock = Number(stockDoc[field] || 0);
-
-      if (currentStock < item.qty) {
-        throw new Error(`${item.productName} has insufficient stock`);
+      if (Number(stockDoc.stock) < Number(item.qty)) {
+        throw new Error(
+          `${item.productName || "Product"} only ${stockDoc.stock} pcs available`,
+        );
       }
 
       await ShowroomStock.updateOne(
@@ -103,7 +127,7 @@ export async function POST(req) {
         },
         {
           $inc: {
-            [field]: -Number(item.qty),
+            stock: -Number(item.qty),
           },
         },
         { session },
@@ -162,6 +186,7 @@ export async function POST(req) {
         {
           orderNumber: exchangeNumber,
 
+          // যে showroom থেকে exchange করা হচ্ছে
           showroomId,
 
           userId: createdBy || null,
@@ -170,7 +195,17 @@ export async function POST(req) {
 
           status: "completed",
 
-          items: newItems,
+          items: newItems.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            productName: item.productName || item.name || "Unknown Product",
+            image: item.image || "",
+            color: item.color || "",
+            size: item.size || "",
+            qty: Number(item.qty),
+            price: Number(item.price),
+            subtotal: Number(item.subtotal || item.price * item.qty),
+          })),
 
           subTotal: newTotal,
 
@@ -178,20 +213,58 @@ export async function POST(req) {
 
           vat: 0,
 
+          // Invoice total
           total: payable,
 
           payments: cleanPayments,
+
+          customerName,
+          phone,
+          address,
+          saleDate,
+          soldBy,
+          remark,
 
           exchange: {
             isExchange: true,
 
             originalOrderId,
 
+            originalShowroomId: originalOrder.showroomId,
+
+            exchangeShowroomId: showroomId,
+
             reason,
 
-            returnedItems,
+            returnedItems: returnedItems.map((item) => ({
+              productId: item.productId,
+              variantId: item.variantId,
+              productName: item.productName || item.name || "Unknown Product",
+              image: item.image || "",
+              color: item.color || "",
+              size: item.size || "",
+              qty: Number(item.qty),
+              price: Number(item.price),
+              subtotal: Number(item.subtotal || item.price * item.qty),
+            })),
 
-            newItems,
+            newItems: newItems.map((item) => ({
+              productId: item.productId,
+              variantId: item.variantId,
+              productName: item.productName || item.name || "Unknown Product",
+              image: item.image || "",
+              color: item.color || "",
+              size: item.size || "",
+              qty: Number(item.qty),
+              price: Number(item.price),
+              subtotal: Number(item.subtotal || item.price * item.qty),
+            })),
+
+            returnedTotal,
+
+            newTotal,
+
+            difference,
 
             refundAmount: difference < 0 ? Math.abs(difference) : 0,
 
@@ -214,7 +287,14 @@ export async function POST(req) {
       success: true,
       message: "Exchange completed successfully",
       exchangeOrder: exchangeOrder[0],
+
+      returnedTotal,
+      newTotal,
       difference,
+
+      refundAmount: difference < 0 ? Math.abs(difference) : 0,
+
+      extraPaid: difference > 0 ? difference : 0,
     });
   } catch (error) {
     console.log(error);
