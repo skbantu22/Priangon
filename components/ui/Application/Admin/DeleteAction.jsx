@@ -1,20 +1,21 @@
 import { ListItemIcon, MenuItem } from "@mui/material";
-import React from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
+import RestoreFromTrashIcon from "@mui/icons-material/RestoreFromTrash";
 
 const DeleteAction = ({ handleDelete, row, deleteType }) => {
+  const isTrash = deleteType === "RSD" || deleteType === "PD";
+
   return (
     <MenuItem
-      key="delete"
       onClick={() => {
-        console.log("DeleteAction", row.original._id, deleteType);
-        handleDelete([row.original._id], deleteType);
+        handleDelete([row.original._id], isTrash ? "RSD" : "SD");
       }}
     >
       <ListItemIcon>
-        <DeleteIcon />
+        {isTrash ? <RestoreFromTrashIcon /> : <DeleteIcon />}
       </ListItemIcon>
-      Delete
+
+      {isTrash ? "Restore" : "Delete"}
     </MenuItem>
   );
 };

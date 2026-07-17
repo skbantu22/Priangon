@@ -397,28 +397,18 @@ const Datatable = ({
         <MRT_ToggleFullScreenButton table={table} />
         <MRT_ToggleDensePaddingButton table={table} />
 
-        {deleteType !== "PD" && (
-          <Tooltip title="Permanently Delete Data">
-            <IconButton
-              disabled={
-                !table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()
-              }
-              onClick={() =>
-                handleDelete(
-                  table
-                    .getSelectedRowModel()
-                    .rows.map((row) => row.original._id),
-                  "PD",
-                )
-              }
-            >
-              <DeleteForeverIcon />
+        {/* Recycle Bin */}
+        {trashView && (
+          <Tooltip title="Recycle Bin">
+            <IconButton component={Link} href={trashView}>
+              <RecyclingIcon />
             </IconButton>
           </Tooltip>
         )}
 
+        {/* Normal Page */}
         {deleteType === "SD" && (
-          <Tooltip title="Delete All">
+          <Tooltip title="Move Selected To Trash">
             <IconButton
               disabled={
                 !table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()
@@ -437,9 +427,10 @@ const Datatable = ({
           </Tooltip>
         )}
 
+        {/* Trash Page */}
         {deleteType === "PD" && (
           <>
-            <Tooltip title="Restore Data">
+            <Tooltip title="Restore Selected">
               <IconButton
                 disabled={
                   !table.getIsSomeRowsSelected() &&
@@ -458,7 +449,7 @@ const Datatable = ({
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Permanently Delete Data">
+            <Tooltip title="Permanent Delete">
               <IconButton
                 disabled={
                   !table.getIsSomeRowsSelected() &&

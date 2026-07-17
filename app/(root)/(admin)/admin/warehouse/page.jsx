@@ -18,6 +18,8 @@ export default function WarehousePage() {
   const [activeCategory, setActiveCategory] = useState("ALL");
 
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // ================= LOAD STOCK (FIXED WITH RETURN) =================
   const loadStock = useCallback(async () => {
