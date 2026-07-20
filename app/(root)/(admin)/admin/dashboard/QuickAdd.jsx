@@ -1,70 +1,83 @@
-import Link from 'next/link'
-import React from 'react'
-import { BiCategory } from "react-icons/bi";
+"use client";
+
+import Link from "next/link";
+
+import { BiCategory, BiImage, BiPurchaseTag } from "react-icons/bi";
+
 import { IoShirtOutline } from "react-icons/io5";
-import { MdOutlineShoppingBag } from "react-icons/md";
-import { LuUserRound } from "react-icons/lu";
-import { ADMIN_CATEGORY_ADD, ADMIN_MEDIA_SHOW, ADMIN_PRODUCT_ADD } from '@/Route/Adminpannelroute';
+import { MdOutlineAddPhotoAlternate } from "react-icons/md";
 
-const QuickAdd = () => {
+import {
+  ADMIN_CATEGORY_ADD,
+  ADMIN_MEDIA_SHOW,
+  ADMIN_PRODUCT_ADD,
+} from "@/Route/Adminpannelroute";
+
+const actions = [
+  {
+    title: "Add Category",
+    href: ADMIN_CATEGORY_ADD,
+    icon: BiCategory,
+    bg: "from-emerald-500 to-green-600",
+  },
+  {
+    title: "Add Product",
+    href: ADMIN_PRODUCT_ADD,
+    icon: IoShirtOutline,
+    bg: "from-blue-500 to-indigo-600",
+  },
+  {
+    title: "Add Coupon",
+    href: "#",
+    icon: BiPurchaseTag,
+    bg: "from-orange-500 to-red-500",
+  },
+  {
+    title: "Upload Media",
+    href: ADMIN_MEDIA_SHOW,
+    icon: MdOutlineAddPhotoAlternate,
+    bg: "from-violet-500 to-purple-600",
+  },
+];
+
+export default function QuickAdd() {
   return (
-    <div className='grid lg:grid-cols-4 sm:grid-cols-2 sm:gap-10 gap-5 mt-10'>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-6">
+      {actions.map((item) => {
+        const Icon = item.icon;
 
-  <Link href={ADMIN_CATEGORY_ADD}>
-    <div className='flex items-center justify-between p-3 rounded-lg shadow bg-white dark:bg-card bg-gradient-to-tr from-green-400 via-green-500 to-green-600'>
+        return (
+          <Link key={item.title} href={item.href}>
+            <div
+              className={`
+                bg-gradient-to-r
+                ${item.bg}
+                rounded-xl
+                p-4
+                shadow-md
+                hover:shadow-xl
+                hover:-translate-y-1
+                transition-all
+                duration-300
+                flex
+                items-center
+                justify-between
+                text-white
+              `}
+            >
+              <div>
+                <p className="text-sm opacity-90">Quick Action</p>
 
-      <h4 className='font-medium text-white dark:text-black'>
-        Add Category
-      </h4>
+                <h3 className="font-semibold text-lg mt-1">{item.title}</h3>
+              </div>
 
-      <span className='w-12 h-12 border dark:border-green-800 flex justify-center items-center rounded-full text-white'>
-        <BiCategory size={20} />
-      </span>
-
+              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">
+                <Icon />
+              </div>
+            </div>
+          </Link>
+        );
+      })}
     </div>
-  </Link>
-
- <Link href={ADMIN_PRODUCT_ADD}>
-    <div className='flex items-center justify-between p-3 rounded-lg shadow bg-white dark:bg-card bg-gradient-to-tr from-green-400 via-green-500 to-green-600'>
-
-      <h4 className='font-medium text-white dark:text-black'>
-        Add PRoduct
-      </h4>
-
-      <span className='w-12 h-12 border dark:border-green-800 flex justify-center items-center rounded-full text-white'>
-        <BiCategory size={20} />
-      </span>
-
-    </div>
-  </Link>
-   <Link href={ADMIN_CATEGORY_ADD}>
-    <div className='flex items-center justify-between p-3 rounded-lg shadow bg-white dark:bg-card bg-gradient-to-tr from-green-400 via-green-500 to-green-600'>
-
-      <h4 className='font-medium text-white dark:text-black'>
-        Add Coupon
-      </h4>
-
-      <span className='w-12 h-12 border dark:border-green-800 flex justify-center items-center rounded-full text-white'>
-        <BiCategory size={20} />
-      </span>
-
-    </div>
-  </Link>
-   <Link href={ADMIN_MEDIA_SHOW}>
-    <div className='flex items-center justify-between p-3 rounded-lg shadow bg-white dark:bg-card bg-gradient-to-tr from-green-400 via-green-500 to-green-600'>
-
-      <h4 className='font-medium text-white dark:text-black'>
-       Upload Mrdia
-      </h4>
-
-      <span className='w-12 h-12 border dark:border-green-800 flex justify-center items-center rounded-full text-white'>
-        <BiCategory size={20} />
-      </span>
-
-    </div>
-  </Link>
-</div>
-  )
+  );
 }
-
-export default QuickAdd

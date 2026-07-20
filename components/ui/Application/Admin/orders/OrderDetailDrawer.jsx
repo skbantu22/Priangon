@@ -132,6 +132,71 @@ const OrderDetailDrawer = ({ order, onClose }) => {
             </div>
           </div>
 
+          {/* PRODUCTS */}
+          <div className="border rounded-2xl p-4 space-y-4">
+            <div className="font-semibold flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-500" />
+              Products
+            </div>
+            <div className="space-y-3">
+              {order?.items?.map((item, index) => {
+                console.log("ORDER ITEM DATA:", item);
+
+                console.log("PRICE CHECK:", {
+                  variantSellingPrice: item?.variantId?.sellingPrice,
+                  itemPrice: item?.price,
+                  sellingPrice: item?.sellingPrice,
+                  unitPrice: item?.unitPrice,
+                  mrp: item?.mrp,
+                });
+
+                return (
+                  <div key={index} className="flex gap-4 p-3 border rounded-xl">
+                    {/* IMAGE */}
+                    <img
+                      src={
+                        item?.variantId?.media?.[0]?.url ||
+                        item?.productId?.media?.[0]?.url ||
+                        item?.media ||
+                        "/placeholder-product.png"
+                      }
+                      alt={item?.name || "product"}
+                      className="w-20 h-20 rounded-xl object-cover border"
+                    />
+
+                    {/* DETAILS */}
+                    <div className="flex-1">
+                      <h3 className="font-semibold">
+                        {item?.productId?.name || item?.name || "Product"}
+                      </h3>
+
+                      <div className="text-sm text-gray-500 mt-2 space-y-1">
+                        <p>
+                          Variant:{" "}
+                          {item?.variantId?.color || item?.color || "N/A"}
+                        </p>
+
+                        <p>
+                          Size: {item?.variantId?.size || item?.size || "N/A"}
+                        </p>
+
+                        <p>Quantity: {item?.quantity || 1}</p>
+
+                        <p className="font-semibold text-black">
+                          Price: ৳
+                          {item?.variantId?.sellingPrice ??
+                            item?.sellingPrice ??
+                            item?.unitPrice ??
+                            item?.price ??
+                            0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {/* PAYMENT */}
           <div className="border rounded-2xl p-4 space-y-4">
             <div className="font-semibold flex items-center gap-2">

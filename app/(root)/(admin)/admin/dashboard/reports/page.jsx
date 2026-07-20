@@ -33,98 +33,105 @@ export default function DashboardPage() {
     fetchStats();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="p-6 text-gray-500 font-medium">Loading dashboard...</div>
-    );
-  }
-
-  // 💰 Format helper (BDT style)
-  const formatBDT = (value) => {
-    return new Intl.NumberFormat("en-BD", {
+  const formatBDT = (value = 0) =>
+    new Intl.NumberFormat("en-BD", {
       style: "currency",
       currency: "BDT",
       minimumFractionDigits: 0,
     }).format(value);
-  };
 
   const stats = [
     {
       title: "Today's Orders",
-      value: data.todayOrders,
+      value: data?.todayOrders || 0,
       icon: ShoppingCart,
-      color: "text-blue-600",
       bg: "bg-blue-50",
+      iconBg: "bg-blue-500",
     },
     {
       title: "Total Orders",
-      value: data.totalOrders,
+      value: data?.totalOrders || 0,
       icon: Package,
-      color: "text-gray-700",
-      bg: "bg-gray-50",
+      bg: "bg-orange-50",
+      iconBg: "bg-orange-500",
     },
     {
       title: "Today's Sales",
-      value: formatBDT(data.todaySales),
+      value: formatBDT(data?.todaySales),
       icon: Wallet,
-      color: "text-green-600",
       bg: "bg-green-50",
+      iconBg: "bg-green-500",
     },
     {
       title: "Monthly Sales",
-      value: formatBDT(data.monthlySales),
+      value: formatBDT(data?.monthlySales),
       icon: TrendingUp,
-      color: "text-green-700",
-      bg: "bg-green-50",
+      bg: "bg-purple-50",
+      iconBg: "bg-purple-500",
     },
     {
       title: "Total Sales",
-      value: formatBDT(data.totalSales),
+      value: formatBDT(data?.totalSales),
       icon: BarChart3,
-      color: "text-emerald-600",
       bg: "bg-emerald-50",
+      iconBg: "bg-emerald-500",
     },
   ];
 
   return (
-    <div className="p-6 bg-white min-h-screen">
-      {/* HEADER */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="bg-white rounded-xl border shadow-sm px-6 py-4">
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard Overview</h1>
 
-        <p className="text-gray-500 mt-1">Sales and order analytics summary</p>
+        <p className="text-sm text-gray-500 mt-1">Sales & Order Analytics</p>
       </div>
 
-      {/* STATS GRID */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {stats.map((item, i) => {
-          const Icon = item.icon;
+      {/* Cards */}
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+        {loading
+          ? [...Array(5)].map((_, i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-6 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="space-y-3">
+                      <div className="h-3 w-24 rounded bg-gray-200" />
+                      <div className="h-7 w-20 rounded bg-gray-300" />
+                    </div>
 
-          return (
-            <Card
-              key={i}
-              className="border border-gray-200 shadow-sm hover:shadow-md transition rounded-2xl"
-            >
-              <CardContent className="p-6 flex items-center justify-between">
-                {/* TEXT */}
-                <div>
-                  <p className="text-sm text-gray-500">{item.title}</p>
+                    <div className="h-12 w-12 rounded-xl bg-gray-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          : stats.map((item, index) => {
+              const Icon = item.icon;
 
-                  <h2 className="text-xl font-bold text-gray-900 mt-2">
-                    {item.value}
-                  </h2>
-                </div>
-
-                {/* ICON */}
-                <div
-                  className={`h-12 w-12 flex items-center justify-center rounded-xl border ${item.bg}`}
+              return (
+                <Card
+                  key={index}
+                  className={`${item.bg} border-0 rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300`}
                 >
-                  <Icon className={`h-6 w-6 ${item.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{item.title}</p>
+
+                        <h2 className="text-2xl font-bold text-gray-900 mt-2">
+                          {item.value}
+                        </h2>
+                      </div>
+
+                      <div
+                        className={`w-12 h-12 rounded-xl ${item.iconBg} flex items-center justify-center shadow-md`}
+                      >
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
       </div>
     </div>
   );

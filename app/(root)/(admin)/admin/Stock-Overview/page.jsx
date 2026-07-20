@@ -186,13 +186,21 @@ export default function StockOverviewPage() {
                   : "text-gray-500"
               }`}
             >
-              All ({metrics.globalTotalItems})
+              All ({metrics.globalTotalStock})
             </button>
 
             {metrics.uniqueZones.map((zoneName) => {
               const count = data
                 .filter((z) => (z.showroom || "").trim() === zoneName)
-                .reduce((acc, z) => acc + (z.items?.length || 0), 0);
+                .reduce(
+                  (acc, z) =>
+                    acc +
+                    (z.items?.reduce(
+                      (sum, item) => sum + Number(item.stock || 0),
+                      0,
+                    ) || 0),
+                  0,
+                );
 
               return (
                 <button

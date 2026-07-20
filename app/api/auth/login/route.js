@@ -96,7 +96,8 @@ export async function POST(request) {
       id: getUser._id.toString(),
       email: getUser.email,
       role: getUser.role,
-      showroomId: getUser.showroomId,
+      showroomId: getUser.showroomId?.toString(),
+
       phone: getUser.phone,
       address: getUser.address,
       city: getUser.city,
