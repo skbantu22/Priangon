@@ -20,6 +20,7 @@ export const USER_PROFILE = "/profile";
 export const USER_ORDER = "/orders";
 export const USER_WISHLIST = "/wishlist";
 export const WEBSITE_ORDER_DETAILS = (order_id) => `/order-details/${order_id}`;
+export const USER_STOCK_CHECK = "/stock-check";
 
 export const WEBSITE_ORDERS_DETAILS = (order_id) =>
   `/order/success?id=${response.orderId}`;

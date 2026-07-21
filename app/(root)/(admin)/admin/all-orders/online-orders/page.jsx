@@ -176,7 +176,7 @@ export default function POSPage() {
   return (
     <div className="grid grid-cols-12 h-screen bg-white text-black font-sans overflow-hidden">
       {/* Left Column - Product Showcase */}
-      <div className="col-span-8 p-6 border-r border-gray-200 flex flex-col h-full">
+      <div className="col-span-8 h-screen p-6 border-r border-gray-200 flex flex-col">
         <div className="flex items-center gap-4 mb-6">
           <input
             ref={searchInputRef}
@@ -193,23 +193,32 @@ export default function POSPage() {
             Loading Products...
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-4 overflow-y-auto pb-20">
-            {filteredProducts.map((product) => (
-              <div
-                key={product._id}
-                onClick={() => setSelectedProduct(product)}
-                className="border border-gray-300 p-3 hover:border-black transition-all cursor-pointer"
-              >
-                <img
-                  src={product.media?.[0]?.secure_url}
-                  className="w-full h-40 object-cover mb-2"
-                />
-                <h3 className="font-bold text-sm uppercase">{product.name}</h3>
-                <p className="text-xs text-gray-500">
-                  {product.variants?.length} ভ্যারিয়েন্ট
-                </p>
-              </div>
-            ))}
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="grid grid-cols-4 gap-4 pb-6">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product._id}
+                  onClick={() => setSelectedProduct(product)}
+                  className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg hover:border-black transition-all duration-300 cursor-pointer"
+                >
+                  <img
+                    src={product.media?.[0]?.secure_url || "/placeholder.png"}
+                    alt={product.name}
+                    className="w-full h-48 object-cover"
+                  />
+
+                  <div className="p-3">
+                    <h3 className="font-bold text-sm leading-5 line-clamp-2">
+                      {product.name}
+                    </h3>
+
+                    <p className="text-xs text-gray-500 mt-1">
+                      {product.variants?.length} ভ্যারিয়েন্ট
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -420,73 +429,128 @@ export default function POSPage() {
       </div>
 
       {selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl border-2 border-black p-6 relative animate-in fade-in zoom-in duration-200">
-            {/* ক্লোজ বাটন */}
-            <button
-              onClick={() => setSelectedProduct(null)}
-              className="absolute top-4 right-4 text-xl font-black hover:scale-110 transition-transform"
-            >
-              ✕
-            </button>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative w-full max-w-7xl h-[88vh] bg-white rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,.35)] overflow-hidden flex flex-col">
+            {/* HEADER */}
+            <div className="sticky top-0 z-30 flex items-center justify-between px-8 py-5 border-b bg-gradient-to-r from-white to-gray-100">
+              <div>
+                <h2 className="text-3xl font-black tracking-tight">
+                  {selectedProduct.name}
+                </h2>
 
-            {/* প্রোডাক্ট টাইটেল */}
-            <h2 className="text-2xl font-black uppercase mb-6 tracking-tighter border-b-2 border-black pb-2">
-              {selectedProduct.name}
-            </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedProduct.variants?.length} Variants Available
+                </p>
+              </div>
 
-            {/* ভ্যারিয়েন্ট গ্রিড */}
-            <div className="grid grid-cols-2 gap-4">
-              {selectedProduct.variants?.map((v) => (
-                <div
-                  key={v._id}
-                  onClick={() => {
-                    if (v.stock > 0) {
-                      addToCart(selectedProduct, v);
-                      // ক্লোজ না করতে চাইলে নিচের লাইনটি বাদ দিন, ক্লোজ করতে চাইলে রাখুন
-                      setSelectedProduct(null);
-                    }
-                  }}
-                  className={`group relative border-2 border-black p-4 cursor-pointer transition-all duration-300
-              ${
-                v.stock > 0
-                  ? "hover:bg-black hover:text-white"
-                  : "opacity-40 cursor-not-allowed bg-gray-100"
-              }`}
-                >
-                  {/* ভ্যারিয়েন্ট ইমেজ (যদি থাকে) */}
-                  <div className="w-full h-40 bg-gray-50 mb-4 overflow-hidden">
-                    <img
-                      src={
-                        v.media?.secure_url ||
-                        selectedProduct.media?.[0]?.secure_url
-                      }
-                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                      alt="variant"
-                    />
-                  </div>
+              <button
+                onClick={() => setSelectedProduct(null)}
+                className="w-12 h-12 rounded-full border hover:bg-black hover:text-white transition-all duration-300 flex items-center justify-center text-2xl"
+              >
+                ✕
+              </button>
+            </div>
 
-                  {/* ভ্যারিয়েন্ট ইনফো */}
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="font-bold text-sm uppercase">
-                        {v.color} / {v.size}
-                      </p>
-                      <p className="text-[10px] font-bold opacity-60">
-                        STOCK: {v.stock}
-                      </p>
+            {/* BODY */}
+            <div className="flex-1 overflow-y-auto p-7 bg-gray-100">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                {selectedProduct.variants?.map((v) => {
+                  const image =
+                    v.media?.secure_url ||
+                    v.media?.[0]?.secure_url ||
+                    selectedProduct.media?.[0]?.secure_url ||
+                    "/placeholder.png";
+
+                  return (
+                    <div
+                      key={v._id}
+                      onClick={() => {
+                        if (v.stock > 0) {
+                          addToCart(selectedProduct, v);
+                          setSelectedProduct(null);
+                        }
+                      }}
+                      className={`group relative bg-white rounded-2xl overflow-hidden transition-all duration-300 border
+
+                ${
+                  v.stock > 0
+                    ? "cursor-pointer hover:-translate-y-1 hover:shadow-2xl hover:border-black"
+                    : "opacity-50 cursor-not-allowed"
+                }`}
+                    >
+                      {/* IMAGE */}
+
+                      <div className="relative">
+                        <img
+                          src={image}
+                          alt=""
+                          className="w-full aspect-[4/5] object-cover group-hover:scale-105 duration-500"
+                        />
+
+                        <div className="absolute top-3 left-3">
+                          <span
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold shadow
+
+                      ${
+                        v.stock > 0
+                          ? "bg-emerald-600 text-white"
+                          : "bg-red-600 text-white"
+                      }`}
+                          >
+                            {v.stock > 0 ? `${v.stock} In Stock` : "Sold Out"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* CONTENT */}
+
+                      <div className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-lg">{v.color}</h3>
+
+                            <p className="text-sm text-gray-500 mt-1">
+                              Size : {v.size}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase">
+                              Price
+                            </p>
+
+                            <h3 className="text-2xl font-black">
+                              ৳{Number(v.sellingPrice).toLocaleString()}
+                            </h3>
+                          </div>
+
+                          <button
+                            className={`px-5 py-2 rounded-xl text-sm font-bold transition
+
+                      ${
+                        v.stock > 0
+                          ? "bg-black text-white group-hover:bg-emerald-600"
+                          : "bg-gray-300 text-gray-600"
+                      }`}
+                          >
+                            {v.stock > 0 ? "Select" : "Unavailable"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {v.stock <= 0 && (
+                        <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex items-center justify-center">
+                          <span className="bg-red-600 text-white px-6 py-2 rounded-full font-bold">
+                            SOLD OUT
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <p className="font-black text-lg">৳{v.sellingPrice}</p>
-                  </div>
-
-                  {/* সিলেক্ট ইফেক্ট */}
-                  {v.stock <= 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 font-black tracking-widest text-black">
-                      SOLD OUT
-                    </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

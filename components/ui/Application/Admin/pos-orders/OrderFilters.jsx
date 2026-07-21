@@ -19,7 +19,7 @@ export default function OrderFilters({
 
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Order Filters</h2>
-          <p className="text-sm text-gray-500">Filter POS Orders</p>
+          <p className="text-sm text-gray-500">Filter POS & Online Orders</p>
         </div>
       </div>
 
@@ -41,6 +41,22 @@ export default function OrderFilters({
             className="w-full h-12 pl-10 pr-3 border rounded-lg"
           />
         </div>
+
+        {/* Source */}
+        <select
+          value={filters.source || ""}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              source: e.target.value,
+            }))
+          }
+          className="h-12 border rounded-lg px-3"
+        >
+          <option value="">All Sources</option>
+          <option value="pos">POS Orders</option>
+          <option value="online">Online Orders</option>
+        </select>
 
         {/* Showroom */}
         <select
@@ -92,27 +108,26 @@ export default function OrderFilters({
           className="h-12 border rounded-lg px-3"
         >
           <option value="">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Completed">Completed</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="Refunded">Refunded</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+          <option value="cancelled">Cancelled</option>
         </select>
 
         {/* Order Type */}
+        {/* Order Source */}
         <select
-          value={filters.orderType}
+          value={filters.source || ""}
           onChange={(e) =>
             setFilters((prev) => ({
               ...prev,
-              orderType: e.target.value,
+              source: e.target.value,
             }))
           }
           className="h-12 border rounded-lg px-3"
         >
-          <option value="">All Types</option>
-          <option value="POS">POS</option>
-          <option value="Online">Online</option>
-          <option value="Exchange">Exchange</option>
+          <option value="">All Orders</option>
+          <option value="pos">POS Orders</option>
+          <option value="online">Online Orders</option>
         </select>
 
         {/* Date From */}

@@ -11,60 +11,154 @@ import {
 export default function OrderSummary({ summary = {} }) {
   const showroomSales = summary.showroomSales || [];
 
+  const cards = [
+    // =====================
+    // TODAY
+    // =====================
+    {
+      title: "Today's Sales",
+      value: `৳ ${(summary.todaySales || 0).toLocaleString()}`,
+      icon: Wallet,
+      bg: "from-orange-500 to-red-500",
+    },
+    {
+      title: "Today's POS Sales",
+      value: `৳ ${(summary.todayPosSales || 0).toLocaleString()}`,
+      icon: Wallet,
+      bg: "from-orange-400 to-orange-600",
+    },
+    {
+      title: "Today's Online Sales",
+      value: `৳ ${(summary.todayOnlineSales || 0).toLocaleString()}`,
+      icon: Wallet,
+      bg: "from-red-400 to-pink-600",
+    },
+
+    // =====================
+    // MONTHLY
+    // =====================
+    {
+      title: "Monthly Sales",
+      value: `৳ ${(summary.monthSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-green-500 to-emerald-600",
+    },
+    {
+      title: "Monthly POS Sales",
+      value: `৳ ${(summary.monthPosSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-green-400 to-green-700",
+    },
+    {
+      title: "Monthly Online Sales",
+      value: `৳ ${(summary.monthOnlineSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-emerald-400 to-teal-600",
+    },
+
+    // =====================
+    // ALL TIME
+    // =====================
+    {
+      title: "Total Sales",
+      value: `৳ ${(summary.totalSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-blue-500 to-blue-700",
+    },
+    {
+      title: "POS Sales",
+      value: `৳ ${(summary.posSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-indigo-500 to-indigo-700",
+    },
+    {
+      title: "Online Sales",
+      value: `৳ ${(summary.onlineSales || 0).toLocaleString()}`,
+      icon: DollarSign,
+      bg: "from-purple-500 to-fuchsia-600",
+    },
+
+    // =====================
+    // ORDERS
+    // =====================
+    {
+      title: "Total Orders",
+      value: summary.totalOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-slate-700 to-slate-900",
+    },
+    {
+      title: "Monthly Orders",
+      value: summary.monthOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-emerald-500 to-green-700",
+    },
+    {
+      title: "POS Orders",
+      value: summary.totalPosOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-blue-500 to-indigo-700",
+    },
+    {
+      title: "Online Orders",
+      value: summary.totalOnlineOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-violet-500 to-purple-700",
+    },
+    {
+      title: "Today's POS Orders",
+      value: summary.todayPosOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-orange-500 to-red-500",
+    },
+    {
+      title: "Today's Online Orders",
+      value: summary.todayOnlineOrders || 0,
+      icon: ShoppingCart,
+      bg: "from-pink-500 to-rose-600",
+    },
+  ];
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Total Orders */}
-        <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm">Total Orders</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {cards.map((card) => {
+          const Icon = card.icon;
 
-              <h2 className="text-4xl font-bold mt-2">
-                {summary.totalOrders || 0}
-              </h2>
+          return (
+            <div
+              key={card.title}
+              className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${card.bg}
+        p-6 text-white shadow-lg transition-all duration-300
+        hover:-translate-y-2 hover:shadow-2xl`}
+            >
+              {/* Background Decoration */}
+              <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/10 blur-md group-hover:scale-125 transition duration-500" />
+
+              <div className="absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-black/10 blur-md" />
+
+              {/* Content */}
+              <div className="relative z-10 flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white/80 uppercase tracking-wide">
+                    {card.title}
+                  </p>
+
+                  <h2 className="mt-4 text-4xl font-extrabold tracking-tight">
+                    {card.value}
+                  </h2>
+                </div>
+
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md border border-white/20 shadow-lg">
+                  <Icon size={30} className="text-white" />
+                </div>
+              </div>
+
+              {/* Bottom line */}
+              <div className="relative z-10 mt-6 h-1 w-14 rounded-full bg-white/40 group-hover:w-24 transition-all duration-300" />
             </div>
-
-            <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-              <ShoppingCart size={28} />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Sales */}
-        <div className="rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-100 text-sm">Total Sales</p>
-
-              <h2 className="text-4xl font-bold mt-2">
-                ৳ {(summary.totalSales || 0).toLocaleString()}
-              </h2>
-            </div>
-
-            <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-              <DollarSign size={28} />
-            </div>
-          </div>
-        </div>
-
-        {/* Today's Sales */}
-        <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-100 text-sm">Today's Sales</p>
-
-              <h2 className="text-4xl font-bold mt-2">
-                ৳ {(summary.todaySales || 0).toLocaleString()}
-              </h2>
-            </div>
-
-            <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-              <Wallet size={28} />
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Showroom Performance */}
@@ -95,6 +189,8 @@ export default function OrderSummary({ summary = {} }) {
                   <th className="text-left px-6 py-4">Showroom</th>
                   <th className="text-center py-4">Orders</th>
                   <th className="text-center py-4">Sales</th>
+                  <th className="text-center py-4">POS Sales</th>
+                  <th className="text-center py-4">Online Sales</th>
                   <th className="text-center py-4">Performance</th>
                 </tr>
               </thead>
@@ -114,7 +210,15 @@ export default function OrderSummary({ summary = {} }) {
                     </td>
 
                     <td className="text-center font-bold text-green-600">
-                      ৳ {Number(item.totalSales).toLocaleString()}
+                      ৳ {Number(item.totalSales || 0).toLocaleString()}
+                    </td>
+
+                    <td className="text-center text-blue-600 font-semibold">
+                      ৳ {Number(item.posSales || 0).toLocaleString()}
+                    </td>
+
+                    <td className="text-center text-purple-600 font-semibold">
+                      ৳ {Number(item.onlineSales || 0).toLocaleString()}
                     </td>
 
                     <td className="text-center">

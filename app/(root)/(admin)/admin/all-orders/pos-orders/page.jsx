@@ -84,6 +84,7 @@ export default function POSOrdersPage() {
       const res = await fetch(url);
 
       const data = await res.json();
+      console.log("API Response:", data);
 
       if (data.success) {
         setOrders(data.orders || []);
