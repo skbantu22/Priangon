@@ -189,6 +189,10 @@ export async function GET(req) {
       }
 
       orders = await ShowroomOrderRequest.find(onlineFilter)
+        .populate({
+          path: "items.productId",
+          select: "name thumbnail featuredImage",
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
