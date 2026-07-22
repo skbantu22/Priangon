@@ -473,6 +473,13 @@ export default function POSPage() {
   );
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(search, selectedShowroomId);
+    }, 300); // debounce
+
+    return () => clearTimeout(timer);
+  }, [search, selectedShowroomId, fetchProducts]);
+  useEffect(() => {
     const fetchShowrooms = async () => {
       const currentUser = user?.data?.user || user?.user || user;
       if (currentUser?.role !== "admin") return;

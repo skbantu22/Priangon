@@ -109,7 +109,15 @@ export async function GET(req) {
       const matchVariant = item.variants.some((v) => {
         const barcode = (v.barcode || "").toLowerCase();
         const sku = (v.sku || "").toLowerCase();
-        return barcode === q || sku === q;
+        const color = (v.color || "").toLowerCase();
+        const size = (v.size || "").toLowerCase();
+
+        return (
+          barcode.includes(q) ||
+          sku.includes(q) ||
+          color.includes(q) ||
+          size.includes(q)
+        );
       });
 
       return productName.includes(q) || matchVariant;
