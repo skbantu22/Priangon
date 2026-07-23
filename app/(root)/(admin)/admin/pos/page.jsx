@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
 import { showToast } from "@/lib/showToast";
 import ProductGallery from "@/components/ui/Application/Admin/pos/ProductGallery";
 import CartSidebar from "@/components/ui/Application/Admin/pos/CartSidebar";
 import VariantModal from "@/components/ui/Application/Admin/pos/VariantModal";
+import { useDispatch, useSelector } from "react-redux";
+
+import {
+  addToCart as addToCartAction,
+  increaseQty as increaseQtyAction,
+  decreaseQty as decreaseQtyAction,
+  removeCartItem as removeCartItemAction,
+  clearCart,
+} from "@/store/reducer/posCartSlice";
 
 export default function POSPage() {
+  const dispatch = useDispatch();
+
+  const cart = useSelector((state) => state.posCart.cart);
   const user = useSelector((state) => state.authStore.auth);
 
   // Core States
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [showrooms, setShowrooms] = useState([]);
@@ -62,67 +72,56 @@ export default function POSPage() {
       return;
     }
 
-    setCart((prev) => {
-      const existing = prev.find((i) => i.variantId === variant._id);
+    // Redux cart থেকে existing item খুঁজে বের করো
+    const existing = cart.find((i) => i.variantId === variant._id);
 
-      if (existing) {
-        if (existing.qty + qty > variant.stock) {
-          showToast("Not enough stock ❌");
-          return prev;
-        }
-        return prev.map((i) =>
-          i.variantId === variant._id ? { ...i, qty: i.qty + qty } : i,
-        );
-      }
+    // Stock check
+    if (existing && existing.qty + qty > variant.stock) {
+      showToast("Not enough stock ❌");
+      return;
+    }
 
-      return [
-        ...prev,
-        {
-          _id: `${product._id}-${variant._id}`,
-          productId: product._id,
-          variantId: variant._id,
-          name: product.name,
-          color: variant.color,
-          size: variant.size,
-          price: variant.sellingPrice,
-          qty,
-          image: product.media?.[0]?.secure_url || "/placeholder.png",
-        },
-      ];
-    });
-  };
-
-  const removeCartItem = (variantId) => {
-    setCart((prev) => prev.filter((item) => item.variantId !== variantId));
-  };
-
-  const increaseQty = (variantId) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.variantId === variantId) {
-          const parentProduct = products.find((p) => p._id === item.productId);
-          const vMeta = parentProduct?.variants?.find(
-            (v) => v._id === variantId,
-          );
-          if (vMeta && item.qty + 1 > vMeta.stock) {
-            showToast("Not enough stock ❌");
-            return item;
-          }
-          return { ...item, qty: item.qty + 1 };
-        }
-        return item;
+    // Redux Action Dispatch
+    dispatch(
+      addToCartAction({
+        _id: `${product._id}-${variant._id}`,
+        productId: product._id,
+        variantId: variant._id,
+        name: product.name,
+        color: variant.color,
+        size: variant.size,
+        price: variant.sellingPrice,
+        qty,
+        image: product.media?.[0]?.secure_url || "/placeholder.png",
       }),
     );
   };
 
-  const decreaseQty = (variantId) =>
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.variantId === variantId ? { ...item, qty: item.qty - 1 } : item,
-        )
-        .filter((item) => item.qty > 0),
-    );
+  const removeCartItem = (variantId) => {
+    dispatch(removeCartItemAction(variantId));
+  };
+
+  const increaseQty = (variantId) => {
+    const item = cart.find((i) => i.variantId === variantId);
+
+    if (!item) return;
+
+    const parentProduct = products.find((p) => p._id === item.productId);
+
+    const vMeta = parentProduct?.variants?.find((v) => v._id === variantId);
+
+    // Stock check
+    if (vMeta && item.qty + 1 > vMeta.stock) {
+      showToast("Not enough stock ❌");
+      return;
+    }
+
+    dispatch(increaseQtyAction(variantId));
+  };
+
+  const decreaseQty = (variantId) => {
+    dispatch(decreaseQtyAction(variantId));
+  };
 
   // --- 🛠️ Complete Standard/Exchange Checkout Handler ---
   const handleCheckout = async (modalData = {}) => {
@@ -339,7 +338,7 @@ export default function POSPage() {
           : "Order created successfully ✅",
       );
 
-      setCart([]);
+      dispatch(clearCart());
 
       setDiscount(0);
 
@@ -384,7 +383,8 @@ export default function POSPage() {
 
       if (result.success) {
         showToast("Exchange completed successfully");
-        setCart([]);
+        dispatch(clearCart());
+
         setExchangeOpen(false);
         setExchangeData(null);
         fetchProducts("", selectedShowroomId);
@@ -535,7 +535,6 @@ export default function POSPage() {
 
       <CartSidebar
         cart={cart}
-        setCart={setCart}
         user={user}
         selectedShowroomId={selectedShowroomId}
         setSelectedShowroomId={setSelectedShowroomId}

@@ -1,13 +1,14 @@
-"use border";
+"use client";
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import CheckoutModal from "./CheckoutModal";
 import ExchangeModal from "./ExchangeModal";
+import { useDispatch } from "react-redux";
+import { clearCart } from "@/store/reducer/posCartSlice";
 
 export default function CartSidebar({
   cart,
-  setCart,
   subTotal,
   discount,
   setDiscount,
@@ -36,15 +37,17 @@ export default function CartSidebar({
   const [isExchangeMode, setIsExchangeMode] = useState(false);
   const [isExchangeOpen, setIsExchangeOpen] = useState(false);
 
+  const dispatch = useDispatch();
+
   // 💡 এক্সচেঞ্জের পর অ্যাডজাস্টেড নেট পেয়েবল অ্যামাউন্ট রাখার স্টেট
   const [exchangeTotal, setExchangeTotal] = useState(0);
 
   // 👑 মেইন ফিক্স: এক্সচেঞ্জ মডাল থেকে আসা সম্পূর্ণ অবজেক্টটি ধরে রাখার জন্য ক্যাশ স্টেট
   const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
 
-  useEffect(() => {
-    setCart([]);
-  }, [selectedShowroomId, setCart]);
+  // useEffect(() => {
+  //   dispatch(clearCart());
+  // }, [selectedShowroomId, dispatch]);
 
   const handleNumericInput = (val, setter) => {
     if (val === "") setter(0);

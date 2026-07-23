@@ -5,12 +5,15 @@ import { persistReducer, persistStore } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "./reducer/authReducer";
 import cartReducer from "./reducer/cartReducer";
+import posCartReducer from "./reducer/posCartSlice";
+
 import wishlistSlice from "./reducer/favReducer";
 import notificationReducer from "./reducer/notificationSlice";
 const rootReducer = combineReducers({
   authStore: authReducer,
   cartStore: cartReducer,
   wishlistStore: wishlistSlice,
+  posCart: posCartReducer,
   notification: notificationReducer,
 });
 
