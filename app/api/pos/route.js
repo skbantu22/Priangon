@@ -1,137 +1,208 @@
 import { connectDB } from "@/lib/databaseconnection";
 import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
-import "@/models/ProductVariant.model ";
+import ProductVariant from "@/models/ProductVariant.model ";
+
 import "@/models/Media.model";
 
 export async function GET(req) {
+  const start = performance.now();
+
   try {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
+
+    const page = Math.max(1, Number(searchParams.get("page") || 1));
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
     const showroomId = searchParams.get("showroomId");
-    const q = (searchParams.get("q") || "").trim().toLowerCase();
+    const categoryId = searchParams.get("categoryId");
+    const q = (searchParams.get("q") || "").trim();
 
-    // শোরুম ফিল্টার ভ্যালিডেশন চেক
-    const hasSpecificShowroom =
-      showroomId &&
-      showroomId !== "all" &&
-      showroomId !== "undefined" &&
-      showroomId.trim() !== "";
+    const query = {
+      deletedAt: null,
+    };
 
-    // ==========================================
-    // ১. শোরুমের স্টক ডাটা তুলে আনা
-    // ==========================================
-    const stockFilter = {};
-    if (hasSpecificShowroom) {
-      stockFilter.showroomId = showroomId;
+    if (categoryId && categoryId !== "all") {
+      query.category = categoryId;
     }
 
-    const allStocks = await ShowroomStock.find(stockFilter).lean();
+    if (q) {
+      const matchedVariants = await ProductVariant.find({
+        $or: [
+          {
+            barcode: {
+              $regex: q,
+              $options: "i",
+            },
+          },
+          {
+            sku: {
+              $regex: q,
+              $options: "i",
+            },
+          },
+        ],
+      })
+        .select("product")
+        .lean();
 
-    // স্টক ডাটা দ্রুত ম্যাপ করার জন্য সেটআপ
-    const stockMap = new Map();
-    const activeProductIds = new Set();
+      const variantProductIds = matchedVariants
+        .map((v) => v.product?.toString())
+        .filter(Boolean);
 
-    for (const stockItem of allStocks) {
-      const vid = stockItem.variantId ? stockItem.variantId.toString() : null;
-      const pid = stockItem.productId ? stockItem.productId.toString() : null;
+      query.$or = [
+        {
+          name: {
+            $regex: q,
+            $options: "i",
+          },
+        },
+        {
+          _id: {
+            $in: variantProductIds,
+          },
+        },
+      ];
+    }
+    // Showroom wise product filter
+    if (showroomId && showroomId !== "all") {
+      const showroomProducts = await ShowroomStock.find({
+        showroomId,
+      })
+        .select("productId")
+        .lean();
 
-      if (vid) {
-        const current = stockMap.get(vid) || 0;
-        stockMap.set(vid, current + Number(stockItem.stock || 0));
+      const productIds = [
+        ...new Set(
+          showroomProducts
+            .map((item) => item.productId?.toString())
+            .filter(Boolean),
+        ),
+      ];
+
+      if (!productIds.length) {
+        return Response.json({
+          success: true,
+          items: [],
+          page,
+          limit,
+          hasMore: false,
+        });
       }
-      if (pid) {
-        activeProductIds.add(pid);
-      }
+
+      query._id = {
+        $in: productIds,
+      };
     }
 
-    // ==========================================
-    // ২. প্রোডাক্ট মডেল থেকে ডাটা তুলে আনা
-    // ==========================================
-    const productQuery = { deletedAt: null };
+    console.log("showroomId:", showroomId);
 
-    // 💡 এখানে ফিল্টারটি অন থাকবে, যাতে নির্দিষ্ট শোরুম সিলেক্ট করলে কেবল সেই শোরুমের প্রোডাক্টগুলোই আসে
-    if (hasSpecificShowroom) {
-      productQuery._id = { $in: Array.from(activeProductIds) };
-    }
-
-    const allProducts = await Product.find(productQuery)
+    const products = await Product.find(query)
+      .select("name sellingPrice media variants")
+      .skip(skip)
+      .limit(limit)
       .populate({
         path: "media",
         select: "secure_url",
       })
       .populate({
         path: "variants",
-        select: "color size sku barcode mrp sellingPrice  media",
+        select: "color size sku barcode mrp sellingPrice media",
       })
       .lean();
 
-    // ==========================================
-    // ৩. প্রোডাক্টের সাথে স্টক সাজানো (জিরো স্টক সহ)
-    // ==========================================
-    const processedItems = allProducts.map((product) => {
-      const formattedVariants = (product.variants || []).map((variant) => {
-        const vid = variant._id ? variant._id.toString() : "";
-        const stockValue = stockMap.get(vid) || 0;
-
-        return {
-          ...variant,
-          showroomStock: stockValue, // স্টক ০ হলেও ভ্যালু ০ হিসেবেই পাস হবে, ভ্যারিয়েন্ট ডিলিট হবে না
-
-          image:
-            Array.isArray(variant.media) && variant.media.length > 0
-              ? typeof variant.media[0] === "string"
-                ? variant.media[0]
-                : variant.media[0]?.secure_url || ""
-              : "",
-        };
+    if (!products.length) {
+      return Response.json({
+        success: true,
+        items: [],
+        page,
+        limit,
+        hasMore: false,
       });
+    }
 
-      return {
-        productId: {
-          _id: product._id,
-          name: product.name,
-          sellingPrice: product.sellingPrice || 0,
-          media: Array.isArray(product.media) ? product.media : [],
-        },
-        variants: formattedVariants, // কোনো ফিল্টার ছাড়া সব ভ্যারিয়েন্ট যাবে
-      };
-    });
+    const variantIds = [];
 
-    // 💡 এখানে কোনো filter() করা হবে না, যাতে ভ্যারিয়েন্টের স্টক ০ হলেও প্রোডাক্টটি লিস্টে থাকে
-    const items = processedItems.filter((item) => {
-      if (!item.productId) return false;
-      if (!q) return true;
+    for (const product of products) {
+      for (const variant of product.variants || []) {
+        variantIds.push(variant._id);
+      }
+    }
 
-      const productName = (item.productId.name || "").toLowerCase();
+    const stockQuery = {
+      variantId: { $in: variantIds },
+    };
 
-      const matchVariant = item.variants.some((v) => {
-        const barcode = (v.barcode || "").toLowerCase();
-        const sku = (v.sku || "").toLowerCase();
-        const color = (v.color || "").toLowerCase();
-        const size = (v.size || "").toLowerCase();
+    // showroom filter
+    if (showroomId && showroomId !== "all") {
+      stockQuery.showroomId = showroomId;
+    }
 
-        return (
-          barcode.includes(q) ||
-          sku.includes(q) ||
-          color.includes(q) ||
-          size.includes(q)
-        );
-      });
+    const stocks = await ShowroomStock.find(stockQuery)
+      .select("variantId stock")
+      .lean();
 
-      return productName.includes(q) || matchVariant;
-    });
+    const stockMap = new Map();
+
+    for (const stock of stocks) {
+      const key = stock.variantId.toString();
+
+      stockMap.set(key, (stockMap.get(key) || 0) + Number(stock.stock || 0));
+    }
+
+    const items = products.map((product) => ({
+      productId: {
+        _id: product._id,
+        name: product.name,
+        sellingPrice: product.sellingPrice,
+        image: product.media?.[0]?.secure_url || "/placeholder.png",
+      },
+
+      variants: (product.variants || []).map((variant) => ({
+        _id: variant._id,
+        color: variant.color,
+        size: variant.size,
+        sku: variant.sku,
+        barcode: variant.barcode,
+        mrp: variant.mrp,
+        sellingPrice: variant.sellingPrice,
+
+        // showroom wise stock (or all showroom total)
+        showroomStock: stockMap.get(variant._id.toString()) ?? 0,
+
+        image:
+          variant.media?.[0]?.secure_url ||
+          product.media?.[0]?.secure_url ||
+          "/placeholder.png",
+      })),
+    }));
+
+    console.log(
+      "TOTAL Execution:",
+      (performance.now() - start).toFixed(2),
+      "ms",
+    );
 
     return Response.json({
       success: true,
       items,
+      page,
+      limit,
+      hasMore: products.length === limit,
     });
   } catch (error) {
-    console.error("POS API ERROR:", error);
+    console.error(error);
+
     return Response.json(
-      { success: false, message: "Server Error" },
-      { status: 500 },
+      {
+        success: false,
+      },
+      {
+        status: 500,
+      },
     );
   }
 }

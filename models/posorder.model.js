@@ -104,6 +104,12 @@ const POSOrderSchema = new mongoose.Schema(
     // =========================
     // CUSTOMER INFO
     // =========================
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      index: true,
+    },
     customerName: {
       type: String,
       default: "Walk-in Customer",

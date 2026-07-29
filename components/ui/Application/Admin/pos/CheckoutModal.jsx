@@ -11,7 +11,7 @@ export default function CheckoutModal({
   exchangeData = null,
 }) {
   const [payments, setPayments] = useState([
-    { type: "Mobile Banking", option: "", amount: total },
+    { type: "Cash", option: "", amount: total },
   ]);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [remark, setRemark] = useState("");
@@ -24,11 +24,50 @@ export default function CheckoutModal({
   const [saleDate, setSaleDate] = useState(
     new Date().toISOString().split("T")[0],
   );
+  const resetForm = () => {
+    setPayments([
+      {
+        type: "Cash",
+        option: "",
+        amount: total,
+      },
+    ]);
+
+    setDeliveryCharge(0);
+    setRemark("");
+
+    setSoldBy(cashierName || "Guest");
+
+    setCustomerName("");
+    setPhone("");
+    setAddress("");
+
+    setSaleDate(new Date().toISOString().split("T")[0]);
+  };
+  useEffect(() => {
+    if (phone.trim().length < 11) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customer/search?phone=${phone}`);
+        const data = await res.json();
+
+        if (data.success && data.customer) {
+          setCustomerName(data.customer.name || "");
+          setAddress(data.customer.address || "");
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [phone]);
 
   // Sync initial payment line item with the current incoming total
   useEffect(() => {
     if (isOpen) {
-      setPayments([{ type: "Mobile Banking", option: "", amount: total }]);
+      setPayments([{ type: "Cash", option: "", amount: total }]);
     }
   }, [isOpen, total]);
 
@@ -257,7 +296,7 @@ export default function CheckoutModal({
           </button>
           <button
             disabled={balanceDue > 0}
-            onClick={() =>
+            onClick={() => {
               onCheckout({
                 soldBy,
                 customerName,
@@ -272,8 +311,9 @@ export default function CheckoutModal({
                   variantId: i.variantId,
                   qty: i.qty,
                 })),
-              })
-            }
+              });
+              resetForm();
+            }}
             className={`px-12 py-3 font-bold rounded-none transition ${
               balanceDue > 0
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"

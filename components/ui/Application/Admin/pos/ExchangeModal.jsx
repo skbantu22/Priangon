@@ -7,7 +7,7 @@ export default function ExchangeModal({
   onClose,
   showroomId,
   onOpenCheckout,
-  currentPosCart = [], // 👈 ১. মেইন POS কার্ট রিসিভ করার প্রপস যোগ করা হয়েছে
+  currentPosCart = [],
 }) {
   const [orderNumber, setOrderNumber] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,7 +15,7 @@ export default function ExchangeModal({
 
   // Core Arrays
   const [returnedItems, setReturnedItems] = useState([]);
-  const [newItems, setNewItems] = useState([]); // Operational Exchange Cart Tray
+  const [newItems, setNewItems] = useState([]);
 
   const [reason, setReason] = useState("");
 
@@ -23,7 +23,21 @@ export default function ExchangeModal({
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
 
-  // 👈 ২. মডাল ওপেন হলে মেইন কার্ট আইটেমগুলোকে অটোমেটিক এক্সচেঞ্জ ট্রিতে সিঙ্ক করার ইফেক্ট
+  // Toast Notification State
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "success" });
+    }, 3000);
+  };
+
+  // Sync current POS cart items to exchange tray
   useEffect(() => {
     if (isOpen) {
       if (currentPosCart && currentPosCart.length > 0) {
@@ -41,7 +55,7 @@ export default function ExchangeModal({
               nestedVariant.stock ||
               item?.maxStock ||
               item?.stock ||
-              99, // সেফটি ব্যাকআপ স্টক
+              99,
           );
 
           const parsedPrice = parseFloat(
@@ -57,7 +71,6 @@ export default function ExchangeModal({
             productId: targetProductId,
             variantId: targetVariantId,
             name: nestedProduct.name || item?.name || "Catalog Product",
-
             image:
               nestedVariant?.media?.[0]?.secure_url ||
               nestedVariant?.media?.[0]?.url ||
@@ -65,7 +78,6 @@ export default function ExchangeModal({
               nestedProduct?.media?.[0]?.url ||
               item.image ||
               "",
-
             color: nestedVariant.color || item?.color || "N/A",
             size: nestedVariant.size || item?.size || "Standard",
             price: parsedPrice,
@@ -75,10 +87,6 @@ export default function ExchangeModal({
           };
         });
 
-        console.log(
-          "Synced current POS cart items directly to exchange tray:",
-          preLoadedItems,
-        );
         setNewItems(preLoadedItems);
       }
     }
@@ -100,23 +108,25 @@ export default function ExchangeModal({
   if (!isOpen) return null;
 
   // ==========================================
-  // SEARCH INVOICE (With HTML Error Safeguards)
+  // SEARCH INVOICE (Trimmed spaces & Toast added)
   // ==========================================
   const searchOrder = async () => {
-    if (!orderNumber) return;
+    const cleanOrderNumber = orderNumber.trim();
+    if (!cleanOrderNumber) {
+      showToast("Please enter a valid invoice number!", "error");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/showroom-orders?orderNumber=${orderNumber}`,
+        `/api/showroom-orders?orderNumber=${encodeURIComponent(cleanOrderNumber)}`,
       );
 
-      // Prevent crashing if Next.js returns an HTML error page (404/500)
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Server HTML Error Response:", errorText);
-        alert(
-          `Failed to load invoice (${res.status}). See server terminal logs.`,
-        );
+        showToast(`Failed to load invoice (${res.status})`, "error");
         return;
       }
 
@@ -124,27 +134,31 @@ export default function ExchangeModal({
 
       if (data?.order) {
         setOriginalOrder(data.order);
+        showToast("Invoice loaded successfully!");
       } else {
-        alert("Invoice not found!");
+        showToast("Invoice not found!", "error");
         setOriginalOrder(null);
       }
     } catch (err) {
       console.error("Order Search Error:", err);
-      alert("An unexpected error occurred while looking up the invoice.");
+      showToast(
+        "An unexpected error occurred while looking up invoice.",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   // ==========================================
-  // SEARCH PRODUCTS (With Robust Data Mapping)
+  // SEARCH PRODUCTS
   // ==========================================
   const searchProducts = async () => {
     if (!search.trim()) return;
 
     try {
       const res = await fetch(
-        `/api/wirehouse-stock?showroomId=${showroomId}&q=${search}`,
+        `/api/wirehouse-stock?showroomId=${showroomId}&q=${encodeURIComponent(search.trim())}`,
       );
 
       if (!res.ok) {
@@ -164,7 +178,7 @@ export default function ExchangeModal({
   };
 
   // ==========================================
-  // TOGGLE RETURNED ITEMS (With Safe Deep Checking)
+  // TOGGLE RETURNED ITEMS
   // ==========================================
   const toggleReturnItem = (item) => {
     const itemUniqueId = item.variantId?._id || item.variantId || item._id;
@@ -177,37 +191,30 @@ export default function ExchangeModal({
     } else {
       const cleanReturnItem = {
         productId: item.productId?._id || item.productId,
-
         variantId: itemUniqueId,
-
         name: item.name || item.productName || "Unknown Item",
-
         image: item.image || "",
-
         color: item.color || "",
-
         size: item.size || "",
-
         price: parseFloat(item.price || item.sellingPrice || 0),
-
         qty: parseInt(item.qty || 1),
-
         maxQty: parseInt(item.qty || 1),
-
         subtotal: parseFloat(item.subtotal || item.price * item.qty || 0),
       };
       setReturnedItems([...returnedItems, cleanReturnItem]);
     }
   };
 
-  // রিটার্ন আইটেমের কোয়ান্টিটি কমানো/বাড়ানো যদি কাস্টমার আংশিক রিটার্ন করতে চায়
   const updateReturnQty = (variantId, newQty) => {
     const val = parseInt(newQty) || 1;
     setReturnedItems((prev) =>
       prev.map((item) => {
         if (item.variantId === variantId) {
           if (val > item.maxQty) {
-            alert(`Cannot return more than purchased qty (${item.maxQty}) ❌`);
+            showToast(
+              `Cannot return more than purchased qty (${item.maxQty})`,
+              "error",
+            );
             return item;
           }
           return { ...item, qty: val, subtotal: val * item.price };
@@ -218,7 +225,7 @@ export default function ExchangeModal({
   };
 
   // ==========================================
-  // FIXED NEW CART SYSTEM (Handles Stock Validation)
+  // FIXED NEW CART SYSTEM
   // ==========================================
   const addToCart = (stockItem) => {
     const nestedProduct = stockItem?.productId || {};
@@ -226,8 +233,6 @@ export default function ExchangeModal({
 
     const targetProductId =
       nestedProduct._id || stockItem?.productId || stockItem?._id;
-
-    // 🛠️ ফিক্সড: আইডি ফ্ল্যাট বা নেস্টেড যাই হোক রিড করবে সেফলি
     const targetVariantId =
       nestedVariant._id || stockItem?.variantId || stockItem?._id;
 
@@ -235,17 +240,16 @@ export default function ExchangeModal({
       nestedVariant.showroomStock ||
         nestedVariant.stock ||
         stockItem?.stock ||
-        99, // ব্যাকআপ স্টক ভ্যালু যাতে এপিআই এর ভুলের জন্য ব্লক না হয়
+        99,
     );
 
     if (!targetVariantId) {
-      console.error("Missing variant properties!", stockItem);
-      alert("Cannot add item: Variant identifier properties are missing.");
+      showToast("Cannot add item: Variant identifier missing.", "error");
       return;
     }
 
     if (availableStock <= 0) {
-      alert("This item is completely out of stock in this showroom! ❌");
+      showToast("This item is completely out of stock!", "error");
       return;
     }
 
@@ -256,9 +260,7 @@ export default function ExchangeModal({
     if (existsIndex > -1) {
       const updated = [...newItems];
       if (updated[existsIndex].qty + 1 > availableStock) {
-        alert(
-          `Not enough stock available! Only ${availableStock} pcs in stock.`,
-        );
+        showToast(`Only ${availableStock} pcs available in stock.`, "error");
         return;
       }
       updated[existsIndex].qty += 1;
@@ -281,14 +283,10 @@ export default function ExchangeModal({
           productId: targetProductId,
           variantId: targetVariantId,
           name: nameString,
-
           image:
             nestedVariant?.media?.[0]?.secure_url ||
             nestedVariant?.media?.[0]?.url ||
-            coreProduct?.media?.[0]?.secure_url ||
-            coreProduct?.media?.[0]?.url ||
             "",
-
           color: nestedVariant.color || "",
           size: nestedVariant.size || "",
           price: parsedPrice,
@@ -306,7 +304,10 @@ export default function ExchangeModal({
 
     const updated = [...newItems];
     if (val > updated[index].maxStock) {
-      alert(`Only ${updated[index].maxStock} pcs available in stock ❌`);
+      showToast(
+        `Only ${updated[index].maxStock} pcs available in stock`,
+        "error",
+      );
       return;
     }
     updated[index].qty = val;
@@ -318,23 +319,18 @@ export default function ExchangeModal({
     setNewItems(newItems.filter((_, i) => i !== index));
   };
 
-  // ==========================================
-  // CALCULATIONS BAR
-  // ==========================================
+  // Calculations
   const returnedTotal = returnedItems.reduce((sum, i) => sum + i.subtotal, 0);
   const newTotal = newItems.reduce((sum, i) => sum + i.subtotal, 0);
   const difference = newTotal - returnedTotal;
 
-  // ==========================================
-  // ROUTE DYNAMICALLY TO CHECKOUT MODAL
-  // ==========================================
   const handleProceedToExchangeCheckout = () => {
     if (returnedItems.length === 0) {
-      alert("Please select at least one item to return!");
+      showToast("Please select at least one item to return!", "error");
       return;
     }
     if (newItems.length === 0) {
-      alert("Please add at least one new item to cart!");
+      showToast("Please add at least one new item to cart!", "error");
       return;
     }
 
@@ -347,38 +343,23 @@ export default function ExchangeModal({
         returnedItems: returnedItems.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
-
           productName: i.name,
-
           image: i.image || "",
-
           color: i.color,
-
           size: i.size,
-
           qty: i.qty,
-
           price: i.price,
-
           subtotal: i.subtotal,
         })),
-
         newItems: newItems.map((i) => ({
           productId: i.productId,
           variantId: i.variantId,
-
           productName: i.name,
-
           image: i.image || "",
-
           color: i.color,
-
           size: i.size,
-
           qty: i.qty,
-
           price: i.price,
-
           subtotal: i.subtotal,
         })),
       },
@@ -390,6 +371,18 @@ export default function ExchangeModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
+      {/* Toast Notification Popup */}
+      {toast.show && (
+        <div
+          className={`absolute top-6 right-6 z-[10000] px-4 py-2.5 shadow-lg text-white font-medium text-xs flex items-center gap-2 transition-all ${
+            toast.type === "error" ? "bg-red-600" : "bg-green-600"
+          }`}
+        >
+          <span>{toast.type === "error" ? "❌" : "✅"}</span>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div className="bg-white w-full max-w-7xl shadow-2xl rounded-none flex flex-col max-h-[92vh]">
         {/* HEADER */}
         <div className="bg-orange-500 text-white p-4 text-center font-bold text-xl flex-shrink-0 relative">
@@ -416,7 +409,7 @@ export default function ExchangeModal({
                 onChange={(e) => setOrderNumber(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchOrder()}
                 className="flex-1 border p-2 text-sm rounded-none focus:outline-orange-500"
-                placeholder="Invoice No (e.g. 2026101)"
+                placeholder="Invoice No (e.g. INV-00068)"
               />
               <button
                 type="button"
@@ -506,7 +499,6 @@ export default function ExchangeModal({
                       </div>
                     </div>
 
-                    {/* রিটার্ন কোয়ান্টিটি ইনপুট এডজাস্টমেন্ট */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-gray-500">Qty:</span>
                       <input

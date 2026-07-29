@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function numberToWords(num) {
   const a = [
@@ -69,8 +71,12 @@ function numberToWords(num) {
 }
 
 export default function PrintReceipt({ order }) {
+  // Auto Print popup after 0.5s so buttons are rendered first
   useEffect(() => {
-    window.print();
+    const timer = setTimeout(() => {
+      window.print();
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
@@ -88,7 +94,6 @@ export default function PrintReceipt({ order }) {
   const changeAmount = cashReceive - totalPaid;
   const totalInWords = numberToWords(Math.round(totalAmount));
 
-  // Date & Time formatting from the custom Server payload date configs
   const saleDate = order.saleDate ? new Date(order.saleDate) : new Date();
   const createdTime = order.createdAt ? new Date(order.createdAt) : saleDate;
 
@@ -105,231 +110,477 @@ export default function PrintReceipt({ order }) {
     hour12: true,
   });
 
-  console.log("ORDER =", order);
-  console.log("createdAt =", order.createdAt);
-  console.log("saleDate =", order.saleDate);
+  // Action Handlers
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF({
+      unit: "mm",
+      format: [90, 240],
+    });
+
+    let y = 8;
+    const pageWidth = 80;
+    const margin = 4;
+    const contentWidth = pageWidth - margin * 2;
+
+    // Header Info
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(showroomName, pageWidth / 2, y, { align: "center" });
+    y += 5;
+
+    if (order.showroom?.name) {
+      doc.setFontSize(9);
+      doc.text(`Branch: ${order.showroom.name}`, pageWidth / 2, y, {
+        align: "center",
+      });
+      y += 4;
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const splitAddress = doc.splitTextToSize(showroomAddress, contentWidth);
+    doc.text(splitAddress, pageWidth / 2, y, { align: "center" });
+    y += splitAddress.length * 3.5 + 1;
+
+    doc.text(`Mobile: ${showroomPhone}`, pageWidth / 2, y, { align: "center" });
+    y += 3.5;
+    doc.text(`Email: ${showroomEmail}`, pageWidth / 2, y, { align: "center" });
+    y += 5;
+
+    // Divider Line
+    doc.setLineDash([1, 1], 0);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 4;
+
+    // Meta Details
+    doc.setFontSize(8);
+    const meta = [
+      ["Invoice ID:", order.orderNumber || order._id || "20261011747"],
+      ["Sale Date:", `${orderDate} @ ${orderTime}`],
+      ["Customer:", order.customerName || "Walk-in"],
+      ["Phone:", order.customerPhone || "N/A"],
+      ["Sold By:", order.soldBy || "N/A"],
+    ];
+
+    meta.forEach(([label, val]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(String(val), margin + 22, y);
+      y += 4;
+    });
+
+    y += 2;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 4;
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("INVOICE", pageWidth / 2, y, { align: "center" });
+    y += 4;
+
+    // Products Table (Fixed undefined and table bracket issues)
+    const tableRows = (order.items || []).map((item, index) => {
+      const itemName = item.name || item.title || item.productName || "Item";
+      return [
+        index + 1,
+        itemName + (item.code ? `\n(${item.code})` : ""),
+        Number(item.price || 0).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+        }),
+        item.qty || 1,
+        ((item.price || 0) * (parseInt(item.qty) || 1)).toLocaleString(
+          "en-US",
+          { minimumFractionDigits: 2 },
+        ),
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Sl", "Name", "Price", "Qty", "Total"]],
+      body: tableRows,
+      theme: "grid", // grid দিলে টেবিলের লাইন পরিষ্কার থাকবে
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 1,
+        textColor: [0, 0, 0],
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        lineWidth: 0.2,
+        lineColor: [0, 0, 0],
+      },
+      columnStyles: {
+        0: { cellWidth: 6 },
+        1: { cellWidth: 33 },
+        2: { cellWidth: 15, halign: "right" },
+        3: { cellWidth: 8, halign: "center" },
+        4: { cellWidth: 18, halign: "right" },
+      },
+    });
+
+    // Get final Y position after table
+    y = doc.lastAutoTable.finalY + 4;
+    doc.setLineDash([], 0);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 4;
+
+    // Summary Calculations
+    const summaries = [
+      ["Subtotal :", Number(order.subTotal || totalAmount)],
+      ["Total :", Number(totalAmount)],
+      ["Paid :", Number(totalPaid)],
+      ["Cash Receive:", Number(cashReceive)],
+      ["Change :", Number(changeAmount)],
+    ];
+
+    doc.setFontSize(8);
+    summaries.forEach(([label, val]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, 35, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        val.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        pageWidth - margin,
+        y,
+        { align: "right" },
+      );
+      y += 4;
+    });
+
+    y += 2;
+    doc.setFont("helvetica", "bold");
+    doc.text(`In Words: ${totalInWords} TK Only`, margin, y);
+    y += 6;
+
+    // Payment Box
+    doc.setLineWidth(0.2);
+    doc.rect(margin, y, contentWidth, 12);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENTS", pageWidth / 2, y + 4, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.text(
+      `${order.paymentMethod || "Cash"} =              TK ${Number(totalPaid).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      margin + 3,
+      y + 9,
+    );
+    y += 16;
+
+    // Footer Notes
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "Note: No return policy. Exchange is allowed within three days from buying date.",
+      pageWidth / 2,
+      y,
+      { align: "center", maxWidth: contentWidth },
+    );
+    y += 4;
+    doc.text(
+      "Items purchased with discounts are not eligible for exchange.",
+      pageWidth / 2,
+      y,
+      { align: "center", maxWidth: contentWidth },
+    );
+    y += 3;
+    doc.text("Hijab items cannot be exchanged.", pageWidth / 2, y, {
+      align: "center",
+      maxWidth: contentWidth,
+    });
+    y += 4;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      "This is a computer generated copy. No signature required.",
+      pageWidth / 2,
+      y,
+      { align: "center", maxWidth: contentWidth },
+    );
+
+    doc.save(`Invoice-${order.orderNumber || order._id}.pdf`);
+  };
+
+  const handleWhatsApp = () => {
+    const phone = (order.customerPhone || "").replace(/\D/g, "");
+
+    if (!phone) {
+      alert("Customer phone not found!");
+      return;
+    }
+
+    const invoiceLink = `${window.location.origin}/invoice/${order.orderNumber}`;
+
+    const message = `🛍️ Thank you for shopping with Mini Thailand!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
+    window.open(
+      `https://wa.me/88${phone}?text=${encodeURIComponent(message)}`,
+      "_blank",
+    );
+  };
 
   return (
-    <div
-      id="receipt"
-      className="mx-auto p-4 font-sans text-[12px] leading-relaxed text-black bg-white"
-      style={{ width: "80mm", color: "#000000" }}
-    >
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        @media print {
-          body * { visibility: hidden; background: #fff !important; }
-          #receipt, #receipt * { visibility: visible; }
-          #receipt { position: absolute; left: 0; top: 0; width: 80mm !important; }
-        }
-      `,
-        }}
-      />
+    <div className="max-w-[80mm] mx-auto">
+      {/* Action Buttons Panel (Hidden during print) */}
+      <div className="print:hidden flex flex-wrap gap-2 justify-center mb-4 p-2 bg-gray-100 rounded shadow-sm">
+        <button
+          onClick={handlePrint}
+          className="bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
+        >
+          🖨️ Print
+        </button>
 
-      {/* Header Info */}
-      <div className="text-center mb-3">
-        <h2 className="font-serif font-bold text-[22px] tracking-wide text-gray-800">
-          {showroomName}
-        </h2>
-        {order.showroom?.name && (
-          <p className="text-[11px] font-bold text-gray-700 uppercase mt-0.5">
-            Branch: {order.showroom.name}
-          </p>
-        )}
-        <p className="whitespace-pre-line text-[11px] leading-4 text-gray-700 mt-1">
-          {showroomAddress}
-        </p>
-        <p className="text-[11px] text-gray-700 mt-0.5">
-          Mobile: {showroomPhone}
-        </p>
-        <p className="text-[11px] text-gray-700">Email: {showroomEmail}</p>
+        <button
+          onClick={handleDownloadPDF}
+          className="bg-red-600 hover:bg-red-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
+        >
+          📥 Download PDF
+        </button>
+
+        <button
+          onClick={handleWhatsApp}
+          className="bg-green-600 hover:bg-green-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
+        >
+          📱 Send WhatsApp
+        </button>
       </div>
 
-      {/* Core Metadata Specifications Grid Block */}
-      <div className="space-y-0.5 text-[11px] px-1 text-gray-800 border-t border-b border-gray-200 py-1.5 my-2">
-        <div className="flex">
-          <span className="w-32 font-medium">Invoice ID:</span>
-          <span>{order.orderNumber || order._id || "20261011747"}</span>
-        </div>
-        <div className="flex">
-          <span className="w-32 font-medium">Sale Date:</span>
-          <span>
-            {orderDate} @ {orderTime}
-          </span>
-        </div>
-        <div className="flex">
-          <span className="w-32 font-medium">Customer Name:</span>
-          <span>{order.customerName}</span>
-        </div>
-        <div className="flex">
-          <span className="w-32 font-medium">Phone:</span>
-          <span>{order.customerPhone}</span>
-        </div>
-        <div className="flex font-semibold text-gray-950">
-          <span className="w-32">Sold By:</span>
-          <span>{order.soldBy}</span>
-        </div>
-      </div>
-
-      {/* Barcode Element */}
-      <div className="my-3 text-center">
-        <img
-          src={`https://barcode.tec-it.com/barcode.ashx?data=${order.orderNumber || "20261011747"}&code=Code128&translate-esc=true`}
-          alt="barcode"
-          className="mx-auto h-8 w-[85%] object-stretch block"
+      {/* Main Receipt Content */}
+      <div
+        id="receipt"
+        className="mx-auto p-4 font-sans text-[12px] leading-relaxed text-black bg-white"
+        style={{ width: "80mm", color: "#000000", background: "#ffffff" }}
+      >
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+            @media print {
+              body * { visibility: hidden; background: #fff !important; }
+              #receipt, #receipt * { visibility: visible; }
+              #receipt { position: absolute; left: 0; top: 0; width: 80mm !important; }
+            }
+          `,
+          }}
         />
-      </div>
 
-      <h3 className="text-center font-bold text-[13px] tracking-wider my-1 uppercase">
-        INVOICE
-      </h3>
+        {/* Header Info */}
+        <div className="text-center mb-3">
+          <h2 className="font-serif font-bold text-[22px] tracking-wide text-gray-800">
+            {showroomName}
+          </h2>
+          {order.showroom?.name && (
+            <p className="text-[11px] font-bold text-gray-700 uppercase mt-0.5">
+              Branch: {order.showroom.name}
+            </p>
+          )}
+          <p className="whitespace-pre-line text-[11px] leading-4 text-gray-700 mt-1">
+            {showroomAddress}
+          </p>
+          <p className="text-[11px] text-gray-700 mt-0.5">
+            Mobile: {showroomPhone}
+          </p>
+          <p className="text-[11px] text-gray-700">Email: {showroomEmail}</p>
+        </div>
 
-      {/* Products Grid Layout Table */}
-      <table className="w-full text-left border-collapse text-[11px] mt-2">
-        <thead>
-          <tr className="border-b border-black font-semibold text-gray-800">
-            <th className="w-[8%] pb-1">Sl.</th>
-            <th className="w-[47%] pb-1">Name</th>
-            <th className="text-right w-[20%] pb-1">Price</th>
-            <th className="text-center w-[10%] pb-1">Qty</th>
-            <th className="text-right w-[15%] pb-1">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(order.items || []).map((item, index) => (
-            <tr
-              key={index}
-              className="align-top border-b border-black/5 last:border-b-0"
-            >
-              <td className="py-1 text-gray-800">{index + 1}</td>
-              <td className="py-1 pr-1 break-words">
-                <span className="block lowercase text-gray-800">
-                  {item.name}
-                </span>
-                {item.code && (
-                  <span className="block text-[10px] tracking-wide text-gray-600">
-                    {item.code}
+        {/* Core Metadata Specifications Grid Block */}
+        <div className="space-y-0.5 text-[11px] px-1 text-gray-800 border-t border-b border-gray-200 py-1.5 my-2">
+          <div className="flex">
+            <span className="w-32 font-medium">Invoice ID:</span>
+            <span>{order.orderNumber || order._id || "20261011747"}</span>
+          </div>
+          <div className="flex">
+            <span className="w-32 font-medium">Sale Date:</span>
+            <span>
+              {orderDate} @ {orderTime}
+            </span>
+          </div>
+          <div className="flex">
+            <span className="w-32 font-medium">Customer Name:</span>
+            <span>{order.customerName}</span>
+          </div>
+          <div className="flex">
+            <span className="w-32 font-medium">Phone:</span>
+            <span>{order.customerPhone}</span>
+          </div>
+          <div className="flex font-semibold text-gray-950">
+            <span className="w-32">Sold By:</span>
+            <span>{order.soldBy}</span>
+          </div>
+        </div>
+
+        {/* Barcode Element */}
+        <div className="my-3 text-center">
+          <img
+            src={`https://barcode.tec-it.com/barcode.ashx?data=${order.orderNumber || "20261011747"}&code=Code128&translate-esc=true`}
+            alt="barcode"
+            className="mx-auto h-8 w-[85%] object-stretch block"
+          />
+        </div>
+
+        <h3 className="text-center font-bold text-[13px] tracking-wider my-1 uppercase">
+          INVOICE
+        </h3>
+
+        {/* Products Grid Layout Table */}
+        <table className="w-full text-left border-collapse text-[11px] mt-2">
+          <thead>
+            <tr className="border-b border-black font-semibold text-gray-800">
+              <th className="w-[8%] pb-1">Sl.</th>
+              <th className="w-[47%] pb-1">Name</th>
+              <th className="text-right w-[20%] pb-1">Price</th>
+              <th className="text-center w-[10%] pb-1">Qty</th>
+              <th className="text-right w-[15%] pb-1">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(order.items || []).map((item, index) => (
+              <tr
+                key={index}
+                className="align-top border-b border-black/5 last:border-b-0"
+              >
+                <td className="py-1 text-gray-800">{index + 1}</td>
+                <td className="py-1 pr-1 break-words">
+                  <span className="block lowercase text-gray-800">
+                    {item.name}
                   </span>
-                )}
-              </td>
-              <td className="text-right py-1 align-bottom text-gray-800">
-                {Number(item.price).toLocaleString("en-US", {
+                  {item.code && (
+                    <span className="block text-[10px] tracking-wide text-gray-600">
+                      {item.code}
+                    </span>
+                  )}
+                </td>
+                <td className="text-right py-1 align-bottom text-gray-800">
+                  {Number(item.price).toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+                <td className="text-center py-1 align-bottom text-gray-800">
+                  {item.qty}
+                </td>
+                <td className="text-right py-1 align-bottom font-medium text-gray-900">
+                  {(item.price * (parseInt(item.qty) || 1)).toLocaleString(
+                    "en-US",
+                    { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="border-t border-black my-1" />
+
+        {/* Calculations Pricing Summary */}
+        <div className="text-[11px] font-medium space-y-0.5 pr-0.5 text-gray-900">
+          <div className="flex justify-end space-x-4">
+            <span className="w-28 text-right font-bold">Subtotal :</span>
+            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
+              {Number(order.subTotal || totalAmount).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          <div className="flex justify-end space-x-4">
+            <span className="w-28 text-right font-bold">Total :</span>
+            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
+              {Number(totalAmount).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          <div className="flex justify-end space-x-4">
+            <span className="w-28 text-right font-bold">Paid :</span>
+            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
+              {Number(totalPaid).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          <div className="flex justify-end space-x-4">
+            <span className="w-28 text-right font-bold">Cash Receive:</span>
+            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
+              {Number(cashReceive).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+          <div className="flex justify-end space-x-4">
+            <span className="w-28 text-right font-bold">Change:</span>
+            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
+              {Number(changeAmount).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        </div>
+
+        {/* Words Summary */}
+        <div className="text-[11px] font-medium text-gray-800 mt-3 px-1">
+          <strong>In Words:</strong> {totalInWords} TK Only
+        </div>
+
+        {/* Payment Block */}
+        <div className="mt-3 border border-black text-[11px]">
+          <div className="text-center font-bold tracking-wider py-0.5 border-b border-black bg-gray-50 uppercase">
+            Payments
+          </div>
+          <div className="p-1 px-2 space-y-0.5">
+            <div className="flex justify-between text-gray-800">
+              <span>{order.paymentMethod || "Cash"}</span>
+              <span>
+                =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
+                {Number(totalPaid).toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
-              </td>
-              <td className="text-center py-1 align-bottom text-gray-800">
-                {item.qty}
-              </td>
-              <td className="text-right py-1 align-bottom font-medium text-gray-900">
-                {(item.price * (parseInt(item.qty) || 1)).toLocaleString(
-                  "en-US",
-                  { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="border-t border-black my-1" />
-
-      {/* Calculations Pricing Summary */}
-      <div className="text-[11px] font-medium space-y-0.5 pr-0.5 text-gray-900">
-        <div className="flex justify-end space-x-4">
-          <span className="w-28 text-right font-bold">Subtotal :</span>
-          <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-            {Number(order.subTotal || totalAmount).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-        <div className="flex justify-end space-x-4">
-          <span className="w-28 text-right font-bold">Total :</span>
-          <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-            {Number(totalAmount).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-        <div className="flex justify-end space-x-4">
-          <span className="w-28 text-right font-bold">Paid :</span>
-          <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-            {Number(totalPaid).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-        <div className="flex justify-end space-x-4">
-          <span className="w-28 text-right font-bold">Cash Receive:</span>
-          <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-            {Number(cashReceive).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-        <div className="flex justify-end space-x-4">
-          <span className="w-28 text-right font-bold">Change:</span>
-          <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-            {Number(changeAmount).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-      </div>
-
-      {/* Words Summary */}
-      <div className="text-[11px] font-medium text-gray-800 mt-3 px-1">
-        <strong>In Words:</strong> {totalInWords} TK Only
-      </div>
-
-      {/* Payment Block */}
-      <div className="mt-3 border border-black text-[11px]">
-        <div className="text-center font-bold tracking-wider py-0.5 border-b border-black bg-gray-50 uppercase">
-          Payments
-        </div>
-        <div className="p-1 px-2 space-y-0.5">
-          <div className="flex justify-between text-gray-800">
-            <span>{order.paymentMethod || "Cash"}</span>
-            <span>
-              =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
-              {Number(totalPaid).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-          <div className="flex justify-between font-bold border-t border-dashed border-black/40 pt-0.5 text-gray-950">
-            <span>Total</span>
-            <span>
-              =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
-              {Number(totalPaid).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+              </span>
+            </div>
+            <div className="flex justify-between font-bold border-t border-dashed border-black/40 pt-0.5 text-gray-950">
+              <span>Total</span>
+              <span>
+                =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
+                {Number(totalPaid).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Footer Notes */}
-      <div className="text-center mt-5 px-1 space-y-1 text-[9px] leading-3 text-gray-600 font-sans font-medium italic opacity-90">
-        <p className="border-t border-dashed border-black/20 pt-2">
-          Note: No return policy. Exchange is allowed within three days from the
-          buying date.
-        </p>
-        <p>Items purchased with discounts are not eligible for exchange.</p>
-        <p>Hijab items cannot be exchanged.</p>
-        <p className="text-black font-semibold not-italic mt-2">
-          This is a computer generated copy. No signature is required from the
-          company.
-        </p>
+        {/* Footer Notes */}
+        <div className="text-center mt-5 px-1 space-y-1 text-[9px] leading-3 text-gray-600 font-sans font-medium italic opacity-90">
+          <p className="border-t border-dashed border-black/20 pt-2">
+            Note: No return policy. Exchange is allowed within three days from
+            the buying date.
+          </p>
+          <p>Items purchased with discounts are not eligible for exchange.</p>
+          <p>Hijab items cannot be exchanged.</p>
+          <p className="text-black font-semibold not-italic mt-2">
+            This is a computer generated copy. No signature is required from the
+            company.
+          </p>
+        </div>
       </div>
     </div>
   );

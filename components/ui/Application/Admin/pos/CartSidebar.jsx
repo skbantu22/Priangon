@@ -1,340 +1,506 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import CheckoutModal from "./CheckoutModal";
-import ExchangeModal from "./ExchangeModal";
-import { useDispatch } from "react-redux";
-import { clearCart } from "@/store/reducer/posCartSlice";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  setDiscount,
+  setVat,
+  selectPosSummary,
+} from "@/store/reducer/posCartSlice";
+import { showToast } from "@/lib/showToast";
 
 export default function CartSidebar({
-  cart,
-  subTotal,
-  discount,
-  setDiscount,
-  total,
-  totalQty,
+  expanded,
+  setExpanded,
+  cart = [],
+  products = [],
+  addToCart,
   removeCartItem,
   increaseQty,
   decreaseQty,
-  user,
-  selectedShowroomId,
-  setSelectedShowroomId,
-  showrooms,
-  handleCheckout,
-  checkoutLoading,
-  discountType,
-  setDiscountType,
-  vat,
-  setVat,
-  vatType,
-  setVatType,
-  discountAmount,
-  vatAmount,
-  handleExchange,
+  searchTerm = "",
+  setSearchTerm,
+  customers = [],
+  selectedCustomer,
+  setSelectedCustomer,
+  onAddNewCustomer,
+  exchangeTotal = 0,
 }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isExchangeMode, setIsExchangeMode] = useState(false);
-  const [isExchangeOpen, setIsExchangeOpen] = useState(false);
-
   const dispatch = useDispatch();
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
 
-  // 💡 এক্সচেঞ্জের পর অ্যাডজাস্টেড নেট পেয়েবল অ্যামাউন্ট রাখার স্টেট
-  const [exchangeTotal, setExchangeTotal] = useState(0);
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  // 👑 মেইন ফিক্স: এক্সচেঞ্জ মডাল থেকে আসা সম্পূর্ণ অবজেক্টটি ধরে রাখার জন্য ক্যাশ স্টেট
-  const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
+  // ================= Redux State & Summary =================
+  const summary = useSelector(selectPosSummary) || {};
+  const {
+    subtotal = 0,
+    discount = 0,
+    vat = 0,
+    total = 0,
+    totalQty = 0,
+  } = summary;
 
-  // useEffect(() => {
-  //   dispatch(clearCart());
-  // }, [selectedShowroomId, dispatch]);
+  const discountType = useSelector(
+    (state) => state.posCart?.discountType || "fixed",
+  );
+  const discountValue = useSelector(
+    (state) => state.posCart?.discountValue || 0,
+  );
+  const vatValue = useSelector((state) => state.posCart?.vatValue || 0);
 
-  const handleNumericInput = (val, setter) => {
-    if (val === "") setter(0);
-    else {
-      const num = parseFloat(val);
-      setter(isNaN(num) ? 0 : num);
+  const currentExchangeTotal = Number(exchangeTotal) || 0;
+  const payableAmount = Math.max(
+    0,
+    (Number(total) || 0) - currentExchangeTotal,
+  );
+
+  useEffect(() => {
+    console.log("Products:", products.length);
+    console.log("Search:", searchTerm);
+  }, [products, searchTerm]);
+
+  // ---------------- 1. OPTIMIZED SEARCHABLE ITEMS (useMemo used to prevent Infinite Loop) ----------------
+  const allSearchableItems = useMemo(() => {
+    const items = [];
+
+    (products || []).forEach((item) => {
+      const hasValidProductId =
+        item?.productId &&
+        typeof item.productId === "object" &&
+        Object.keys(item.productId).length > 0;
+
+      const p = hasValidProductId ? item.productId : item;
+
+      const variants = item?.variants?.length
+        ? item.variants
+        : p?.variants || [];
+
+      if (variants.length > 0) {
+        variants.forEach((v) => {
+          items.push({
+            product: p,
+            variant: v,
+            variantId: v._id || v.id, // ইউনিক ভ্যারিয়েন্ট আইডি ট্র্যাক করার জন্য দরকার
+            name: p?.name || item?.name || "Unnamed",
+            barcode: v.barcode || "",
+            color: v.color || "",
+            size: v.size || "",
+            stock: v.showroomStock ?? v.stock ?? 0,
+            price: v.sellingPrice || p?.sellingPrice || 0,
+          });
+        });
+      }
+    });
+
+    return items;
+  }, [products]);
+
+  // ---------------- 2. SEARCH FILTERED RESULTS ----------------
+  const searchResults = useMemo(() => {
+    const term = (searchTerm || "").trim().toLowerCase();
+    if (!term) return [];
+
+    return allSearchableItems.filter(
+      (i) =>
+        i.name.toLowerCase().includes(term) ||
+        i.barcode.toLowerCase().includes(term) ||
+        (i.color && i.color.toLowerCase().includes(term)) ||
+        (i.size && i.size.toLowerCase().includes(term)),
+    );
+  }, [searchTerm, allSearchableItems]);
+
+  // ---------------- 3. AUTO SHOW/HIDE DROPDOWN ----------------
+  useEffect(() => {
+    if ((searchTerm || "").trim() && searchResults.length > 0) {
+      setShowDropdown(true);
+    } else {
+      setShowDropdown(false);
+    }
+  }, [searchTerm, searchResults]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        !inputRef.current?.contains(event.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ---------------- HANDLE ADD TO CART ----------------
+  const handleSelectItem = (item) => {
+    // কার্টে অলরেডি আইটেমটি কত পিস আছে তা চেক করা
+    const existingCartItem = cart.find(
+      (cartItem) =>
+        (cartItem.variantId || cartItem.id) === (item.variantId || item.id),
+    );
+    const currentQtyInCart = existingCartItem
+      ? Number(existingCartItem.qty)
+      : 0;
+    const maxStock = Number(item.stock) || 0;
+
+    // স্টক শেষ হলে বা স্টক লিমিট ক্রস করলে
+    if (maxStock <= 0 || currentQtyInCart >= maxStock) {
+      showToast(
+        "error",
+        `"${item.name}" স্টক লিমিট শেষ! সর্বোচ্চ ${maxStock} পিস পাওয়া যাবে।`,
+      );
+      return;
+    }
+
+    if (addToCart && item.product) {
+      addToCart(item.product, item.variant, 1);
+
+      showToast("success", `"${item.name}" কার্টে যোগ করা হয়েছে!`);
+
+      if (setSearchTerm) setSearchTerm("");
+      setShowDropdown(false);
+      inputRef.current?.focus();
     }
   };
 
-  const currentUser = user?.data?.user || user?.user || user;
-  const userRole = currentUser?.role;
+  // ---------------- HANDLE INCREASE QTY WITH STOCK CHECK ----------------
+  const handleIncreaseQty = (item) => {
+    const currentQty = Number(item.qty) || 0;
 
-  const hideButtons =
-    userRole === "admin" && (!selectedShowroomId || selectedShowroomId === "");
+    // মেইন প্রোডাক্ট লিস্ট বা সার্চ আইটেম থেকে আসল স্টক খুঁজে বের করা
+    const targetSearchItem = allSearchableItems.find(
+      (i) => (i.variantId || i.id) === (item.variantId || item.id),
+    );
+
+    // আইটেমের নিজস্ব অবজেক্টে স্টক না থাকলে ওভারঅল লিস্ট থেকে নেব, অন্যথায় আইটেমের স্টক ধরব
+    const maxStock = Number(targetSearchItem?.stock ?? item.stock) || 0;
+
+    if (maxStock > 0 && currentQty >= maxStock) {
+      showToast(
+        "error",
+        `স্টক লিমিট শেষ! সর্বোচ্চ ${maxStock} পিস পাওয়া যাবে।`,
+      );
+      return;
+    }
+
+    if (increaseQty) {
+      increaseQty(item.variantId || item.id);
+    }
+  };
+
+  // ---------------- BARCODE SCANNER (ENTER PRESS AUTO-ADD) ----------------
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      const code = (searchTerm || "").trim().toLowerCase();
+      if (!code) return;
+
+      // ১. পারফেক্ট বারকোড ম্যাচ খোঁজা
+      let matchedItem = allSearchableItems.find(
+        (i) => i.barcode && i.barcode.toLowerCase() === code,
+      );
+
+      // ২. পারফেক্ট ম্যাচ না পেলে ১ম রিজাল্ট অ্যাড হবে
+      if (!matchedItem && searchResults.length > 0) {
+        matchedItem = searchResults[0];
+      }
+
+      if (matchedItem) {
+        handleSelectItem(matchedItem);
+      } else {
+        showToast("error", "কোনো প্রোডাক্ট পাওয়া যায়নি!");
+      }
+    }
+  };
 
   return (
-    <div className="lg:col-span-4 bg-white p-6 border-l border-gray-100 shadow-xl flex flex-col justify-between min-h-screen">
-      <div>
-        <div className="flex justify-between items-center border-b pb-4 mb-4">
-          <h2 className="font-bold text-lg text-gray-800">Current Checkout</h2>
-          <span className="bg-green-100 text-green-700 text-xs px-3 py-1 font-bold">
-            {totalQty} Items
-          </span>
-        </div>
+    <div className="lg:col-span-6 flex h-full min-h-0 w-full flex-col justify-between overflow-hidden border-l border-gray-200 bg-white text-base">
+      {/* ================= 1. TOP HEADER: Search & Customer ================= */}
+      <div className="p-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          title={expanded ? "Collapse Cart" : "Expand Cart"}
+          className="w-11 h-11 bg-[#1d3557] hover:bg-[#15263f] text-white rounded flex items-center justify-center transition shrink-0 cursor-pointer"
+        >
+          <span className="text-2xl leading-none font-semibold">⇄</span>
+        </button>
 
-        <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
-          {cart.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-100">
-              <p className="text-4xl mb-2">🛍️</p>
-              <p className="text-sm font-medium">No products added</p>
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div
-                key={item.variantId}
-                className="flex gap-3 items-center bg-gray-50 p-2 border border-gray-100"
+        {/* SEARCH BAR */}
+        <div className="relative flex-1 min-w-[200px]">
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm && setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (searchResults.length > 0) setShowDropdown(true);
+              }}
+              placeholder="Search Name / Scan Barcode..."
+              className="w-full pl-9 pr-8 py-2 border-2 border-blue-400 focus:border-blue-600 rounded-md text-sm font-medium outline-none bg-white text-gray-900 shadow-sm transition-all"
+            />
+            <span className="absolute left-2.5 top-2.5 text-gray-400 text-base">
+              🔍
+            </span>
+            {searchTerm && (
+              <span
+                onClick={() => {
+                  if (setSearchTerm) setSearchTerm("");
+                  setShowDropdown(false);
+                }}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-sm font-bold cursor-pointer"
               >
-                <div className="relative h-14 w-14 bg-white border border-gray-200">
-                  <Image
-                    src={item.image || "/placeholder.png"}
-                    fill
-                    className="object-cover"
-                    alt={item.name}
-                  />
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-xs font-bold text-gray-800 truncate">
-                    {item.name}
-                  </p>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-xs font-bold text-green-600">
-                      {item.price.toLocaleString()}৳
-                    </span>
-                    <div className="flex items-center bg-white border border-gray-300">
-                      <button
-                        onClick={() => decreaseQty(item.variantId)}
-                        className="px-2 py-0.5 hover:bg-gray-100"
-                      >
-                        −
-                      </button>
-                      <span className="px-2 text-xs font-bold border-x border-gray-300">
-                        {item.qty}
-                      </span>
-                      <button
-                        onClick={() => increaseQty(item.variantId)}
-                        className="px-2 py-0.5 hover:bg-gray-100"
-                      >
-                        +
-                      </button>
+                ✕
+              </span>
+            )}
+          </div>
+
+          {/* SEARCH DROPDOWN */}
+          {showDropdown && searchResults.length > 0 && (
+            <div
+              ref={dropdownRef}
+              className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded-md shadow-2xl max-h-80 overflow-y-auto z-50 divide-y divide-gray-200"
+            >
+              {searchResults.map((item, idx) => {
+                const isOutOfStock = item.stock <= 0;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectItem(item)}
+                    className={`flex items-center justify-between px-3 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                      isOutOfStock
+                        ? "bg-red-100/80 hover:bg-red-200 text-gray-800"
+                        : "bg-white hover:bg-blue-50 text-gray-800"
+                    }`}
+                  >
+                    <div className="truncate pr-2 flex-1">
+                      <span>{item.name}</span>
+                      {item.barcode && (
+                        <span className="text-gray-600">
+                          {" "}
+                          - ({item.barcode})
+                        </span>
+                      )}
+                      {(item.color || item.size) && (
+                        <span className="text-gray-600 font-normal">
+                          {" "}
+                          ( {item.color} {item.color && item.size ? "-" : ""}{" "}
+                          {item.size} )
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 font-bold text-right text-gray-900 ml-2">
+                      Qty: {item.stock}
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ================= 2. MIDDLE SECTION: Scrollable Items ================= */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-white">
+        <div className="grid grid-cols-12 bg-[#1d3557] text-white py-2 px-3 text-xs font-semibold sticky top-0 z-10 items-center text-center">
+          <div className="col-span-6 text-left">Name</div>
+          <div className="col-span-2">Price</div>
+          <div className="col-span-2">Qty</div>
+          <div className="col-span-1">Total</div>
+          <div className="col-span-1">🗑️</div>
+        </div>
+
+        <div className="divide-y divide-gray-100">
+          {cart.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-2xl mb-1">🛍️</p>
+              <p className="text-xs font-medium">No products added</p>
+            </div>
+          ) : (
+            cart.map((item, idx) => (
+              <div
+                key={item.variantId || item.id || idx}
+                className="grid grid-cols-12 gap-1 p-2.5 items-center text-sm hover:bg-gray-50 border-b border-gray-100"
+              >
+                <div className="col-span-6 pr-1">
+                  <p className="font-bold text-gray-900 text-sm line-clamp-1">
+                    {item.name} {item.stock ? `(${item.stock})` : ""}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {item.barcode ? `Barcode: ${item.barcode} ` : ""}
+                    {item.color ? `${item.color} - ` : ""}
+                    {item.size ? item.size : ""}
+                  </p>
                 </div>
-                <button
-                  data-no-focus
-                  onClick={() => removeCartItem(item.variantId)}
-                  className="text-gray-300 hover:text-red-500 p-1"
-                >
-                  ✕
-                </button>
+
+                <div className="col-span-2 text-center font-semibold text-gray-800 text-sm">
+                  {item.price}
+                </div>
+
+                <div className="col-span-2 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      decreaseQty && decreaseQty(item.variantId || item.id)
+                    }
+                    className="w-5 h-5 bg-pink-600 hover:bg-pink-700 text-white font-bold flex items-center justify-center rounded-l text-xs"
+                  >
+                    -
+                  </button>
+                  <span className="w-7 h-5 border-t border-b text-center font-bold flex items-center justify-center bg-white text-gray-900 text-xs">
+                    {item.qty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleIncreaseQty(item)}
+                    className="w-5 h-5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold flex items-center justify-center rounded-r text-xs cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="col-span-1 text-center font-bold text-gray-900 text-sm">
+                  {(Number(item.price) || 0) * (Number(item.qty) || 0)}
+                </div>
+
+                <div className="col-span-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeCartItem &&
+                      removeCartItem(item.variantId || item.id)
+                    }
+                    className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded font-bold flex items-center justify-center mx-auto text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
 
-      <div className="space-y-4">
-        {/* Discount & VAT Section */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-green-600">
-              Discount
-            </label>
-            <div className="flex">
-              <input
-                type="number"
-                min="0"
-                value={discount}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) =>
-                  handleNumericInput(e.target.value, setDiscount)
-                }
-                className="w-full text-sm p-2 outline outline-1 outline-gray-300 focus:outline-green-500"
-              />
-              <select
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-                className="outline outline-1 outline-gray-300 px-1 text-xs bg-gray-50 text-green-700"
-              >
-                <option value="amount">৳</option>
-                <option value="percent">%</option>
-              </select>
-            </div>
+      {/* ================= 3. BOTTOM SECTION: Billing Summary ================= */}
+      <div className="bg-[#fdf6ed] border-t border-orange-200 text-xs flex-shrink-0 divide-y divide-orange-200/60">
+        <div className="flex justify-between items-center px-3 py-1 font-semibold text-gray-700">
+          <div>
+            <span>Items</span>
+            <span className="font-bold text-black ml-3">{cart.length}</span>
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-bold text-green-600">
-              VAT
-            </label>
-            <div className="flex">
-              <input
-                type="number"
-                min="0"
-                value={vat}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => handleNumericInput(e.target.value, setVat)}
-                className="w-full text-sm p-2 outline outline-1 outline-gray-300 focus:outline-green-500"
-              />
-              <select
-                value={vatType}
-                onChange={(e) => setVatType(e.target.value)}
-                className="outline outline-1 outline-gray-300 px-1 text-xs bg-gray-50 text-green-700"
-              >
-                <option value="amount">৳</option>
-                <option value="percent">%</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Pricing Summary */}
-        <div className="bg-green-600 text-white p-4 space-y-2">
-          <div className="flex justify-between text-xs opacity-90">
+          <div>
             <span>Subtotal</span>
-            <span>{subTotal.toLocaleString()}৳</span>
-          </div>
-          <div className="flex justify-between text-xs opacity-90">
-            <span>Discount</span>
-            <span>-{discountAmount.toLocaleString()}৳</span>
-          </div>
-          <div className="flex justify-between text-xs opacity-90">
-            <span>VAT</span>
-            <span>+{vatAmount.toLocaleString()}৳</span>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-green-500">
-            <span className="text-sm font-bold">Grand Total</span>
-            <span className="text-2xl font-black">
-              {total.toLocaleString()}৳
+            <span className="font-bold text-black ml-3">
+              TK {(subtotal ?? 0).toLocaleString()}
             </span>
           </div>
         </div>
 
-        {userRole === "admin" && (
-          <select
-            className="w-full p-2.5 text-sm font-medium outline outline-1 outline-gray-300 focus:outline-green-500"
-            value={selectedShowroomId}
-            onChange={(e) => setSelectedShowroomId(e.target.value)}
-          >
-            <option value="">Select Showroom Location</option>
-            {showrooms.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="flex justify-between items-center px-3 py-1 font-semibold text-gray-700">
+          <div>
+            <span>Quantity</span>
+            <span className="font-bold text-black ml-3">{totalQty}</span>
+          </div>
 
-        {!hideButtons && (
-          <>
-            <button
-              disabled={checkoutLoading || cart.length === 0}
-              onClick={() => {
-                setIsExchangeMode(false);
-                setExchangeTotal(0);
-                setExchangePayloadCache(null);
-                setIsModalOpen(true);
-              }}
-              className="w-full bg-green-600 text-white py-4 font-black text-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Complete Sale
-            </button>
-
-            <button
-              disabled={checkoutLoading}
-              onClick={() => setIsExchangeOpen(true)}
-              className="w-full bg-orange-500 text-white py-3 font-bold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Exchange
-            </button>
-          </>
-        )}
-      </div>
-
-      <CheckoutModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setIsExchangeMode(false);
-          setExchangePayloadCache(null);
-        }}
-        total={isExchangeMode ? exchangeTotal : total}
-        cashierName={currentUser?.name}
-        isExchangeMode={isExchangeMode}
-        cart={cart}
-        onCheckout={(modalFormData) => {
-          // 👑 ওরিজিনাল আইডি ট্র্যাকিং ফিক্স: মডাল ও ক্যাশ থেকে সমস্ত সম্ভাব্য আইডি ট্র্যাকিং প্রোপার্টি ফিল্টার করা
-          const detectedOriginalOrderId =
-            exchangePayloadCache?.originalOrderId ||
-            exchangePayloadCache?.orderId ||
-            exchangePayloadCache?.oldOrderId ||
-            exchangePayloadCache?.exchangeData?.originalOrderId ||
-            exchangePayloadCache?.exchangeData?.orderId ||
-            exchangePayloadCache?.exchangeData?._id ||
-            null;
-
-          const detectedReturnedItems =
-            exchangePayloadCache?.returnedItems ||
-            exchangePayloadCache?.exchangeData?.returnedItems ||
-            [];
-
-          const detectedReason =
-            exchangePayloadCache?.reason ||
-            exchangePayloadCache?.exchangeData?.reason ||
-            "Product Exchange";
-
-          const finalPayload = isExchangeMode
-            ? {
-                ...exchangePayloadCache,
-                ...modalFormData,
-                originalOrderId: detectedOriginalOrderId, // ব্যাকএন্ড রিকোয়ার্ড ফিল্ড নিশ্চিত করা হলো
-                returnedItems: detectedReturnedItems, // ব্যাকএন্ড রিকোয়ার্ড ফিল্ড নিশ্চিত করা হলো
-                reason: detectedReason,
-                isExchangeMode: true,
-                total: exchangeTotal,
+          <div className="flex items-center gap-1">
+            <span className="mr-1">Discount 📝</span>
+            <select
+              value={discountType}
+              onChange={(e) =>
+                dispatch(
+                  setDiscount({
+                    type: e.target.value,
+                    value: discountValue,
+                  }),
+                )
               }
-            : {
-                ...modalFormData,
-                isExchangeMode: false,
-                total: total,
-              };
+              className="p-0.5 border border-gray-300 rounded text-[11px] bg-white outline-none"
+            >
+              <option value="fixed">TK</option>
+              <option value="percent">%</option>
+            </select>
 
-          handleCheckout(finalPayload);
-          setIsModalOpen(false);
-          setIsExchangeMode(false);
-          setExchangeTotal(0);
-          setExchangePayloadCache(null);
-        }}
-      />
+            <input
+              type="number"
+              min="0"
+              value={discountValue}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) =>
+                dispatch(
+                  setDiscount({
+                    type: discountType,
+                    value: Number(e.target.value) || 0,
+                  }),
+                )
+              }
+              className="w-12 p-0.5 border border-gray-300 rounded text-center font-bold bg-white outline-none focus:border-blue-500 text-[11px]"
+            />
+            <span className="font-bold text-black ml-1">
+              TK {(discount ?? 0).toLocaleString()}
+            </span>
+          </div>
+        </div>
 
-      <ExchangeModal
-        isOpen={isExchangeOpen}
-        onClose={() => setIsExchangeOpen(false)}
-        showroomId={selectedShowroomId || currentUser?.showroomId}
-        currentPosCart={cart}
-        onOpenCheckout={(checkoutPayload) => {
-          setIsExchangeMode(true);
+        <div className="flex justify-between items-center px-3 py-1 font-semibold text-gray-700 bg-orange-100/40">
+          <div className="flex items-center gap-1.5">
+            <span>VAT</span>
+            <select
+              value={vatValue}
+              onChange={(e) =>
+                dispatch(
+                  setVat({
+                    type: "percent",
+                    value: Number(e.target.value),
+                  }),
+                )
+              }
+              className="p-0.5 border border-gray-300 rounded text-[11px] bg-white font-bold outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value={0}>0%</option>
+              <option value={7.5}>7.5%</option>
+            </select>
 
-          const finalAdjustmentAmount =
-            checkoutPayload?.total ??
-            checkoutPayload?.difference ??
-            checkoutPayload?.payableAmount ??
-            0;
+            <span className="font-bold text-black ml-1">
+              TK {(vat ?? 0).toLocaleString()}
+            </span>
+          </div>
 
-          setExchangeTotal(finalAdjustmentAmount);
+          <div>
+            <span>Net Total</span>
+            <span className="font-bold text-black ml-3">
+              TK {(total ?? 0).toLocaleString()}
+            </span>
+          </div>
+        </div>
 
-          // এক্সচেঞ্জের পুরো অবজেক্ট ডেটা ক্যাশ স্টেটে স্টোর করা হচ্ছে
-          setExchangePayloadCache(checkoutPayload);
+        {currentExchangeTotal > 0 && (
+          <div className="flex justify-between items-center px-3 py-1 font-semibold text-gray-700">
+            <span className="font-bold text-black">Exchange Total</span>
+            <span className="font-bold text-black">
+              TK {(currentExchangeTotal ?? 0).toLocaleString()}
+            </span>
+          </div>
+        )}
 
-          if (
-            typeof handleExchange === "function" &&
-            checkoutPayload?.exchangeData
-          ) {
-            handleExchange(checkoutPayload.exchangeData);
-          }
-
-          setIsExchangeOpen(false);
-          setIsModalOpen(true);
-        }}
-      />
+        <div className="p-2.5 bg-[#e8decb] flex items-center justify-between gap-2">
+          <span className="text-xs uppercase font-bold text-gray-700">
+            Payable Amount
+          </span>
+          <span className="text-lg font-black text-black">
+            TK {(payableAmount ?? 0).toLocaleString()}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import Posorder from "@/models/posorder.model";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { connectDB } from "@/lib/databaseconnection";
 import { NextResponse } from "next/server";
-
+import Customer from "@/models/Customer.model";
 /* =========================
    GET ORDER
 ========================= */
@@ -88,8 +88,43 @@ export async function POST(req) {
     const orderNumber = `INV-${String(seq).padStart(6, "0")}`;
 
     /* =========================
+       CUSTOMER CREATE / UPDATE
+    ========================= */
+
+    let customer = null;
+
+    if (phone?.trim()) {
+      customer = await Customer.findOne({ phone }).session(session);
+
+      if (customer) {
+        customer.name = customerName || customer.name;
+        customer.address = address || customer.address;
+        customer.totalOrders += 1;
+        customer.totalSpent += Number(total || 0);
+
+        await customer.save({ session });
+      } else {
+        customer = await Customer.create(
+          [
+            {
+              name: customerName || "Walk In Customer",
+              phone,
+              address,
+              totalOrders: 1,
+              totalSpent: Number(total || 0),
+            },
+          ],
+          { session },
+        );
+
+        customer = customer[0];
+      }
+    }
+
+    /* =========================
        CLEAN PAYMENTS
     ========================= */
+
     const cleanPayments =
       payments?.length > 0
         ? payments.map((p) => ({
@@ -108,6 +143,7 @@ export async function POST(req) {
     /* =========================
        STOCK UPDATE
     ========================= */
+
     for (const item of items) {
       const stockDoc = await ShowroomStock.findOne({
         showroomId,
@@ -130,36 +166,47 @@ export async function POST(req) {
           productId: item.productId,
           variantId: item.variantId,
         },
-        { $inc: update },
-        { session },
+        {
+          $inc: update,
+        },
+        {
+          session,
+        },
       );
     }
 
     /* =========================
-       DEBUG REQUEST BODY
+       ORDER DATA
     ========================= */
-    console.log("========== REQUEST BODY ==========");
-    console.log(JSON.stringify(body, null, 2));
 
-    /* =========================
-       DEBUG ORDER DATA
-    ========================= */
     const orderData = {
       orderNumber,
+
+      customerId: customer?._id || null,
+
       items,
+
       total,
       subTotal: subTotal || total,
       discount: discount || 0,
       vat: vat || 0,
+
       payments: cleanPayments,
+
       deliveryCharge: deliveryCharge || 0,
+
       remark,
+
       soldBy: soldBy || "Counter Guest",
+
       customerName,
       phone,
       address,
+
       saleDate,
+
       showroomId,
+
       userId: createdBy || null,
 
       exchange: {
@@ -174,22 +221,18 @@ export async function POST(req) {
       },
 
       status: "completed",
+
       orderType: isExchangeMode ? "exchange" : "pos",
+
       createdAt: new Date(),
     };
 
-    console.log("========== ORDER DATA ==========");
-    console.log(JSON.stringify(orderData, null, 2));
-
-    /* =========================
-       CREATE ORDER
-    ========================= */
-    const order = await Posorder.create([orderData], { session });
-
-    console.log("========== SAVED ORDER ==========");
-    console.log(JSON.stringify(order[0], null, 2));
+    const order = await Posorder.create([orderData], {
+      session,
+    });
 
     await session.commitTransaction();
+
     session.endSession();
 
     return NextResponse.json({
@@ -198,9 +241,10 @@ export async function POST(req) {
         ? "Exchange completed successfully"
         : "Order created successfully",
       order: order[0],
+      customer,
     });
   } catch (error) {
-    console.error("ORDER ERROR:", error);
+    console.error(error);
 
     if (session.inTransaction()) {
       await session.abortTransaction();
