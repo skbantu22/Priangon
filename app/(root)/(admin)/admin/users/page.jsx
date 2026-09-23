@@ -10,7 +10,6 @@ const STAFF_ROLES = [
   ["cashier", "Cashier", "POS sales and warranty check"],
   ["manager", "Manager", "POS, products, stock, orders and reports"],
   ["admin", "Admin", "Everything, including users and settings"],
-  ["moderator", "Moderator", "Online orders assigned to them"],
 ];
 
 const EMPTY = { name: "", email: "", password: "", role: "cashier" };

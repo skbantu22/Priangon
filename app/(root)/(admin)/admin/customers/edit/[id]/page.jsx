@@ -180,7 +180,6 @@ export default function EditCustomer({ params }) {
                       <select {...field} className="w-full border p-2 rounded">
                         <option value="customer">Customer</option>
                         <option value="cashier">Cashier</option>
-                        <option value="moderator">Moderator</option>
                         <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                       </select>

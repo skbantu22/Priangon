@@ -3,7 +3,7 @@ import { isAuthenticated } from "@/lib/auth.server";
 import User from "@/models/User.model";
 import Showroom from "@/models/Showroom.model";
 
-const STAFF_ROLES = ["admin", "manager", "cashier", "moderator"];
+const STAFF_ROLES = ["admin", "manager", "cashier"];
 
 export async function POST(req) {
   try {
@@ -23,7 +23,7 @@ export async function POST(req) {
     // ================= VALIDATION =================
     // dealers / retailers are created from /api/partners (they need a customer account)
     if (!STAFF_ROLES.includes(body.role)) {
-      throw new Error("Choose Admin, Manager, Cashier or Moderator");
+      throw new Error("Choose Admin, Manager or Cashier");
     }
     if (!body.name?.trim() || !body.email?.trim()) throw new Error("Name and email are required");
     if (String(body.password || "").length < 6) {
