@@ -115,7 +115,8 @@ export async function POST(request) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      // "Remember me" off: a session cookie, gone when the browser closes
+      ...(payload.remember === false ? {} : { maxAge: 60 * 60 * 24 * 7 }),
     });
 
     // ================= RESPONSE =================

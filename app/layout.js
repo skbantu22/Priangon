@@ -28,8 +28,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Premium Women Clothing",
-  description: "Premium Women Clothing",
+  title: {
+    default: "SB Telecom",
+    template: "%s | SB Telecom",
+  },
+  description: "SB Telecom: Global Connectivity Solutions",
 };
 
 export default function RootLayout({ children }) {

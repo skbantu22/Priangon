@@ -42,7 +42,7 @@ export default function GlobalStoreProvider({ children }) {
 
       {process.env.NODE_ENV === "development" && (
         <Suspense fallback={null}>
-          <ReactQueryDevtools initialIsOpen={false} />
+          <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
         </Suspense>
       )}
     </PersistQueryClientProvider>
