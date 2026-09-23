@@ -5,6 +5,7 @@ import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
 import { cleanMobileFields } from "@/lib/productMobileFields";
 import { cleanTierPrices } from "@/lib/priceTiers";
+import { cleanExtraFields } from "@/lib/productExtraFields";
 
 export async function PUT(request) {
   try {
@@ -69,7 +70,8 @@ export async function PUT(request) {
     product.warranty = mobile.warranty;
     product.trackSerial = mobile.trackSerial;
 
-    Object.assign(product, cleanTierPrices(payload));
+    Object.assign(product, cleanTierPrices(payload), cleanExtraFields(payload));
+    if (payload.freeDelivery !== undefined) product.freeDelivery = !!payload.freeDelivery;
 
     await product.save();
 

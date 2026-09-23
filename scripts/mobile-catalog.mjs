@@ -48,6 +48,26 @@ export const PRODUCTS = [
   { name: "realme C67", cat: "Mobile Phones", kind: "phone", colors: [C("Sunny Oasis", "#fde68a", "#f59e0b"), C("Black Rock", "#1f2937", "#64748b")], options: [["8/128GB", 20999, 21999]] },
   { name: "Anker Soundcore R50i", cat: "Earphones & Headphones", kind: "earbuds", colors: [C("Black", "#1f2937"), C("White", "#f3f4f6")], options: [["Standard", 1899, 2299]] },
   { name: "Baseus 65W GaN Charger", cat: "Chargers & Adapters", kind: "charger", colors: [C("White", "#ffffff"), C("Black", "#374151")], options: [["3 Port", 3499, 3999]] },
+
+  // ---- more stock for dealers ----
+  { name: "iPhone 13", cat: "Mobile Phones", kind: "phone", colors: [C("Midnight", "#1f2937", "#6366f1"), C("Starlight", "#f5f0e6", "#f59e0b")], options: [["128GB", 74999, 79999]] },
+  { name: "Samsung Galaxy A35 5G", cat: "Mobile Phones", kind: "phone", colors: [C("Awesome Navy", "#1e3a8a", "#818cf8"), C("Awesome Lilac", "#ddd6fe", "#a78bfa")], options: [["8/128GB", 39999, 41999], ["8/256GB", 44999, 46999]] },
+  { name: "Samsung Galaxy A05", cat: "Mobile Phones", kind: "phone", colors: [C("Black", "#111827", "#22c55e"), C("Silver", "#d1d5db", "#38bdf8")], options: [["4/64GB", 11999, 12999], ["6/128GB", 13999, 14999]] },
+  { name: "Xiaomi Redmi A3", cat: "Mobile Phones", kind: "phone", colors: [C("Midnight Black", "#111827", "#f43f5e"), C("Olive Green", "#4d7c0f", "#a3e635")], options: [["3/64GB", 10999, 11499], ["4/128GB", 12499, 12999]] },
+  { name: "Xiaomi POCO X6 Pro", cat: "Mobile Phones", kind: "phone", colors: [C("POCO Yellow", "#facc15", "#1f2937"), C("Black", "#111827", "#eab308")], options: [["8/256GB", 38999, 40999], ["12/512GB", 45999, 47999]] },
+  { name: "OPPO Reno 11 F", cat: "Mobile Phones", kind: "phone", colors: [C("Ocean Blue", "#0369a1", "#67e8f9"), C("Palm Green", "#15803d", "#86efac")], options: [["8/256GB", 42990, 44990]] },
+  { name: "vivo V30", cat: "Mobile Phones", kind: "phone", colors: [C("Peacock Green", "#0f766e", "#5eead4"), C("Noble Black", "#111827", "#a78bfa")], options: [["12/256GB", 55999, 57999]] },
+  { name: "Infinix Note 40", cat: "Mobile Phones", kind: "phone", colors: [C("Racing Gray", "#4b5563", "#f97316"), C("Titan Gold", "#ca8a04", "#fde68a")], options: [["8/256GB", 23999, 24999]] },
+  { name: "TECNO Camon 30", cat: "Mobile Phones", kind: "phone", colors: [C("Basaltic Dark", "#1f2937", "#0ea5e9"), C("Uyuni White", "#f3f4f6", "#60a5fa")], options: [["8/256GB", 27999, 28999]] },
+  { name: "Samsung Galaxy Buds FE", cat: "Earphones & Headphones", kind: "earbuds", colors: [C("Graphite", "#374151"), C("White", "#f9fafb")], options: [["Standard", 8999, 9999]] },
+  { name: "Xiaomi Redmi Buds 5", cat: "Earphones & Headphones", kind: "earbuds", colors: [C("Midnight Black", "#111827"), C("Fantasy White", "#f3f4f6")], options: [["Standard", 3499, 3999]] },
+  { name: "Samsung Galaxy Watch 6", cat: "Smart Watch", kind: "watch", colors: [C("Graphite", "#374151", "#1e3a8a"), C("Silver", "#d1d5db", "#0f172a")], options: [["40mm", 29999, 32999], ["44mm", 32999, 35999]] },
+  { name: "Xiaomi Smart Band 8", cat: "Smart Watch", kind: "watch", colors: [C("Graphite Black", "#1f2937", "#f97316"), C("Champagne Gold", "#d4b483", "#1e1b4b")], options: [["Standard", 3999, 4499]] },
+  { name: "Anker 10000mAh Power Bank", cat: "Power Bank", kind: "powerbank", colors: [C("Black", "#111827"), C("White", "#e5e7eb")], options: [["22.5W", 2299, 2599]] },
+  { name: "Samsung 45W Charger", cat: "Chargers & Adapters", kind: "charger", colors: [C("Black", "#1f2937")], options: [["Adapter only", 3299, 3799]] },
+  { name: "Lightning Data Cable", cat: "Chargers & Adapters", kind: "cable", colors: [C("White", "#e5e7eb")], options: [["1m", 699, 899]] },
+  { name: "Samsung Silicone Case", cat: "Cases & Covers", kind: "case", colors: [C("Black", "#1f2937"), C("Navy", "#1e3a8a"), C("Lavender", "#c4b5fd")], options: [["Galaxy A35", 999, 1299], ["Galaxy A55", 1099, 1399]] },
+  { name: "SanDisk 64GB Card", cat: "Others", kind: "memory", colors: [C("Red", "#dc2626")], options: [["Class 10", 849, 999]] },
 ];
 
 export const slugify = (s) =>

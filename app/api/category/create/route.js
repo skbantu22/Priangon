@@ -40,10 +40,10 @@ export async function POST(request) {
       );
     }
 
-    await CategoryModel.create({ name, slug });
+    const created = await CategoryModel.create({ name, slug });
 
     return NextResponse.json(
-      { success: true, message: "Category added successfully" },
+      { success: true, message: "Category added successfully", data: created },
       { status: 201 }
     );
   } catch (error) {

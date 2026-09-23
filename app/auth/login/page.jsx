@@ -77,9 +77,14 @@ export default function Login() {
       if (searchParams.has("callback")) {
         router.push(searchParams.get("callback"));
       } else {
-        registerResponse.data.role === "admin"
-          ? router.push(ADMIN_DASHBOARD)
-          : router.push("/admin/pos");
+        const role = registerResponse.data?.role || registerResponse.data?.user?.role;
+        router.push(
+          role === "admin"
+            ? ADMIN_DASHBOARD
+            : ["dealer", "subDealer", "retailer"].includes(role)
+              ? "/partner"
+              : "/admin/pos",
+        );
       }
 
       form.reset();
@@ -202,7 +207,7 @@ export default function Login() {
 
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">
-                  Don't have an account?{" "}
+                  Don&apos;t have an account?{" "}
                   <Link
                     href={WEBSITE_REGISTER}
                     className="font-semibold text-primary hover:underline"

@@ -227,8 +227,18 @@ export async function POST(req) {
         variantId: item.variantId,
       }).session(session);
 
+      const label = [item.productName, item.size, item.color]
+        .filter(Boolean)
+        .join(" · ");
       if (!stockDoc) {
-        throw new Error(`Stock not found for product ${item.productId}`);
+        // usually a cart kept from before the catalogue / branch changed
+        throw new Error(
+          `${label} is not stocked at this branch. Remove it from the cart and add it again.`,
+        );
+      }
+      const available = Number(stockDoc.stock ?? stockDoc.showroomStock ?? 0);
+      if (available < Number(item.qty)) {
+        throw new Error(`${label}: only ${Math.max(0, available)} left in stock`);
       }
 
       const update =

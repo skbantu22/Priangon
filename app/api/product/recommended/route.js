@@ -25,6 +25,7 @@ export async function GET(req) {
       category,
       _id: { $ne: exclude },
       deletedAt: null,
+      showInWebsite: { $ne: false },
     })
       .limit(100)
       .sort({ createdAt: -1 })

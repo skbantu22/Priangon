@@ -14,7 +14,7 @@ const selectClass =
   "h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus:border-primary dark:bg-input/30";
 
 // Brand + warranty + IMEI tracking for a product (add & edit forms)
-export default function MobileSpecsCard({ form }) {
+export default function MobileSpecsCard({ form, hideBrand = false }) {
   const { data: brands = [] } = useQuery({
     ...posBrandsQueryOptions(),
     refetchOnWindowFocus: false,
@@ -28,25 +28,27 @@ export default function MobileSpecsCard({ form }) {
     <Card className="gap-0 rounded-xl py-0 shadow-sm">
       <CardHeader className="border-b py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="size-4 text-primary" /> Brand &amp; Warranty
+          <ShieldCheck className="size-4 text-primary" /> {hideBrand ? "Warranty & IMEI" : <>Brand &amp; Warranty</>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 p-5">
-        <FormField
-          control={form.control}
-          name="brand"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Brand</FormLabel>
-              <Input list="brand-options" placeholder="Ex: Samsung" {...field} />
-              <datalist id="brand-options">
-                {brands.map((b) => (
-                  <option key={b} value={b} />
-                ))}
-              </datalist>
-            </FormItem>
-          )}
-        />
+        {!hideBrand && (
+          <FormField
+            control={form.control}
+            name="brand"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Brand</FormLabel>
+                <Input list="brand-options" placeholder="Ex: Samsung" {...field} />
+                <datalist id="brand-options">
+                  {brands.map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <FormField

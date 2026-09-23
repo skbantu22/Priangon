@@ -5,8 +5,26 @@ const userSchema = new mongoose.Schema(
   {
     role: {
       type: String,
-      enum: ["customer", "cashier", "admin", "moderator", "manager"],
+      enum: [
+        "customer",
+        "cashier",
+        "admin",
+        "moderator",
+        "manager",
+        // partner logins: buy at their price list through /partner
+        "dealer",
+        "subDealer",
+        "retailer",
+      ],
       default: "customer",
+    },
+
+    // partner logins: the Customer account their invoices and dues belong to
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      index: true,
     },
 
     showroomId: {

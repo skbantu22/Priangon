@@ -25,8 +25,8 @@ import {
   posProductsQueryOptions,
   posShowroomsQueryOptions,
   resolvePosShowroomId,
-  writePosShowroom,
 } from "@/lib/posProducts";
+import { ShoppingCart } from "lucide-react";
 import { ratesFor } from "@/lib/priceTiers";
 
 import {
@@ -70,11 +70,11 @@ export default function POSPage() {
   const cart = useSelector((state) => state.posCart.cart);
   const user = useSelector((state) => state.authStore.auth);
   const [cartExpanded, setCartExpanded] = useState(false);
+  // phones: the cart opens full screen over the products
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   // Core States
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(""); // 🚀 Debounce Search State
-  // admin: showroom picked in the top bar (empty = not picked yet)
-  const [pickedShowroomId, setPickedShowroomId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [sort, setSort] = useState("latest");
@@ -106,6 +106,61 @@ export default function POSPage() {
   } = useSelector(selectPosSummary, shallowEqual);
 
   const searchInputRef = useRef(null);
+
+  // /admin/pos?partnerOrder=<id>: load a dealer's order into the cart at the
+  // prices they ordered at, for the cashier to scan IMEIs and invoice it
+  const partnerOrderRef = useRef(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("partnerOrder");
+    if (!id) return;
+    window.history.replaceState(null, "", "/admin/pos");
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/partner-orders/${id}`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        const order = data.order;
+        if (!["pending", "confirmed"].includes(order.status)) {
+          throw new Error(`${order.orderNumber} is already ${order.status}`);
+        }
+
+        dispatch(clearCart());
+        dispatch(
+          setCart(
+            order.items.map((i) => ({
+              _id: `${i.productId}-${i.variantId}`,
+              productId: i.productId,
+              variantId: i.variantId,
+              name: i.productName,
+              color: i.color,
+              size: i.size,
+              price: i.price,
+              qty: i.qty,
+              image: i.image || "/placeholder.png",
+              warrantyType: i.warrantyType,
+              warrantyMonths: i.warrantyMonths,
+              trackSerial: i.trackSerial,
+              imeis: [],
+            })),
+          ),
+        );
+        dispatch(
+          setCustomer({
+            _id: order.customerId,
+            name: order.customerName,
+            phone: order.phone,
+            address: "",
+            type: order.customerType,
+          }),
+        );
+        partnerOrderRef.current = order._id;
+        showToast("success", `${order.orderNumber} loaded: scan IMEIs and complete the sale`);
+      } catch (err) {
+        showToast("error", err.message || "Could not load the dealer order");
+      }
+    })();
+  }, [dispatch]);
   const currentUser = useMemo(
     () => user?.data?.user || user?.user || user,
     [user],
@@ -114,22 +169,13 @@ export default function POSPage() {
   // Showrooms rarely change: cached (and persisted), so revisits are instant
   const { data: showrooms = [] } = useQuery({
     ...posShowroomsQueryOptions(),
-    enabled: currentUser?.role === "admin",
+    // single store: every role needs it (it is where stock is taken from)
+    enabled: !!currentUser,
     refetchOnWindowFocus: false,
   });
 
-  // an admin always sells from one showroom: the picked one, else the one
-  // used last time on this device, else the first
-  const selectedShowroomId = resolvePosShowroomId({
-    currentUser,
-    picked: pickedShowroomId,
-    showrooms,
-  });
-
-  const pickShowroom = useCallback((id) => {
-    setPickedShowroomId(id);
-    writePosShowroom(id);
-  }, []);
+  // single store: everyone sells from the one store
+  const selectedShowroomId = resolvePosShowroomId({ currentUser, showrooms });
 
   // 🚀 Debounce Search Effect (দ্রুত টাইপিংয়ে বারবার API কল হওয়া আটকাবে)
   useEffect(() => {
@@ -311,13 +357,10 @@ export default function POSPage() {
       return;
     }
 
-    const showroomId =
-      currentUser?.role === "admin"
-        ? selectedShowroomId
-        : currentUser?.showroomId || selectedShowroomId;
+    const showroomId = selectedShowroomId || currentUser?.showroomId;
 
     if (!showroomId) {
-      showToast("error", "Select a showroom from the top bar first");
+      showToast("error", "Store is still loading, try again in a moment");
       return;
     }
 
@@ -477,6 +520,23 @@ export default function POSPage() {
       });
 
       setSaleKey((k) => k + 1);
+      setMobileCartOpen(false);
+
+      // a dealer order was loaded into this sale: mark it invoiced
+      if (!isExchange && partnerOrderRef.current && resData.order?._id) {
+        const partnerOrderId = partnerOrderRef.current;
+        partnerOrderRef.current = null;
+        fetch(`/api/partner-orders/${partnerOrderId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "invoiced", posOrderId: resData.order._id }),
+        })
+          .then((r) => r.json())
+          .then((r) => {
+            if (!r.success) showToast("error", `Dealer order not updated: ${r.message}`);
+          })
+          .catch(() => showToast("error", "Dealer order not updated"));
+      }
 
       const printId = resData.exchangeOrder?._id || resData.order?._id;
       if (printId) {
@@ -693,9 +753,7 @@ export default function POSPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const isAdmin = currentUser?.role === "admin";
   const activeShowroomId = selectedShowroomId || currentUser?.showroomId;
-  const showroomName = showrooms.find((s) => s._id === activeShowroomId)?.name;
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -704,10 +762,6 @@ export default function POSPage() {
         setSearch={setSearch}
         inputRef={searchInputRef}
         onSearchKeyDown={handleSearchKeyDown}
-        isAdmin={isAdmin}
-        showrooms={showrooms}
-        selectedShowroomId={selectedShowroomId}
-        setSelectedShowroomId={pickShowroom}
         heldSales={heldSales}
         onRestoreHeld={restoreHeldSale}
         onDeleteHeld={deleteHeldSale}
@@ -747,6 +801,8 @@ export default function POSPage() {
           expanded={cartExpanded}
           setExpanded={setCartExpanded}
           cart={cart}
+          mobileOpen={mobileCartOpen}
+          onMobileClose={() => setMobileCartOpen(false)}
           removeCartItem={removeCartItem}
           onComplete={(paymentData) => handleCheckout(paymentData)}
           onHold={holdSale}
@@ -757,7 +813,30 @@ export default function POSPage() {
         />
       </div>
 
-      <PosFooter showroomName={showroomName} />
+      {/* phones: cart summary bar, opens the cart */}
+      {cart.length > 0 && !mobileCartOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileCartOpen(true)}
+          className="fixed inset-x-3 bottom-3 z-40 flex h-14 items-center gap-3 rounded-2xl bg-primary px-4 text-white shadow-xl shadow-primary/40 lg:hidden"
+        >
+          <span className="relative">
+            <ShoppingCart className="size-6" />
+            <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-gray-900">
+              {cart.reduce((n, i) => n + (Number(i.qty) || 0), 0)}
+            </span>
+          </span>
+          <span className="text-left text-sm leading-tight">
+            <span className="block font-semibold">View Cart</span>
+            <span className="text-xs text-white/80">{cart.length} products</span>
+          </span>
+          <span className="ml-auto text-lg font-bold">
+            ৳{Number(total || 0).toLocaleString("en-BD")}
+          </span>
+        </button>
+      )}
+
+      <PosFooter />
 
       {openProduct && (
         <VariantModal

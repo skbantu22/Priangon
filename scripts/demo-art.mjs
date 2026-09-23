@@ -231,7 +231,7 @@ const glass = () =>
   </g>`,
   );
 
-const memory = () =>
+const memory = (_c, _a, p) =>
   scene(
     `<linearGradient id="sd" x1="0" y1="0" x2="1" y2="1">
        <stop offset="0" stop-color="#ef4444"/><stop offset="1" stop-color="#991b1b"/></linearGradient>`,
@@ -241,7 +241,7 @@ const memory = () =>
     <rect x="128" y="226" width="158" height="114" fill="#141418"/>
     <g fill="#f5c542">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="${140 + i * 19}" y="82" width="11" height="26" rx="2"/>`).join("")}</g>
     <text x="207" y="176" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#fff" text-anchor="middle">SanDisk</text>
-    <text x="207" y="296" font-family="Arial, sans-serif" font-size="36" font-weight="800" fill="#fbbf24" text-anchor="middle">128GB</text>
+    <text x="207" y="296" font-family="Arial, sans-serif" font-size="36" font-weight="800" fill="#fbbf24" text-anchor="middle">${(p?.name.match(/(\d+GB)/i) || [])[1] || "128GB"}</text>
     <path d="M128 70 H248 L286 108 V340 H128 Z" fill="url(#gloss)"/>
   </g>`,
   );

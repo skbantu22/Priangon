@@ -34,7 +34,6 @@ import {
   CreditCard,
   Loader2,
 } from "lucide-react";
-import { posShowroomsQueryOptions } from "@/lib/posProducts";
 
 const SERIES = [1, 2, 3, 4, 5].map((n) => `var(--series-${n})`);
 
@@ -130,17 +129,11 @@ function ChartTooltip({ active, payload, label, render }) {
 
 export default function Dashboard() {
   const today = new Date();
-  const [showroomId, setShowroomId] = useState("");
   const [chart, setChart] = useState("daily");
   const [period, setPeriod] = useState(isoDay(today).slice(0, 7)); // YYYY-MM
   const [from, setFrom] = useState(isoDay(new Date(today.getTime() - 29 * 864e5)));
   const [to, setTo] = useState(isoDay(today));
   const [limit, setLimit] = useState(10);
-
-  const { data: showrooms = [] } = useQuery({
-    ...posShowroomsQueryOptions(),
-    refetchOnWindowFocus: false,
-  });
 
   const params = new URLSearchParams({
     chart,
@@ -148,7 +141,6 @@ export default function Dashboard() {
     from,
     to,
     limit: String(limit),
-    ...(showroomId && { showroomId }),
   });
 
   const { data, isLoading, isFetching, isError } = useQuery({
@@ -202,21 +194,14 @@ export default function Dashboard() {
 
       {/* ================= KPI TILES ================= */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={Store} tone="orange" label="">
-          <p className="text-xl font-bold text-gray-900 dark:text-white">Select Branch</p>
-          <select
-            value={showroomId}
-            onChange={(e) => setShowroomId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-white/10 dark:bg-card"
-          >
-            <option value="">All Branches</option>
-            {showrooms.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </Kpi>
+        <Kpi
+          icon={Store}
+          tone="orange"
+          value={k.pendingDealerOrders ?? 0}
+          label="New Dealer Orders"
+          sub="Waiting to be invoiced"
+          href="/admin/partner-orders"
+        />
         <Kpi
           icon={TrendingUp}
           tone="emerald"

@@ -9,6 +9,24 @@ const repriceCart = (state) => {
   }
 };
 
+// ids may arrive as strings or ObjectId-like values: compare them as text
+const sameId = (a, b) => a != null && b != null && String(a) === String(b);
+
+// one line per variant: repeated lines (held sale, dealer order...) are merged
+const mergeLines = (lines) => {
+  const out = [];
+  for (const line of lines) {
+    const found = out.find((i) => sameId(i.variantId, line.variantId));
+    if (found) {
+      found.qty = (Number(found.qty) || 0) + (Number(line.qty) || 1);
+      found.imeis = [...(found.imeis || []), ...(line.imeis || [])];
+    } else {
+      out.push({ ...line, qty: Number(line.qty) || 1 });
+    }
+  }
+  return out;
+};
+
 const initialState = {
   cart: [],
 
@@ -42,7 +60,7 @@ const posCartSlice = createSlice({
     addToCart(state, action) {
       const item = action.payload;
 
-      const existing = state.cart.find((i) => i.variantId === item.variantId);
+      const existing = state.cart.find((i) => sameId(i.variantId, item.variantId));
 
       if (existing) {
         existing.qty += Number(item.qty) || 1;
@@ -55,10 +73,13 @@ const posCartSlice = createSlice({
           qty: Number(item.qty) || 1,
         });
       }
+
+      // also folds together any duplicate lines left from an older cart
+      state.cart = mergeLines(state.cart);
     },
 
     increaseQty(state, action) {
-      const item = state.cart.find((i) => i.variantId === action.payload);
+      const item = state.cart.find((i) => sameId(i.variantId, action.payload));
 
       if (item) {
         item.qty += 1;
@@ -66,21 +87,21 @@ const posCartSlice = createSlice({
     },
 
     decreaseQty(state, action) {
-      const item = state.cart.find((i) => i.variantId === action.payload);
+      const item = state.cart.find((i) => sameId(i.variantId, action.payload));
 
       if (!item) return;
 
       item.qty--;
 
       if (item.qty <= 0) {
-        state.cart = state.cart.filter((i) => i.variantId !== action.payload);
+        state.cart = state.cart.filter((i) => !sameId(i.variantId, action.payload));
       }
     },
 
     updateQty(state, action) {
       const { variantId, qty } = action.payload;
 
-      const item = state.cart.find((i) => i.variantId === variantId);
+      const item = state.cart.find((i) => sameId(i.variantId, variantId));
 
       if (!item) return;
 
@@ -91,13 +112,13 @@ const posCartSlice = createSlice({
     setItemImeis(state, action) {
       const { variantId, imeis } = action.payload;
 
-      const item = state.cart.find((i) => i.variantId === variantId);
+      const item = state.cart.find((i) => sameId(i.variantId, variantId));
 
       if (item) item.imeis = imeis;
     },
 
     removeCartItem(state, action) {
-      state.cart = state.cart.filter((i) => i.variantId !== action.payload);
+      state.cart = state.cart.filter((i) => !sameId(i.variantId, action.payload));
     },
 
     clearCart(state) {
@@ -112,7 +133,7 @@ const posCartSlice = createSlice({
     },
 
     setCart(state, action) {
-      state.cart = Array.isArray(action.payload) ? action.payload : [];
+      state.cart = Array.isArray(action.payload) ? mergeLines(action.payload) : [];
     },
 
     // ==========================

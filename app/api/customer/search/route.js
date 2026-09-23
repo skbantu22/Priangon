@@ -6,6 +6,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ?phone=017...  -> exact match, one customer (used by the checkout form)
 // ?q=rahim       -> name / phone contains, up to 8 customers (POS picker)
+// ?recent=1      -> the 10 most recent customers
 export async function GET(req) {
   try {
     await connectDB();
@@ -23,6 +24,17 @@ export async function GET(req) {
         .select("name phone address type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(8)
+        .lean();
+
+      return NextResponse.json({ success: true, customers });
+    }
+
+    // ?recent=1 -> latest customers (POS customer modal before typing)
+    if (searchParams.get("recent")) {
+      const customers = await Customer.find({})
+        .select("name phone address type totalOrders totalSpent")
+        .sort({ updatedAt: -1 })
+        .limit(10)
         .lean();
 
       return NextResponse.json({ success: true, customers });

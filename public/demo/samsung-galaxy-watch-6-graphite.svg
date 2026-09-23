@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eeebf7"/>
+  </radialGradient>
+  <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="blur4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+  <linearGradient id="gloss" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".35" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="strap" x1="0" y1="0" x2="1" y2="0">
+       <stop offset="0" stop-color="#2c3441"/><stop offset=".5" stop-color="#4f5866"/><stop offset="1" stop-color="#2c3441"/></linearGradient>
+     <linearGradient id="caseG" x1="0" y1="0" x2="1" y2="1">
+       <stop offset="0" stop-color="#d9dbe3"/><stop offset=".5" stop-color="#8d909c"/><stop offset="1" stop-color="#4b4e59"/></linearGradient>
+</defs>
+<rect width="400" height="400" fill="url(#bg)"/>
+<ellipse cx="200" cy="372" rx="90" ry="10" fill="#1e1b4b" opacity=".22" filter="url(#soft)"/>
+
+  <rect x="152" y="18" width="96" height="120" rx="26" fill="url(#strap)"/>
+  <rect x="152" y="262" width="96" height="124" rx="26" fill="url(#strap)"/>
+  <g stroke="#272e39" stroke-width="2" opacity=".35">
+    <line x1="158" y1="300" x2="242" y2="300"/><line x1="158" y1="320" x2="242" y2="320"/><line x1="158" y1="340" x2="242" y2="340"/></g>
+  <rect x="112" y="104" width="176" height="196" rx="52" fill="url(#caseG)"/>
+  <rect x="120" y="112" width="160" height="180" rx="44" fill="#07070a"/>
+  <rect x="290" y="160" width="12" height="40" rx="6" fill="#9a9dab"/>
+  <circle cx="200" cy="202" r="58" fill="none" stroke="#1e3a8a" stroke-width="8" stroke-dasharray="250 400" stroke-linecap="round" transform="rotate(-90 200 202)"/>
+  <circle cx="200" cy="202" r="44" fill="none" stroke="#34d399" stroke-width="7" stroke-dasharray="170 400" stroke-linecap="round" transform="rotate(-90 200 202)"/>
+  <text x="200" y="212" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="middle">10:08</text>
+  <rect x="112" y="104" width="176" height="196" rx="52" fill="url(#gloss)"/>
+</svg>

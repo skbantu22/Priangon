@@ -21,6 +21,7 @@ import {
   HandCoins,
   UserPlus,
   ShieldCheck,
+  ArrowLeft,
 } from "lucide-react";
 import {
   setDiscount,
@@ -33,6 +34,7 @@ import {
 } from "@/store/reducer/posCartSlice";
 import { showToast } from "@/lib/showToast";
 import { CUSTOMER_TYPES, normalizeCustomerType } from "@/lib/priceTiers";
+import CustomerModal from "./CustomerModal";
 import { isValidSerial, warrantyLabel } from "@/lib/warranty";
 
 // IMEI / serial inputs, one per unit, for phones and other tracked items
@@ -101,6 +103,8 @@ function CustomerPicker() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
+  // full customer modal: search, add new, set dealer / retailer type
+  const [modalOpen, setModalOpen] = useState(false);
   const boxRef = useRef(null);
 
   useEffect(() => {
@@ -153,18 +157,13 @@ function CustomerPicker() {
   };
 
   const inputClass =
-    "h-9 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
+    "h-8 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 text-[12px] outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
 
   return (
     <div ref={boxRef} className="relative">
-      <p className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-        <User className="size-4 text-primary" />
-        Customer <span className="font-normal text-gray-400">(Optional)</span>
-      </p>
-
       {customer ? (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-2">
-          <div className="flex gap-2">
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-1.5">
+          <div className="flex gap-1.5">
             <input
               value={customer.name}
               onChange={(e) =>
@@ -186,21 +185,29 @@ function CustomerPicker() {
             />
             <button
               type="button"
+              onClick={() => setModalOpen(true)}
+              title="Change customer"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10"
+            >
+              <Search className="size-4" />
+            </button>
+            <button
+              type="button"
               onClick={() => dispatch(clearCustomer())}
               title="Walk-in customer"
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
             >
               <X className="size-4" />
             </button>
           </div>
-          <div className="mt-1.5 flex items-center gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <select
               value={normalizeCustomerType(customer.type)}
               onChange={(e) =>
                 dispatch(setCustomer({ ...customer, type: e.target.value }))
               }
               title="Customer type: sets the rate"
-              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-[12px] font-medium outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+              className="h-7 rounded-md border border-gray-200 bg-white px-1.5 text-[11px] font-medium outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
             >
               {Object.entries(CUSTOMER_TYPES).map(([key, t]) => (
                 <option key={key} value={key}>
@@ -221,18 +228,35 @@ function CustomerPicker() {
           </div>
         </div>
       ) : (
-        <label className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary dark:border-white/10 dark:bg-transparent">
-          <User className="size-4 text-gray-400" />
+        <label className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary dark:border-white/10 dark:bg-transparent">
+          <User className="size-4 text-primary" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => results.length && setOpen(true)}
-            placeholder="Walk-in Customer"
+            placeholder="Customer (optional): name / phone"
             className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
           />
-          <Search className="size-4 text-primary" />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setModalOpen(true);
+            }}
+            title="Find or add customer"
+            className="-mr-2 flex h-7 items-center gap-1 rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20"
+          >
+            <Search className="size-3.5" /> Find / Add
+          </button>
         </label>
       )}
+
+      <CustomerModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onPick={pick}
+        initialQuery={customer ? "" : query}
+      />
 
       {open && !customer && query.trim().length >= 2 && (
         <div className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-card">
@@ -284,6 +308,8 @@ function CustomerPicker() {
 export default function CartSidebar({
   expanded,
   setExpanded,
+  mobileOpen = false,
+  onMobileClose,
   cart = [],
   products = [],
   removeCartItem,
@@ -426,15 +452,28 @@ export default function CartSidebar({
 
   return (
     <aside
-      className={`flex h-full min-h-0 flex-col overflow-y-auto border-l border-gray-200 bg-white dark:border-white/10 dark:bg-card ${
-        expanded ? "flex-1" : "w-full shrink-0 lg:w-[410px] 2xl:w-[440px]"
-      }`}
+      className={`h-full min-h-0 flex-col overflow-y-auto bg-white dark:bg-card lg:static lg:z-auto lg:flex lg:border-l lg:border-gray-200 lg:dark:border-white/10 ${
+        mobileOpen ? "fixed inset-0 z-50 flex" : "hidden"
+      } ${expanded ? "lg:flex-1" : "w-full shrink-0 lg:w-[410px] 2xl:w-[440px]"}`}
     >
       {/* ================= HEADER ================= */}
-      <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={onMobileClose}
+          className="-ml-1 flex size-9 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden dark:text-gray-300 dark:hover:bg-white/10"
+          aria-label="Back to products"
+        >
+          <ArrowLeft className="size-5" />
+        </button>
         <ShoppingBag className="size-5 text-primary" strokeWidth={2.5} />
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+        <h2 className="text-base font-bold text-gray-900 dark:text-white">
           Current Sale
+          {cart.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              {cart.length}
+            </span>
+          )}
         </h2>
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -442,7 +481,7 @@ export default function CartSidebar({
             type="button"
             onClick={() => setExpanded(!expanded)}
             title={expanded ? "Show products" : "Expand cart"}
-            className="hidden size-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 lg:flex dark:hover:bg-white/10"
+            className="hidden size-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 lg:flex dark:hover:bg-white/10"
           >
             {expanded ? (
               <Minimize2 className="size-4" />
@@ -454,25 +493,16 @@ export default function CartSidebar({
             type="button"
             onClick={onClear}
             disabled={!cart.length}
-            title="Clear all"
-            className="flex size-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 disabled:opacity-40 dark:hover:bg-red-500/10"
+            className="flex h-8 items-center gap-1 rounded-lg bg-red-50 px-2.5 text-[12px] font-medium text-red-600 hover:bg-red-100 disabled:opacity-40 dark:bg-red-500/10"
           >
-            <Trash2 className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={!cart.length}
-            className="h-9 rounded-lg bg-red-50 px-3 text-[13px] font-medium text-red-600 hover:bg-red-100 disabled:opacity-40 dark:bg-red-500/10"
-          >
-            Clear All
+            <Trash2 className="size-3.5" /> Clear All
           </button>
         </div>
       </div>
 
       {/* ================= ITEMS ================= */}
-      <div className="mx-3 flex min-h-30 flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
-        <div className="grid shrink-0 grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-2.5 text-[12px] font-semibold text-gray-600 dark:bg-white/5 dark:text-gray-300">
+      <div className="mx-3 flex min-h-[220px] flex-1 flex-col lg:min-h-[260px] overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
+        <div className="grid shrink-0 grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:bg-white/5 dark:text-gray-300">
           <span>#</span>
           <span>Product</span>
           <span className="text-center">Qty</span>
@@ -494,17 +524,17 @@ export default function CartSidebar({
               return (
                 <div
                   key={id || idx}
-                  className="grid grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-2 first:border-t-0 dark:border-white/10"
+                  className="grid grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-1 first:border-t-0 dark:border-white/10"
                 >
                   <span className="text-[12px] text-gray-500">{idx + 1}</span>
 
                   <div className="flex min-w-0 items-center gap-2">
-                    <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-gray-50">
+                    <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-gray-50">
                       <Image
                         src={item.image || "/placeholder.png"}
                         alt={item.name || ""}
                         fill
-                        sizes="40px"
+                        sizes="36px"
                         className="object-contain"
                         unoptimized={skipOptimize(item.image)}
                       />
@@ -513,15 +543,17 @@ export default function CartSidebar({
                       <p className="line-clamp-2 text-[12px] font-medium leading-tight text-gray-900 dark:text-gray-100">
                         {item.name}
                       </p>
-                      <p className="truncate text-[11px] text-gray-500">
-                        {[item.size, item.color].filter(Boolean).join(" · ")}
+                      <p className="flex items-center gap-1 truncate text-[10px] text-gray-500">
+                        {[item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" · ")}
+                        {warrantyLabel(item) && (
+                          <ShieldCheck
+                            className="size-3 shrink-0 text-emerald-600"
+                            aria-label={warrantyLabel(item)}
+                          >
+                            <title>{warrantyLabel(item)}</title>
+                          </ShieldCheck>
+                        )}
                       </p>
-                      {warrantyLabel(item) && (
-                        <p className="flex items-center gap-1 truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
-                          <ShieldCheck className="size-3 shrink-0" />
-                          {warrantyLabel(item)}
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -531,7 +563,7 @@ export default function CartSidebar({
                     value={item.qty}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => changeQty(item, e.target.value)}
-                    className="h-8 w-full rounded-md border border-gray-200 bg-white px-1.5 text-center text-[13px] font-semibold outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+                    className="h-7 w-full rounded-md border border-gray-200 bg-white px-1 text-center text-[12px] font-semibold outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
                   />
 
                   <span className="text-right text-[12px] text-gray-700 dark:text-gray-300">
@@ -559,12 +591,12 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2.5 px-4 pt-2.5">
+      <div className="shrink-0 space-y-2 px-3 pt-2">
         {/* ================= CUSTOMER ================= */}
         <CustomerPicker />
 
         {/* ================= SUMMARY ================= */}
-        <div className="space-y-1.5 border-t border-gray-100 pt-2 text-[13px] dark:border-white/10">
+        <div className="space-y-1 text-[12px]">
           <div className="flex justify-between text-gray-600 dark:text-gray-300">
             <span>
               Subtotal ({totalQty} items)
@@ -590,7 +622,7 @@ export default function CartSidebar({
                     }),
                   )
                 }
-                className={`${inputBox} w-20`}
+                className={`${inputBox} h-7 w-16`}
               />
               <select
                 value={discountType}
@@ -599,7 +631,7 @@ export default function CartSidebar({
                     setDiscount({ type: e.target.value, value: discountValue }),
                   )
                 }
-                className={`${inputBox} w-14 px-1.5`}
+                className={`${inputBox} h-7 w-12 px-1`}
               >
                 <option value="percent">%</option>
                 <option value="fixed">৳</option>
@@ -635,9 +667,9 @@ export default function CartSidebar({
         </div>
 
         {/* ================= TOTAL ================= */}
-        <div className="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-2">
-          <span className="text-base font-bold text-primary">Total Amount</span>
-          <span className="text-[24px] font-extrabold leading-none text-primary">
+        <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5">
+          <span className="text-sm font-bold text-primary">Total Amount</span>
+          <span className="text-xl font-extrabold leading-none text-primary">
             {money(total)}
           </span>
         </div>
@@ -649,7 +681,7 @@ export default function CartSidebar({
               key={key}
               type="button"
               onClick={() => chooseMethod(key)}
-              className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border px-1 text-[12px] font-medium transition ${
+              className={`flex h-8 items-center justify-center gap-1 rounded-lg border px-1 text-[11px] font-medium transition ${
                 method === key
                   ? "border-primary bg-primary text-white shadow-md shadow-primary/30"
                   : "border-gray-200 bg-white text-gray-700 hover:border-primary/50 dark:border-white/10 dark:bg-transparent dark:text-gray-200"
@@ -680,12 +712,12 @@ export default function CartSidebar({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2 text-[12px]">
+        <div className="grid grid-cols-2 items-center gap-2 text-[11px]">
           <label className="block">
             <span className="text-gray-600 dark:text-gray-300">
-              {method === "Due" ? "Paid Now" : "Received Amount"}
+              {method === "Due" ? "Paid Now" : "Received"}
             </span>
-            <span className="mt-0.5 flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 focus-within:border-primary dark:border-white/10">
+            <span className="mt-0.5 flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 px-2 focus-within:border-primary dark:border-white/10">
               <span className="text-gray-500">৳</span>
               <input
                 type="number"
@@ -699,10 +731,10 @@ export default function CartSidebar({
           </label>
           <div className="text-right">
             <span className="text-gray-600 dark:text-gray-300">
-              {due > 0 ? "Due Amount" : "Change Amount"}
+              {due > 0 ? "Due" : "Change"}
             </span>
             <p
-              className={`mt-0.5 flex h-9 items-center justify-end text-xl font-extrabold ${
+              className={`mt-0.5 flex h-8 items-center justify-end text-lg font-extrabold ${
                 due > 0 ? "text-red-500" : "text-emerald-600"
               }`}
             >
@@ -713,38 +745,37 @@ export default function CartSidebar({
       </div>
 
       {/* ================= ACTIONS (always visible at the bottom) ================= */}
-      <div className="sticky bottom-0 z-10 mt-auto shrink-0 space-y-2 border-t border-gray-100 bg-white px-4 py-3 shadow-[0_-6px_16px_-10px_rgba(0,0,0,0.25)] dark:border-white/10 dark:bg-card">
+      <div className="sticky bottom-0 z-10 mt-auto flex shrink-0 gap-1.5 border-t border-gray-100 bg-white px-3 py-2 shadow-[0_-6px_16px_-10px_rgba(0,0,0,0.25)] dark:border-white/10 dark:bg-card">
         <button
           type="button"
           onClick={complete}
           disabled={checkoutLoading || cart.length === 0}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[16px] font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           <CheckCircle2 className="size-5" />
           {checkoutLoading ? "Processing..." : "Complete Sale (F2)"}
         </button>
 
-        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={onHold}
             disabled={cart.length === 0}
-            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+            title="Save & Hold (F3)"
+            className="flex h-11 w-14 flex-col items-center justify-center rounded-lg bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
           >
             <Pause className="size-4" strokeWidth={3} />
-            Save &amp; Hold (F3)
+            Hold
           </button>
           <button
             type="button"
             onClick={onPrint}
             disabled={!canPrint}
-            title={canPrint ? "Print last invoice" : "No sale completed yet"}
-            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+            title={canPrint ? "Print last invoice (F4)" : "No sale completed yet"}
+            className="flex h-11 w-14 flex-col items-center justify-center rounded-lg bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
           >
             <Printer className="size-4" />
-            Print Invoice (F4)
+            Print
           </button>
-        </div>
       </div>
     </aside>
   );

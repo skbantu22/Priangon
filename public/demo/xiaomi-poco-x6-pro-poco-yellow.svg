@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eeebf7"/>
+  </radialGradient>
+  <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="blur4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+  <linearGradient id="gloss" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".35" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+       <stop offset="0" stop-color="#fbda57"/><stop offset=".5" stop-color="#facc15"/><stop offset="1" stop-color="#cda711"/></linearGradient>
+     <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+       <stop offset="0" stop-color="#575f69"/><stop offset=".55" stop-color="#1f2937"/><stop offset="1" stop-color="#140f35"/></linearGradient>
+     <radialGradient id="lens" cx="45%" cy="40%" r="60%">
+  <stop offset="0" stop-color="#3b4a6b"/><stop offset=".55" stop-color="#0b0d14"/><stop offset="1" stop-color="#2a2d36"/></radialGradient>
+</defs>
+<rect width="400" height="400" fill="url(#bg)"/>
+<ellipse cx="200" cy="352" rx="120" ry="14" fill="#1e1b4b" opacity=".22" filter="url(#soft)"/>
+
+  <!-- back -->
+  <g transform="rotate(8 250 190)">
+    <rect x="178" y="42" width="150" height="296" rx="28" fill="#bc9910"/>
+    <rect x="181" y="45" width="144" height="290" rx="25" fill="url(#body)"/>
+    <rect x="193" y="58" width="68" height="74" rx="20" fill="#e6bc13" stroke="#fbd644" stroke-width="2"/>
+    
+  <circle cx="213" cy="80" r="14" fill="#1a1a1f" opacity=".9"/>
+  <circle cx="213" cy="80" r="11" fill="url(#lens)"/>
+  <circle cx="209.15" cy="76.15" r="2.42" fill="#9ec5ff" opacity=".7"/>
+  <circle cx="242" cy="80" r="14" fill="#1a1a1f" opacity=".9"/>
+  <circle cx="242" cy="80" r="11" fill="url(#lens)"/>
+  <circle cx="238.15" cy="76.15" r="2.42" fill="#9ec5ff" opacity=".7"/>
+  <circle cx="213" cy="110" r="14" fill="#1a1a1f" opacity=".9"/>
+  <circle cx="213" cy="110" r="11" fill="url(#lens)"/>
+  <circle cx="209.15" cy="106.15" r="2.42" fill="#9ec5ff" opacity=".7"/>
+    <circle cx="243" cy="110" r="5" fill="#fff6d5" opacity=".9"/>
+    <rect x="181" y="45" width="144" height="290" rx="25" fill="url(#gloss)"/>
+  </g>
+  <!-- front -->
+  <g transform="rotate(-6 150 210)">
+    <rect x="72" y="62" width="150" height="296" rx="28" fill="#bc9910"/>
+    <rect x="75" y="65" width="144" height="290" rx="25" fill="#0c0c10"/>
+    <rect x="81" y="71" width="132" height="278" rx="20" fill="url(#wall)"/>
+    <circle cx="120" cy="150" r="46" fill="#848991" opacity=".55" filter="url(#blur4)"/>
+    <circle cx="178" cy="262" r="58" fill="#ffffff" opacity=".16" filter="url(#blur4)"/>
+    <rect x="128" y="80" width="40" height="11" rx="5.5" fill="#050507"/>
+    <text x="147" y="140" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#fff" text-anchor="middle" opacity=".92">10:08</text>
+    <text x="147" y="158" font-family="Arial, sans-serif" font-size="9" fill="#fff" text-anchor="middle" opacity=".75">Tuesday, 24 September</text>
+    <rect x="75" y="65" width="144" height="290" rx="25" fill="url(#gloss)"/>
+  </g>
+</svg>

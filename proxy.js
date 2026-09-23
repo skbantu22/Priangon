@@ -3,6 +3,9 @@ import { jwtVerify } from "jose";
 
 const SECRET = new TextEncoder().encode(process.env.SECRET_KEY);
 
+// kept here (not imported) so the proxy bundle stays tiny
+const PARTNER_ROLES = ["dealer", "subDealer", "retailer"];
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -45,6 +48,21 @@ export async function proxy(request) {
     const { payload } = await jwtVerify(token, SECRET);
 
     const role = payload?.role;
+    const isPartner = PARTNER_ROLES.includes(role);
+
+    // dealer / sub dealer / retailer: only the partner portal
+    if (isPartner && (isAuthRoute || pathname.startsWith("/admin") || pathname.startsWith("/my-account"))) {
+      return NextResponse.redirect(new URL("/partner", request.url));
+    }
+    if (pathname.startsWith("/partner") && !isPartner) {
+      const home =
+        role === "admin"
+          ? "/admin/dashboard"
+          : role === "cashier" || role === "manager"
+            ? "/admin/pos"
+            : "/my-account";
+      return NextResponse.redirect(new URL(home, request.url));
+    }
 
     // already logged in user visiting auth page
     if (isAuthRoute) {
@@ -92,5 +110,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/", "/admin/:path*", "/my-account/:path*", "/auth/:path*"],
+  matcher: ["/", "/admin/:path*", "/partner/:path*", "/my-account/:path*", "/auth/:path*"],
 };

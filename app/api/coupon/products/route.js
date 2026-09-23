@@ -20,7 +20,8 @@ export async function GET(request) {
     const start = Math.max(parseInt(searchParams.get("start") || "0", 10), 0);
     const size = Math.min(Math.max(parseInt(searchParams.get("size") || "12", 10), 1), 60);
 
-    const filter = { deletedAt: null };
+    // hidden products ("Show on website" off) are only sold in the POS
+    const filter = { deletedAt: null, showInWebsite: { $ne: false } };
 
     // ✅ category: id or slug
     if (category) {

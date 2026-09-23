@@ -38,6 +38,20 @@ const productSchema = new mongoose.Schema(
       months: { type: Number, min: 0, default: 0 },
     },
 
+    // simple = one item (auto "Default" variant), variant = colors / storage / sizes
+    productType: { type: String, enum: ["simple", "variant"], default: "variant" },
+    unit: { type: String, trim: true, default: "Pcs" },
+    code: { type: String, trim: true, default: "" },
+    rackNo: { type: String, trim: true, default: "" },
+    weight: { type: Number, min: 0, default: 0 }, // gram
+
+    // low-stock alert when total stock falls to this (0 = no alert)
+    alertQuantity: { type: Number, min: 0, default: 0 },
+    // the POS may not sell below this (0 = no limit)
+    minSalePrice: { type: Number, min: 0, default: 0 },
+    // listed on the website shop
+    showInWebsite: { type: Boolean, default: true },
+
     // phones / watches: each unit sold must carry its IMEI or serial number
     trackSerial: { type: Boolean, default: false },
 

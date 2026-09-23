@@ -5,6 +5,7 @@ import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
 import { cleanMobileFields } from "@/lib/productMobileFields";
 import { cleanTierPrices } from "@/lib/priceTiers";
+import { cleanExtraFields } from "@/lib/productExtraFields";
 
 export async function POST(request) {
   try {
@@ -73,6 +74,7 @@ export async function POST(request) {
 
       ...cleanMobileFields(payload),
       ...cleanTierPrices(payload),
+      ...cleanExtraFields(payload),
 
       freeDelivery: productData.freeDelivery || false,
     });

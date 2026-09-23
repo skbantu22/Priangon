@@ -78,21 +78,23 @@ function numberToWords(num) {
   return str.trim();
 }
 
-export default function PrintReceipt({ order }) {
+export default function PrintReceipt({ order, autoPrint = true }) {
   // Auto Print popup after 0.5s so buttons are rendered first
+  // (the partner portal shows the invoice first and prints on demand)
   useEffect(() => {
+    if (!autoPrint) return;
     const timer = setTimeout(() => {
       window.print();
     }, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [autoPrint]);
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
 
-  const showroomName = "MobiZone";
+  const showroomName = "SB Telecom";
   const showroomAddress = order.showroom?.address || "Dhaka, Bangladesh";
   const showroomPhone = order.showroom?.phone || "01700000001";
-  const showroomEmail = order.showroom?.email || "support@mobizone.com.bd";
+  const showroomEmail = order.showroom?.email || "support@sbtelecom.com.bd";
 
   const totalAmount = order.total || 0;
   // older orders have no paidAmount: they were paid in full
@@ -164,14 +166,6 @@ export default function PrintReceipt({ order }) {
     doc.setFontSize(14);
     doc.text(showroomName, pageWidth / 2, y, { align: "center" });
     y += 5;
-
-    if (order.showroom?.name) {
-      doc.setFontSize(9);
-      doc.text(`Branch: ${order.showroom.name}`, pageWidth / 2, y, {
-        align: "center",
-      });
-      y += 4;
-    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
@@ -352,7 +346,7 @@ export default function PrintReceipt({ order }) {
 
     const invoiceLink = `${window.location.origin}/invoice/${order.orderNumber}`;
 
-    const message = `📱 Thank you for shopping with MobiZone!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
+    const message = `📱 Thank you for shopping with SB Telecom!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
     window.open(
       `https://wa.me/88${phone}?text=${encodeURIComponent(message)}`,
       "_blank",
@@ -409,11 +403,6 @@ export default function PrintReceipt({ order }) {
           <h2 className="font-serif font-bold text-[22px] tracking-wide text-gray-800">
             {showroomName}
           </h2>
-          {order.showroom?.name && (
-            <p className="text-[11px] font-bold text-gray-700 uppercase mt-0.5">
-              Branch: {order.showroom.name}
-            </p>
-          )}
           <p className="whitespace-pre-line text-[11px] leading-4 text-gray-700 mt-1">
             {showroomAddress}
           </p>

@@ -67,22 +67,47 @@ const BRAND_RULES = [
 const brandOf = (name) =>
   BRAND_RULES.find(([rx]) => rx.test(name))?.[1] || "Generic";
 
+// single store (stock is kept against it; the UI never shows it)
 const SHOWROOMS = [
-  { name: "MobiZone - Dhanmondi", address: "Road 27, Dhanmondi, Dhaka", phone: "01700000001" },
-  { name: "MobiZone - Uttara", address: "Sector 7, Uttara, Dhaka", phone: "01700000002" },
+  { name: "Main Store", address: "Road 27, Dhanmondi, Dhaka", phone: "01700000001" },
 ];
 
+// [name, phone, address, price list]
 const CUSTOMERS = [
-  ["Rahim Uddin", "01811111111", "Mirpur 10, Dhaka"],
-  ["Karim Traders (Dealer)", "01822222222", "Gulistan, Dhaka"],
-  ["Nusrat Jahan", "01933333333", "Banani, Dhaka"],
-  ["Sabbir Telecom (Retailer)", "01644444444", "Savar, Dhaka"],
+  ["Rahim Uddin", "01811111111", "Mirpur 10, Dhaka", "retail"],
+  ["Karim Traders", "01822222222", "Gulistan, Dhaka", "dealer"],
+  ["Nusrat Jahan", "01933333333", "Banani, Dhaka", "retail"],
+  ["Sabbir Telecom", "01644444444", "Savar, Dhaka", "retailer"],
+  ["Hasan Mobile Point", "01755555555", "Mohammadpur, Dhaka", "subDealer"],
 ];
 
 // starter logins: change these passwords after the first login
+// (partner logins use `customer` = index in CUSTOMERS)
 const STAFF = [
   { name: "Admin", email: "admin@mobizone.com", password: "admin1234", role: "admin" },
-  { name: "Cashier Dhanmondi", email: "cashier@mobizone.com", password: "cashier1234", role: "cashier", showroom: 0 },
+  { name: "Cashier", email: "cashier@mobizone.com", password: "cashier1234", role: "cashier", showroom: 0 },
+  { name: "Abdul Karim", email: "dealer@mobizone.com", password: "dealer1234", role: "dealer", customer: 1 },
+  { name: "Hasan Ali", email: "subdealer@mobizone.com", password: "subdealer1234", role: "subDealer", customer: 4 },
+  { name: "Sabbir Hossain", email: "retailer@mobizone.com", password: "retailer1234", role: "retailer", customer: 3 },
+];
+
+// price list of each product, as a share of its retail price (rounded to ৳10)
+const TIER_RATIO = { purchasePrice: 0.85, dealerPrice: 0.9, subDealerPrice: 0.93, retailerPrice: 0.96 };
+const TIER_FIELD = { dealer: "dealerPrice", subDealer: "subDealerPrice", retailer: "retailerPrice" };
+const round10 = (n) => Math.round(n / 10) * 10;
+// same rule as lib/priceTiers.js: a dearer variant keeps the product's ratio
+const priceFor = (product, variant, type) => {
+  const field = TIER_FIELD[type];
+  if (!field || !product[field]) return variant.sellingPrice;
+  if (variant.sellingPrice === product.sellingPrice) return product[field];
+  return Math.round((variant.sellingPrice * product[field]) / product.sellingPrice);
+};
+
+// dealer orders waiting in the portal: [customerIndex, status, [[productName, optionIndex, colorIndex, qty]], note]
+const PARTNER_ORDERS = [
+  [1, "pending", [["Samsung Galaxy A05", 0, 0, 3], ["Samsung 25W Charger", 0, 0, 5]], "Please deliver by tomorrow"],
+  [3, "confirmed", [["Xiaomi Redmi A3", 1, 0, 2], ["Samsung Silicone Case", 0, 0, 2]], ""],
+  [4, "pending", [["Infinix Note 40", 0, 0, 2]], "Payment on delivery"],
 ];
 
 // ---------------------------------------------------------------------------
@@ -249,6 +274,8 @@ async function main() {
       mrp: firstMrp,
       sellingPrice: firstPrice,
       discountPercentage: Math.round(((firstMrp - firstPrice) / firstMrp) * 100),
+      // price list: purchase / dealer / sub dealer / retailer (retail = sellingPrice)
+      ...Object.fromEntries(Object.entries(TIER_RATIO).map(([f, r]) => [f, round10(firstPrice * r)])),
       offers: [],
       freeDelivery: false,
       media: mediaIds,
@@ -272,8 +299,8 @@ async function main() {
   await db.collection("productvariants").insertMany(variants);
   await db.collection("showroomstocks").insertMany(stocks);
 
-  const customers = CUSTOMERS.map(([name, phone, address]) => ({
-    _id: id(), name, phone, address, totalOrders: 0, totalSpent: 0, ...stamp,
+  const customers = CUSTOMERS.map(([name, phone, address, type]) => ({
+    _id: id(), name, phone, address, type, totalOrders: 0, totalSpent: 0, ...stamp,
   }));
 
   const staff = await Promise.all(
@@ -283,10 +310,11 @@ async function main() {
       email: s.email,
       role: s.role,
       showroomId: s.showroom === undefined ? null : showrooms[s.showroom]._id,
+      customerId: s.customer === undefined ? null : customers[s.customer]._id,
       password: await bcrypt.hash(s.password, 10),
       tokenVersion: 0,
       isEmailVerified: true,
-      phone: "01700000000",
+      phone: s.customer === undefined ? "01700000000" : customers[s.customer].phone,
       deletedAt: null,
       ...stamp,
     })),
@@ -310,8 +338,9 @@ async function main() {
         color: v.color,
         size: v.size,
         qty,
-        price: v.sellingPrice,
-        subtotal: v.sellingPrice * qty,
+        // dealers / retailers bought at their own price list
+        price: priceFor(product, v, customer.type),
+        subtotal: priceFor(product, v, customer.type) * qty,
         imeis: product.trackSerial ? Array.from({ length: qty }, () => makeSerial(kind)) : [],
         warrantyType: months ? product.warranty.type : "none",
         warrantyMonths: months,
@@ -334,12 +363,13 @@ async function main() {
       vat: 0,
       total,
       customerId: customer._id,
+      customerType: customer.type,
       customerName: customer.name,
       phone: customer.phone,
       address: customer.address,
       saleDate,
       remark: "",
-      soldBy: staff[i % staff.length].name,
+      soldBy: staff[i % 2].name,
       payments: [{ _id: id(), type: payType, option: payType === "Mobile Banking" ? "bKash" : "", amount: paid }],
       paidAmount: paid,
       dueAmount: due,
@@ -385,10 +415,55 @@ async function main() {
   });
   await db.collection("warrantyclaims").insertMany(claims);
 
-  // keep the invoice / claim counters in step with the seeded numbers
+  // ---- orders waiting in the partner portal ----
+  const partnerOrders = PARTNER_ORDERS.map(([ci, status, lines, note], n) => {
+    const customer = customers[ci];
+    const login = staff.find((u) => String(u.customerId) === String(customer._id));
+    const items = lines.map(([name, oi, coi, qty]) => {
+      const { product, grid } = catalog[name];
+      const v = grid[coi][oi];
+      const price = priceFor(product, v, customer.type);
+      return {
+        _id: id(),
+        productId: product._id,
+        variantId: v._id,
+        productName: product.name,
+        image: v.media[0],
+        color: v.color,
+        size: v.size,
+        qty,
+        price,
+        subtotal: price * qty,
+      };
+    });
+    const created = daysAgo(PARTNER_ORDERS.length - n);
+    return {
+      _id: id(),
+      orderNumber: `PO-${String(n + 1).padStart(5, "0")}`,
+      userId: login._id,
+      customerId: customer._id,
+      customerType: customer.type,
+      customerName: customer.name,
+      phone: customer.phone,
+      showroomId: showrooms[0]._id,
+      items,
+      total: items.reduce((s, it) => s + it.subtotal, 0),
+      note,
+      status,
+      staffNote: "",
+      posOrderId: null,
+      invoiceNumber: "",
+      createdAt: created,
+      updatedAt: created,
+    };
+  });
+  await db.collection("partnerorders").insertMany(partnerOrders);
+
+  // keep the invoice / claim / order counters in step with the seeded numbers
   await db.collection("counters").insertMany([
     { name: "pos_invoice", seq: orders.length, ...stamp },
     { name: "warranty_claim", seq: claims.length, ...stamp },
+    { name: "partner_order", seq: partnerOrders.length, ...stamp },
   ]);
 
   const sampleImei = orders[3].items[0].imeis[0];
@@ -396,7 +471,7 @@ async function main() {
 Done ("${MONGODB_DB}"):
   ${CATEGORIES.length} categories, ${products.length} products, ${variants.length} variants
   ${showrooms.length} showrooms, ${stocks.length} stock rows, ${customers.length} customers
-  ${orders.length} past sales, ${claims.length} warranty claims
+  ${orders.length} past sales, ${claims.length} warranty claims, ${partnerOrders.length} dealer orders
   images in public/demo
 
 Try the warranty check with IMEI ${sampleImei}

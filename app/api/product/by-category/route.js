@@ -63,6 +63,7 @@ export async function GET(request) {
     const baseFilter = {
       deleteType: null,
       $or: [{ category: cat._id }, { categoryId: cat._id }],
+      showInWebsite: { $ne: false },
     };
 
     // ✅ Optional subcategory filter (slug OR name, within this category)

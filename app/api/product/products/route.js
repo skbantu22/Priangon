@@ -26,7 +26,8 @@ export async function GET(request) {
       60,
     );
 
-    const filter = { deletedAt: null };
+    // hidden products ("Show on website" off) are only sold in the POS
+    const filter = { deletedAt: null, showInWebsite: { $ne: false } };
 
     // ✅ category: id or slug
     if (category) {

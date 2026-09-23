@@ -5,6 +5,7 @@ import { isAuthenticated } from "@/lib/auth.server";
 import POSOrder from "@/models/posorder.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import WarrantyClaim from "@/models/WarrantyClaim.model";
+import PartnerOrder from "@/models/PartnerOrder.model";
 
 const TZ = "Asia/Dhaka";
 const TZ_OFFSET_MS = 6 * 60 * 60 * 1000; // Dhaka is UTC+6, no DST
@@ -388,6 +389,9 @@ export async function GET(req) {
         openClaims: (claims.received || 0) + (claims.sent_to_service || 0),
         readyClaims: (claims.repaired || 0) + (claims.replaced || 0),
         expiringSoon: orderFacets.expiring.length,
+        pendingDealerOrders: await PartnerOrder.countDocuments({
+          status: { $in: ["pending", "confirmed"] },
+        }),
       },
       salesChart,
       chartTotal: salesChart.reduce((s, c) => s + c.sales, 0),

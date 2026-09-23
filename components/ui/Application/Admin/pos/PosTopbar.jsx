@@ -12,7 +12,6 @@ import {
   Maximize,
   Minimize,
   Trash2,
-  Store,
 } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import {
@@ -32,10 +31,6 @@ export default function PosTopbar({
   setSearch,
   inputRef,
   onSearchKeyDown,
-  isAdmin,
-  showrooms = [],
-  selectedShowroomId,
-  setSelectedShowroomId,
   heldSales = [],
   onRestoreHeld,
   onDeleteHeld,
@@ -75,7 +70,7 @@ export default function PosTopbar({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="Search product by name, SKU or scan barcode..."
+          placeholder="Search or scan barcode..."
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-sm text-gray-900 outline-none placeholder:text-gray-400"
         />
         {search ? (
@@ -90,7 +85,7 @@ export default function PosTopbar({
             <X className="size-4" />
           </button>
         ) : (
-          <kbd className="mr-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary">
+          <kbd className="mr-2 rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary max-sm:hidden">
             F1
           </kbd>
         )}
@@ -98,24 +93,6 @@ export default function PosTopbar({
           <Search className="size-5 text-white" />
         </span>
       </div>
-
-      {/* SHOWROOM (admin only, others are locked to their own showroom) */}
-      {isAdmin && (
-        <label className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-white/10 px-3" title="Showroom">
-          <Store className="size-4 text-white/80" />
-          <select
-            value={selectedShowroomId}
-            onChange={(e) => setSelectedShowroomId(e.target.value)}
-            className="max-w-28 xl:max-w-44 bg-transparent text-sm text-white outline-none [&>option]:text-gray-900"
-          >
-            {showrooms.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
 
       <div className="ml-auto flex items-center gap-1">
         {/* HELD SALES */}
@@ -181,7 +158,7 @@ export default function PosTopbar({
           <span className="hidden lg:inline">Exchange (F6)</span>
         </button>
 
-        <Link href="/admin/all-orders/pos-orders" className={topButton}>
+        <Link href="/admin/all-orders/pos-orders" className={`${topButton} max-sm:hidden`}>
           <History className="size-5" />
           <span className="hidden lg:inline">Recent Sales</span>
         </Link>
@@ -190,7 +167,7 @@ export default function PosTopbar({
           type="button"
           onClick={toggleFullscreen}
           title="Fullscreen"
-          className={topButton}
+          className={`${topButton} max-sm:hidden`}
         >
           {isFullscreen ? (
             <Minimize className="size-5" />

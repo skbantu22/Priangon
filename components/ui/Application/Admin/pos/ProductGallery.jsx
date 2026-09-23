@@ -397,7 +397,7 @@ export default function ProductGallery({
     "h-10 min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none focus:border-primary dark:border-white/10 dark:bg-card dark:text-gray-200";
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-4">
       {/* ---------------- CATEGORY CHIPS ---------------- */}
       <ScrollRow label="categories">
         <button
@@ -445,8 +445,8 @@ export default function ProductGallery({
       {/* ---------------- PRODUCTS PANEL ---------------- */}
       <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
         {/* filter bar */}
-        <div className="grid shrink-0 grid-cols-2 gap-2 p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]">
-          <label className="col-span-2 flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
+        <div className="grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]">
+          <label className="col-span-2 hidden h-10 items-center gap-2 sm:flex rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
             <Search className="size-4 text-gray-400" />
             <input
               value={localFilter}
@@ -518,10 +518,10 @@ export default function ProductGallery({
 
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-3 pb-3"
+          className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-2 pb-24 sm:px-3 lg:pb-3"
         >
           {loading ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
@@ -545,7 +545,7 @@ export default function ProductGallery({
               <div
                 className={
                   view === "grid"
-                    ? "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3"
+                    ? "grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3"
                     : "flex flex-col gap-2"
                 }
               >

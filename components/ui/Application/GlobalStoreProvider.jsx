@@ -33,7 +33,7 @@ export default function GlobalStoreProvider({ children }) {
         persister,
         maxAge: CACHE_MAX_AGE,
         // change this when the data source changes, so browsers drop old cached lists
-        buster: "mobizone-demo-1",
+        buster: "sbt-2",
       }}
     >
       <Provider store={store}>

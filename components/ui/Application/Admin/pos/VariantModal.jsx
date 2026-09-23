@@ -1,245 +1,243 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useSelector } from "react-redux";
+import { Minus, Plus, ShieldCheck, ShoppingCart, X } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { skipOptimize } from "@/lib/imageSrc";
+import { CUSTOMER_TYPES, normalizeCustomerType, rateForType, ratesFor } from "@/lib/priceTiers";
+import { formatWarrantyPeriod } from "@/lib/warranty";
 
+const money = (n) => `৳${Number(n || 0).toLocaleString("en-BD")}`;
+const stockOf = (v) => Number(v?.showroomStock ?? v?.stock ?? 0);
+// "Default" / "Standard" are placeholders of a simple product, not real options
+const real = (x) => (x && !/^(default|standard|n\/a)$/i.test(x) ? x : "");
+
+// POS: pick storage / color and quantity of one product, then add it to the sale
 export default function VariantModal({ product, setOpenProduct, addToCart }) {
-  // 🚀 Safe Data Parsing (Handles nested productId or flat objects)
-  const productData = useMemo(() => {
+  const cart = useSelector((s) => s.posCart.cart);
+  const customerType = normalizeCustomerType(useSelector((s) => s.posCart.customer?.type));
+
+  const { raw, variants, mainImage } = useMemo(() => {
     const rawP =
-      product?.productId &&
-      typeof product.productId === "object" &&
-      Object.keys(product.productId).length > 0
+      product?.productId && typeof product.productId === "object" && Object.keys(product.productId).length
         ? product.productId
         : product;
-
-    const variants = product?.variants?.length
-      ? product.variants
-      : rawP?.variants || [];
-
-    const mainImage =
-      product?.image ||
-      rawP?.image ||
-      (Array.isArray(rawP?.media) && rawP.media[0]?.secure_url) ||
-      (Array.isArray(rawP?.media) && rawP.media[0]) ||
-      "/placeholder.png";
-
     return {
-      name: rawP?.name || product?.name || "Unnamed Product",
-      mainImage,
-      variants,
-      rawProduct: rawP,
+      raw: rawP,
+      variants: product?.variants?.length ? product.variants : rawP?.variants || [],
+      mainImage:
+        product?.image || rawP?.image || rawP?.media?.[0]?.secure_url || "/placeholder.png",
     };
   }, [product]);
 
-  // First available in-stock variant setup
-  const defaultVariant = useMemo(() => {
-    return (
-      productData.variants.find((v) => (v.showroomStock ?? v.stock ?? 0) > 0) ||
-      productData.variants[0] ||
-      null
-    );
-  }, [productData.variants]);
+  const sizes = useMemo(() => [...new Set(variants.map((v) => real(v.size)).filter(Boolean))], [variants]);
+  const colors = useMemo(() => [...new Set(variants.map((v) => real(v.color)).filter(Boolean))], [variants]);
 
-  const [selectedVariant, setSelectedVariant] = useState(defaultVariant);
+  const first = variants.find((v) => stockOf(v) > 0) || variants[0] || null;
+  const [size, setSize] = useState(real(first?.size));
+  const [color, setColor] = useState(real(first?.color));
   const [qty, setQty] = useState(1);
 
-  // Close on Escape key press
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") setOpenProduct(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setOpenProduct]);
+  const variant =
+    variants.find((v) => real(v.size) === size && real(v.color) === color) ||
+    variants.find((v) => real(v.size) === size) ||
+    null;
 
-  const handleAddToCart = () => {
-    if (!selectedVariant) return;
+  const stock = stockOf(variant);
+  const inCart = cart.find((i) => i.variantId === variant?._id)?.qty || 0;
+  const canAdd = Math.max(0, stock - inCart);
+  const rates = ratesFor(raw, variant);
+  const price = rateForType(rates, customerType);
+  const mrp = Number(variant?.mrp) || 0;
+  const image = variant?.image || mainImage;
 
-    const currentStock =
-      selectedVariant.showroomStock ?? selectedVariant.stock ?? 0;
+  // is there stock for this size with that color (and the other way round)?
+  const hasStock = (s, c) =>
+    variants.some(
+      (v) => (s === null || real(v.size) === s) && (c === null || real(v.color) === c) && stockOf(v) > 0,
+    );
 
-    if (qty > currentStock) {
-      alert("Out of stock!");
-      return;
+  const pickSize = (s) => {
+    setSize(s);
+    // keep the color if it exists for this size, else take one that has stock
+    if (!variants.some((v) => real(v.size) === s && real(v.color) === color)) {
+      const v = variants.find((x) => real(x.size) === s && stockOf(x) > 0) || variants.find((x) => real(x.size) === s);
+      setColor(real(v?.color));
     }
-
-    addToCart(productData.rawProduct, selectedVariant, qty);
-    setOpenProduct(null);
+    setQty(1);
   };
 
-  const handleQtyChange = (delta) => {
-    const maxStock =
-      selectedVariant?.showroomStock ?? selectedVariant?.stock ?? 1;
-    setQty((prev) => Math.min(Math.max(1, prev + delta), maxStock));
+  const close = () => setOpenProduct(null);
+
+  const add = () => {
+    if (!variant || qty < 1 || qty > canAdd) return;
+    addToCart(raw, variant, qty);
+    close();
   };
+
+  // Enter adds, like the rest of the POS
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Enter" && e.target.tagName !== "BUTTON") {
+        e.preventDefault();
+        add();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const chip = (active, disabled) =>
+    `h-9 min-w-14 rounded-lg border px-3 text-[13px] font-medium transition ${
+      active
+        ? "border-primary bg-primary text-white"
+        : disabled
+          ? "border-dashed border-gray-200 text-gray-300 line-through dark:border-white/10"
+          : "border-gray-200 text-gray-700 hover:border-primary hover:text-primary dark:border-white/15 dark:text-gray-200"
+    }`;
+
+  const warranty = raw?.warranty?.type && raw.warranty.type !== "none" && raw.warranty.months;
 
   return (
-    <div
-      onClick={() => setOpenProduct(null)}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-3 transition-opacity animate-in fade-in duration-150"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]"
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3 bg-gray-50/50">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900 line-clamp-1 leading-snug">
-              {productData.name}
-            </h2>
-            <p className="text-[11px] text-gray-500 mt-0.5">
-              Select variant & quantity
-            </p>
+    <Dialog open onOpenChange={(o) => !o && close()}>
+      <DialogContent showCloseButton={false} className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <div className="grid sm:grid-cols-[240px_1fr]">
+          {/* picture */}
+          <div className="relative hidden aspect-square bg-gray-50 sm:block dark:bg-white/5">
+            <Image
+              src={image}
+              alt={raw?.name || ""}
+              fill
+              sizes="240px"
+              className="object-contain p-5"
+              unoptimized={skipOptimize(image)}
+            />
           </div>
-          <button
-            onClick={() => setOpenProduct(null)}
-            className="text-gray-400 hover:text-gray-600 h-6 w-6 rounded-full hover:bg-gray-200/60 flex items-center justify-center text-xs transition"
-          >
-            ✕
-          </button>
-        </div>
 
-        {/* Variant List */}
-        <div className="p-3 space-y-2 overflow-y-auto flex-1 divide-y divide-gray-50">
-          {productData.variants.map((v) => {
-            const stock = v.showroomStock ?? v.stock ?? 0;
-            const isOutOfStock = stock <= 0;
-            const isSelected = selectedVariant?._id === v._id;
-
-            const variantImg =
-              v.image || productData.mainImage || "/placeholder.png";
-
-            return (
-              <div
-                key={v._id}
-                onClick={() => {
-                  if (isOutOfStock) return;
-                  setSelectedVariant(v);
-                  setQty(1);
-                }}
-                className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer select-none border ${
-                  isSelected
-                    ? "border-green-500 bg-green-50/40 shadow-2xs"
-                    : "border-transparent hover:bg-gray-50"
-                } ${isOutOfStock ? "opacity-50 cursor-not-allowed bg-gray-50/50" : ""}`}
+          <div className="flex min-w-0 flex-col p-5">
+            <div className="flex items-start gap-3">
+              <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-gray-50 sm:hidden">
+                <Image src={image} alt="" fill sizes="56px" className="object-contain" unoptimized={skipOptimize(image)} />
+              </div>
+              <div className="min-w-0 flex-1">
+                {raw?.brand && <p className="text-xs font-medium text-muted-foreground">{raw.brand}</p>}
+                <DialogTitle className="text-lg leading-snug">{raw?.name || "Product"}</DialogTitle>
+              </div>
+              <button
+                type="button"
+                onClick={close}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10"
+                aria-label="Close"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200/60">
-                    <Image
-                      src={variantImg}
-                      alt={v.color || "Variant"}
-                      fill
-                      sizes="40px"
-                      className="object-cover"
-                      unoptimized={skipOptimize(variantImg)}
-                    />
-                  </div>
+                <X className="size-4" />
+              </button>
+            </div>
 
-                  <div className="min-w-0">
-                    <p className="font-medium text-xs text-gray-900 truncate">
-                      {v.color || "N/A"} / {v.size || "N/A"}
-                    </p>
-                    <p className="text-[11px] text-gray-600 font-medium">
-                      ৳{v.sellingPrice || productData.rawProduct.sellingPrice}
-                    </p>
-                  </div>
-                </div>
+            <div className="mt-2 flex flex-wrap items-baseline gap-2">
+              <span className="text-2xl font-bold text-primary">{money(price)}</span>
+              {mrp > price && <span className="text-sm text-muted-foreground line-through">{money(mrp)}</span>}
+              {customerType !== "retail" && (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  {CUSTOMER_TYPES[customerType].short} rate
+                </span>
+              )}
+            </div>
+            {warranty && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
+                <ShieldCheck className="size-3.5" /> {formatWarrantyPeriod(raw.warranty.months)} warranty
+              </p>
+            )}
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      isOutOfStock
-                        ? "bg-red-50 text-red-600"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {isOutOfStock ? "Stock Out" : `${stock} left`}
-                  </span>
-
-                  <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center transition ${
-                      isSelected
-                        ? "border-green-600 bg-green-600 text-white"
-                        : "border-gray-300"
-                    }`}
-                  >
-                    {isSelected && (
-                      <span className="text-[9px] font-bold">✓</span>
-                    )}
-                  </div>
+            {sizes.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Storage / Size</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {sizes.map((s) => (
+                    <button key={s} type="button" onClick={() => pickSize(s)} className={chip(size === s, !hasStock(s, null))}>
+                      {s}
+                    </button>
+                  ))}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
 
-        {/* Quantity Controls & Action */}
-        <div className="p-4 border-t border-gray-100 bg-white space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-600">Quantity</span>
-            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+            {colors.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Color</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {colors.map((c) => {
+                    const exists = variants.some((v) => real(v.size) === size && real(v.color) === c);
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        disabled={!exists}
+                        onClick={() => {
+                          setColor(c);
+                          setQty(1);
+                        }}
+                        className={chip(color === c, !exists || !hasStock(size, c))}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <p className={`mt-3 text-xs font-medium ${stock > 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {stock > 0 ? `${stock} in stock` : "Out of stock"}
+              {inCart > 0 && <span className="text-muted-foreground"> · {inCart} already in cart</span>}
+              {variant?.barcode && <span className="font-mono text-muted-foreground"> · {variant.barcode}</span>}
+            </p>
+
+            <div className="mt-auto flex items-center gap-3 pt-5">
+              <div className="flex h-11 items-center rounded-lg border border-gray-200 dark:border-white/15">
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  disabled={qty <= 1}
+                  className="flex size-11 items-center justify-center text-gray-600 disabled:opacity-30"
+                  aria-label="Less"
+                >
+                  <Minus className="size-4" />
+                </button>
+                <input
+                  type="number"
+                  value={qty}
+                  min={1}
+                  max={canAdd || 1}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setQty(Math.min(Math.max(1, Number(e.target.value) || 1), canAdd || 1))}
+                  className="h-full w-12 border-x border-gray-200 bg-transparent text-center text-sm font-semibold outline-none dark:border-white/15"
+                />
+                <button
+                  type="button"
+                  onClick={() => setQty((q) => Math.min(canAdd || 1, q + 1))}
+                  disabled={qty >= canAdd}
+                  className="flex size-11 items-center justify-center text-gray-600 disabled:opacity-30"
+                  aria-label="More"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => handleQtyChange(-1)}
-                disabled={qty <= 1}
-                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-200/70 active:bg-gray-300 text-sm font-semibold disabled:opacity-30 transition"
+                onClick={add}
+                disabled={!variant || canAdd < 1}
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-white shadow-md shadow-primary/25 hover:brightness-110 disabled:opacity-50 disabled:shadow-none"
               >
-                -
-              </button>
-              <input
-                type="number"
-                value={qty}
-                onChange={(e) => {
-                  const val = Number(e.target.value) || 1;
-                  const maxStock =
-                    selectedVariant?.showroomStock ??
-                    selectedVariant?.stock ??
-                    1;
-                  setQty(Math.min(Math.max(1, val), maxStock));
-                }}
-                className="w-10 h-8 text-center text-xs font-semibold bg-transparent outline-none text-gray-900 border-x border-gray-200"
-              />
-              <button
-                type="button"
-                onClick={() => handleQtyChange(1)}
-                disabled={
-                  qty >=
-                  (selectedVariant?.showroomStock ??
-                    selectedVariant?.stock ??
-                    1)
-                }
-                className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-200/70 active:bg-gray-300 text-sm font-semibold disabled:opacity-30 transition"
-              >
-                +
+                <ShoppingCart className="size-4" />
+                {canAdd < 1 ? (stock > 0 ? "All stock in cart" : "Out of stock") : `Add ${money(price * qty)}`}
               </button>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              onClick={() => setOpenProduct(null)}
-              className="h-9 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
-            >
-              Cancel
-            </button>
-
-            <button
-              onClick={handleAddToCart}
-              disabled={
-                !selectedVariant ||
-                (selectedVariant.showroomStock ?? selectedVariant.stock ?? 0) <=
-                  0
-              }
-              className="h-9 rounded-lg bg-green-600 text-xs font-medium text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition shadow-2xs"
-            >
-              Add To Cart
-            </button>
-          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

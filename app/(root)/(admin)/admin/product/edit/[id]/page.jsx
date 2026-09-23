@@ -39,6 +39,8 @@ import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import MobileSpecsCard from "@/components/ui/Application/Admin/products/MobileSpecsCard";
 import PriceListCard from "@/components/ui/Application/Admin/products/PriceListCard";
 import { tierPricesFromProduct } from "@/lib/priceTiers";
+import { extraFieldsFromProduct } from "@/lib/productExtraFields";
+import ProductStockCard from "@/components/ui/Application/Admin/products/ProductStockCard";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -76,6 +78,7 @@ const EditProduct = ({ params }) => {
       freeDelivery: false,
       ...mobileFieldsFromProduct(null),
       ...tierPricesFromProduct(null),
+      ...extraFieldsFromProduct(null),
     },
   });
 
@@ -135,6 +138,7 @@ const EditProduct = ({ params }) => {
         freeDelivery: !!product?.freeDelivery,
         ...mobileFieldsFromProduct(product),
         ...tierPricesFromProduct(product),
+        ...extraFieldsFromProduct(product),
       });
 
       if (product?.media?.length) {
@@ -397,6 +401,8 @@ const EditProduct = ({ params }) => {
                 </Card>
 
                 <PriceListCard form={form} />
+
+                <ProductStockCard form={form} showUnit />
 
                 <MobileSpecsCard form={form} />
               </div>

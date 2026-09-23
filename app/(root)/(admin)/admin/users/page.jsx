@@ -1,187 +1,97 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import axios from "axios";
+import { Loader2, UserPlus, Store } from "lucide-react";
+import { showToast } from "@/lib/showToast";
 
-export default function UsersPage() {
-  // ================= STATES =================
+const STAFF_ROLES = [
+  ["cashier", "Cashier", "POS sales and warranty check"],
+  ["manager", "Manager", "POS, products, stock, orders and reports"],
+  ["admin", "Admin", "Everything, including users and settings"],
+  ["moderator", "Moderator", "Online orders assigned to them"],
+];
+
+const EMPTY = { name: "", email: "", password: "", role: "cashier" };
+
+export default function CreateUserPage() {
+  const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const [showrooms, setShowrooms] = useState([]);
-
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "customer",
-    showroomId: "",
-  });
-
-  // ================= FETCH SHOWROOMS =================
-  useEffect(() => {
-    const fetchShowrooms = async () => {
-      try {
-        const res = await axios.get("/api/showrooms");
-
-        setShowrooms(res.data.showrooms || []);
-      } catch (err) {
-        console.log(err);
-      }
-    };
-
-    fetchShowrooms();
-  }, []);
-
-  // ================= HANDLE INPUT =================
-  const handleChange = (key, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  // ================= SUBMIT =================
-  const handleSubmit = async () => {
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      setLoading(true);
-
-      // VALIDATION
-      if (!form.name) {
-        return alert("Name required");
-      }
-
-      if (!form.email) {
-        return alert("Email required");
-      }
-
-      if (!form.password) {
-        return alert("Password required");
-      }
-
-      if (form.role === "cashier" && !form.showroomId) {
-        return alert("Please select showroom");
-      }
-
-      console.log("SUBMIT DATA:", form);
-
-      const res = await axios.post("/api/users/create", form);
-
-      console.log(res.data);
-
-      alert("User Created Successfully");
-
-      // RESET FORM
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-        role: "customer",
-        showroomId: "",
-      });
+      const { data } = await axios.post("/api/users/create", form);
+      if (!data.success) throw new Error(data.message);
+      showToast("success", `Login created for ${form.name}`);
+      setForm(EMPTY);
     } catch (err) {
-      console.log(err);
-
-      alert(err?.response?.data?.message || "Something went wrong");
+      showToast("error", err.response?.data?.message || err.message || "Could not create user");
     } finally {
       setLoading(false);
     }
   };
 
-  // ================= UI =================
+  const input =
+    "h-11 w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:border-primary";
+
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-xl mx-auto bg-white rounded-2xl shadow p-6">
-        {/* TITLE */}
-        <h1 className="text-2xl font-bold mb-6">Create User</h1>
-
-        {/* NAME */}
-        <div className="mb-4">
-          <label className="block mb-1 text-sm font-medium">Name</label>
-
-          <input
-            type="text"
-            placeholder="Enter name"
-            value={form.name}
-            onChange={(e) => handleChange("name", e.target.value)}
-            className="w-full border rounded-lg p-3"
-          />
+    <div className="mx-auto max-w-2xl space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Create User</h1>
+          <p className="text-sm text-muted-foreground">Staff login for the admin panel / POS.</p>
         </div>
-
-        {/* EMAIL */}
-        <div className="mb-4">
-          <label className="block mb-1 text-sm font-medium">Email</label>
-
-          <input
-            type="email"
-            placeholder="Enter email"
-            value={form.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            className="w-full border rounded-lg p-3"
-          />
-        </div>
-
-        {/* PASSWORD */}
-        <div className="mb-4">
-          <label className="block mb-1 text-sm font-medium">Password</label>
-
-          <input
-            type="password"
-            placeholder="Enter password"
-            value={form.password}
-            onChange={(e) => handleChange("password", e.target.value)}
-            className="w-full border rounded-lg p-3"
-          />
-        </div>
-
-        {/* ROLE */}
-        <div className="mb-4">
-          <label className="block mb-1 text-sm font-medium">Role</label>
-
-          <select
-            value={form.role}
-            onChange={(e) => handleChange("role", e.target.value)}
-            className="w-full border rounded-lg p-3"
-          >
-            <option value="customer">Customer</option>
-
-            <option value="cashier">Cashier</option>
-
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-
-        {/* SHOWROOM */}
-        {form.role === "cashier" && (
-          <div className="mb-5">
-            <label className="block mb-1 text-sm font-medium">
-              Select Showroom
-            </label>
-
-            <select
-              value={form.showroomId}
-              onChange={(e) => handleChange("showroomId", e.target.value)}
-              className="w-full border rounded-lg p-3"
-            >
-              <option value="">Select Showroom</option>
-
-              {showrooms.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* BUTTON */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-3"
+        <Link
+          href="/admin/partners"
+          className="flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
         >
-          {loading ? "Creating..." : "Create User"}
-        </button>
+          <Store className="size-4" /> Dealer / Sub Dealer / Retailer login
+        </Link>
       </div>
+
+      <form onSubmit={submit} className="space-y-4 rounded-2xl border bg-card p-6">
+        <label className="block text-sm font-medium">
+          Full name
+          <input required value={form.name} onChange={(e) => set("name", e.target.value)} className={`${input} mt-1`} />
+        </label>
+        <label className="block text-sm font-medium">
+          Email (login)
+          <input required type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className={`${input} mt-1`} />
+        </label>
+        <label className="block text-sm font-medium">
+          Password
+          <input required minLength={6} type="password" value={form.password} onChange={(e) => set("password", e.target.value)} className={`${input} mt-1`} placeholder="min 6 characters" />
+        </label>
+
+        <div>
+          <p className="mb-2 text-sm font-medium">Role</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {STAFF_ROLES.map(([key, label, hint]) => (
+              <label
+                key={key}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
+                  form.role === key ? "border-primary bg-primary/5" : "hover:bg-accent/50"
+                }`}
+              >
+                <input type="radio" name="role" value={key} checked={form.role === key} onChange={() => set("role", key)} className="mt-1 accent-primary" />
+                <span>
+                  <span className="block text-sm font-semibold">{label}</span>
+                  <span className="text-xs text-muted-foreground">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <button disabled={loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+          Create user
+        </button>
+      </form>
     </div>
   );
 }
