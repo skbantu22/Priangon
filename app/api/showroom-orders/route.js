@@ -158,6 +158,25 @@ export async function POST(req) {
       throw new Error("Customer phone is required for a due sale");
     }
 
+    // stock is checked before an invoice number is taken, so a rejected sale
+    // leaves no gap (it is checked again, atomically, when stock is taken)
+    const stockDocs = await ShowroomStock.find({
+      showroomId,
+      variantId: { $in: items.map((i) => i.variantId) },
+    })
+      .select("variantId stock")
+      .lean();
+    const stockLeft = new Map(stockDocs.map((s) => [String(s.variantId), Number(s.stock) || 0]));
+    for (const item of items) {
+      const label = [item.productName, item.size, item.color].filter(Boolean).join(" · ");
+      if (!stockLeft.has(String(item.variantId))) {
+        throw new Error(`${label} is not stocked here. Remove it from the cart and add it again.`);
+      }
+      if (stockLeft.get(String(item.variantId)) < Number(item.qty)) {
+        throw new Error(`${label}: only ${Math.max(0, stockLeft.get(String(item.variantId)))} left in stock`);
+      }
+    }
+
     const seq = await getNextInvoiceNumber("pos_invoice");
     const orderNumber = `INV-${String(seq).padStart(6, "0")}`;
 

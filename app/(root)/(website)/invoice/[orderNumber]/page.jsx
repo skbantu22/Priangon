@@ -6,10 +6,22 @@ import { connectDB } from "@/lib/databaseconnection";
 
 import PrintReceipt from "@/components/PrintReceipt";
 
-export default async function Page({ params }) {
-  await connectDB();
+import { isValidInvoiceToken } from "@/lib/invoiceLink";
 
+const notFound = (
+  <div className="min-h-screen flex items-center justify-center text-red-600 text-xl">
+    Invoice Not Found
+  </div>
+);
+
+export default async function Page({ params, searchParams }) {
   const { orderNumber } = await params;
+  const { t } = await searchParams;
+
+  // only the signed link sent to the customer opens an invoice
+  if (!isValidInvoiceToken(orderNumber, t)) return notFound;
+
+  await connectDB();
 
   const order = await POSOrder.findOne({ orderNumber })
 
@@ -117,5 +129,5 @@ export default async function Page({ params }) {
     };
   }
 
-  return <PrintReceipt order={safeOrder} />;
+  return <PrintReceipt order={safeOrder} publicView />;
 }

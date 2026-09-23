@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { warrantyLabel } from "@/lib/warranty";
+import { showToast } from "@/lib/showToast";
 
 const WARRANTY_NOTES = [
   "Warranty covers manufacturing defects only.",
@@ -78,16 +79,20 @@ function numberToWords(num) {
   return str.trim();
 }
 
-export default function PrintReceipt({ order, autoPrint = true }) {
+// sharePath: signed public link of this invoice (admin print page)
+// publicView: the customer's own copy, no auto print and no send buttons
+export default function PrintReceipt({ order, autoPrint = true, sharePath = "", publicView = false }) {
+  const [sending, setSending] = useState("");
+
   // Auto Print popup after 0.5s so buttons are rendered first
   // (the partner portal shows the invoice first and prints on demand)
   useEffect(() => {
-    if (!autoPrint) return;
+    if (!autoPrint || publicView) return;
     const timer = setTimeout(() => {
       window.print();
     }, 500);
     return () => clearTimeout(timer);
-  }, [autoPrint]);
+  }, [autoPrint, publicView]);
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
 
@@ -336,21 +341,96 @@ export default function PrintReceipt({ order, autoPrint = true }) {
     doc.save(`Invoice-${order.orderNumber || order._id}.pdf`);
   };
 
-  const handleWhatsApp = () => {
-    const phone = (order.customerPhone || "").replace(/\D/g, "");
+  // customer's number as 01XXXXXXXXX, or null
+  const customerPhone = () => {
+    const digits = String(order.customerPhone || "").replace(/\D/g, "").replace(/^88/, "");
+    return /^01\d{9}$/.test(digits) ? digits : null;
+  };
 
+  const invoiceLink = () => (sharePath ? `${window.location.origin}${sharePath}` : "");
+
+  // picture of the receipt (PNG) for WhatsApp
+  const receiptImage = async () => {
+    const { toBlob } = await import("html-to-image");
+    const node = document.getElementById("receipt");
+    const blob = await toBlob(node, {
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      // an image that can't be read (e.g. the external barcode) is left blank
+      imagePlaceholder:
+        "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
+    });
+    return new File([blob], `Invoice-${order.orderNumber || order._id}.png`, { type: "image/png" });
+  };
+
+  const handleWhatsApp = async () => {
+    const phone = customerPhone();
+    const link = invoiceLink();
+    const text = `Thank you for shopping with SB Telecom!\nInvoice ${order.orderNumber}${link ? `\n${link}` : ""}`;
+
+    setSending("whatsapp");
+    try {
+      const file = await receiptImage();
+
+      // phones (and Chrome on Windows): share sheet with the picture -> pick WhatsApp
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text });
+        return;
+      }
+
+      // elsewhere: keep a copy, put the picture on the clipboard, open the chat
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(file);
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": file })]);
+        showToast("success", "Receipt picture copied: press Ctrl+V in the WhatsApp chat");
+      } catch {
+        showToast("success", "Receipt picture downloaded: attach it in the WhatsApp chat");
+      }
+      const to = phone ? `88${phone}` : "";
+      window.open(`https://wa.me/${to}?text=${encodeURIComponent(text)}`, "_blank");
+    } catch (err) {
+      // closing the share sheet is not an error
+      if (err?.name !== "AbortError") showToast("error", "Could not make the receipt picture");
+    } finally {
+      setSending("");
+    }
+  };
+
+  const handleSms = async () => {
+    let phone = customerPhone();
     if (!phone) {
-      alert("Customer phone not found!");
-      return;
+      phone = (window.prompt("Customer mobile number (01XXXXXXXXX):") || "").trim();
+      if (!/^01\d{9}$/.test(phone)) {
+        if (phone) showToast("error", "Number must be 01XXXXXXXXX");
+        return;
+      }
     }
 
-    const invoiceLink = `${window.location.origin}/invoice/${order.orderNumber}`;
+    setSending("sms");
+    try {
+      const res = await fetch("/api/sms/invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order._id, phone }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
 
-    const message = `📱 Thank you for shopping with SB Telecom!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
-    window.open(
-      `https://wa.me/88${phone}?text=${encodeURIComponent(message)}`,
-      "_blank",
-    );
+      if (data.configured) {
+        showToast("success", data.message);
+      } else {
+        // no SMS gateway set up yet: open this device's SMS app with the text
+        window.location.href = `sms:+${data.number}?body=${encodeURIComponent(data.message)}`;
+      }
+    } catch (err) {
+      showToast("error", err.message || "Could not send SMS");
+    } finally {
+      setSending("");
+    }
   };
 
   return (
@@ -371,12 +451,25 @@ export default function PrintReceipt({ order, autoPrint = true }) {
           📥 Download PDF
         </button>
 
-        <button
-          onClick={handleWhatsApp}
-          className="bg-green-600 hover:bg-green-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
-        >
-          📱 Send WhatsApp
-        </button>
+        {!publicView && (
+          <>
+            <button
+              onClick={handleWhatsApp}
+              disabled={!!sending}
+              className="bg-green-600 hover:bg-green-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition disabled:opacity-60"
+            >
+              {sending === "whatsapp" ? "⏳ Preparing..." : "📱 Send WhatsApp"}
+            </button>
+
+            <button
+              onClick={handleSms}
+              disabled={!!sending}
+              className="bg-violet-600 hover:bg-violet-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition disabled:opacity-60"
+            >
+              {sending === "sms" ? "⏳ Sending..." : "💬 Send SMS"}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Main Receipt Content */}

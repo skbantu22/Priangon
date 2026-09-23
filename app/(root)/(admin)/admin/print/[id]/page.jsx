@@ -2,6 +2,7 @@
 
 import PrintReceipt from "@/components/PrintReceipt";
 import { loadPrintableOrder } from "@/lib/printableOrder";
+import { invoicePath } from "@/lib/invoiceLink";
 
 export default async function Page({ params }) {
   const { id } = await params;
@@ -12,5 +13,5 @@ export default async function Page({ params }) {
     return <div className="p-6 text-center text-red-500">Order not found</div>;
   }
 
-  return <PrintReceipt order={order} />;
+  return <PrintReceipt order={order} sharePath={invoicePath(order.orderNumber)} />;
 }
