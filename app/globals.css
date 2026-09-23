@@ -137,6 +137,16 @@
 .dark .admin-theme,
 .dark.admin-theme {
   --background: #0f0b1f;
+  /* near-white text; secondary text stays readable instead of dim grey */
+  --foreground: #f7f5ff;
+  --card: #17112e;
+  --card-foreground: #f7f5ff;
+  --popover: #1b1436;
+  --popover-foreground: #f7f5ff;
+  --muted: #221a45;
+  --muted-foreground: #cfc9e6;
+  --border: rgb(255 255 255 / 0.1);
+  --input: rgb(255 255 255 / 0.14);
   --primary: #8b6cf6;
   --primary-foreground: #ffffff;
   --ring: #8b6cf6;
@@ -158,9 +168,9 @@
   --series-5: #e87ba4;
 }
 .dark .dash-viz {
-  --viz-surface: oklch(0.205 0 0);
-  --viz-grid: rgb(255 255 255 / 0.08);
-  --viz-axis: #a1a0ad;
+  --viz-surface: #17112e;
+  --viz-grid: rgb(255 255 255 / 0.1);
+  --viz-axis: #d4cfe8;
   --viz-sales: #8b6cf6;
   --series-1: #3987e5;
   --series-2: #d95926;

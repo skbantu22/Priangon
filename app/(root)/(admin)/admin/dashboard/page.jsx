@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MotionConfig, motion } from "framer-motion";
 import Image from "next/image";
 import { skipOptimize } from "@/lib/imageSrc";
 import Link from "next/link";
@@ -68,10 +69,20 @@ const TONES = {
   amber: "bg-amber-50 dark:bg-amber-500/10 [&_.kpi-icon]:bg-amber-500",
 };
 
+// tiles fade up one after another; panels slide in as they scroll into view
+const tileList = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const tileItem = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 24 } },
+};
+
 function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
   const body = (
-    <div
-      className={`flex h-full items-center gap-4 rounded-2xl border border-black/5 p-5 transition dark:border-white/10 ${TONES[tone]} ${href ? "hover:shadow-md" : ""}`}
+    <motion.div
+      variants={tileItem}
+      whileHover={{ y: -4 }}
+      transition={{ type: "spring", stiffness: 320, damping: 22 }}
+      className={`flex h-full items-center gap-4 rounded-2xl border border-black/5 p-5 shadow-sm transition-shadow dark:border-white/10 ${TONES[tone]} ${href ? "hover:shadow-lg" : ""}`}
     >
       <span className="kpi-icon flex size-14 shrink-0 items-center justify-center rounded-xl text-white shadow-sm">
         <Icon className="size-7" />
@@ -82,25 +93,29 @@ function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
             {value}
           </p>
         )}
-        <p className="text-[15px] text-gray-600 dark:text-gray-300">{label}</p>
-        {sub && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{sub}</p>}
+        <p className="text-[15px] text-gray-600 dark:text-gray-100">{label}</p>
+        {sub && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-200">{sub}</p>}
       </div>
-    </div>
+    </motion.div>
   );
   return href ? <Link href={href}>{body}</Link> : body;
 }
 
 function Panel({ title, action, children, className = "" }) {
   return (
-    <section
-      className={`flex flex-col rounded-2xl border border-gray-200/70 bg-card p-5 dark:border-white/10 ${className}`}
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={`flex flex-col rounded-2xl border border-gray-200/70 bg-card p-5 shadow-sm dark:border-white/10 ${className}`}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
         {action}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -175,12 +190,13 @@ export default function Dashboard() {
     `h-9 rounded-lg px-4 text-sm font-semibold transition ${
       active
         ? "bg-primary text-white shadow-md shadow-primary/30"
-        : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300"
+        : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-100"
     }`;
   const input =
     "h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-card";
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="dash-viz space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -193,7 +209,12 @@ export default function Dashboard() {
       </div>
 
       {/* ================= KPI TILES ================= */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <motion.div
+        variants={tileList}
+        initial="hidden"
+        animate="show"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <Kpi
           icon={Store}
           tone="orange"
@@ -254,7 +275,7 @@ export default function Dashboard() {
           sub={`${k.readyClaims} ready to deliver · ${k.expiringSoon} expiring in 30 days`}
           href="/admin/warranty"
         />
-      </div>
+      </motion.div>
 
       {/* ================= SALES OVERVIEW + CATEGORIES ================= */}
       <div className="grid gap-5 xl:grid-cols-3">
@@ -285,7 +306,7 @@ export default function Dashboard() {
             </div>
           }
         >
-          <p className="-mt-2 mb-3 text-sm text-gray-600 dark:text-gray-300">
+          <p className="-mt-2 mb-3 text-sm text-gray-600 dark:text-gray-100">
             Total Sale:{" "}
             <span className="font-bold text-gray-900 tabular-nums dark:text-white">{money(data.chartTotal)}</span>
           </p>
@@ -632,7 +653,7 @@ export default function Dashboard() {
             {[
               ["Open", k.openClaims, "text-amber-600"],
               ["Ready", k.readyClaims, "text-emerald-600"],
-              ["Delivered", data.claims.delivered || 0, "text-gray-600 dark:text-gray-300"],
+              ["Delivered", data.claims.delivered || 0, "text-gray-600 dark:text-gray-100"],
             ].map(([label, n, color]) => (
               <div key={label} className="rounded-xl bg-gray-50 py-3 dark:bg-white/5">
                 <p className={`text-xl font-bold tabular-nums ${color}`}>{n}</p>
@@ -661,5 +682,6 @@ export default function Dashboard() {
         </Panel>
       </div>
     </div>
+    </MotionConfig>
   );
 }
