@@ -11,11 +11,14 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { persister } from "@/lib/reactQueryPersister";
 
+const CACHE_MAX_AGE = 1000 * 60 * 30;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 3,
-      gcTime: 1000 * 60 * 10,
+      // must be >= persist maxAge, else queries are dropped before they can be restored
+      gcTime: CACHE_MAX_AGE,
     },
   },
 });
@@ -26,7 +29,9 @@ export default function GlobalStoreProvider({ children }) {
       client={queryClient}
       persistOptions={{
         persister,
-        maxAge: 1000 * 60 * 30,
+        maxAge: CACHE_MAX_AGE,
+        // change this when the data source changes, so browsers drop old cached lists
+        buster: "mobizone-demo-1",
       }}
     >
       <Provider store={store}>

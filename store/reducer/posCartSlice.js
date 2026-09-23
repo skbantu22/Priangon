@@ -75,6 +75,15 @@ const posCartSlice = createSlice({
       item.qty = Math.max(1, Number(qty) || 1);
     },
 
+    // IMEI / serial numbers typed for a cart line (one per unit)
+    setItemImeis(state, action) {
+      const { variantId, imeis } = action.payload;
+
+      const item = state.cart.find((i) => i.variantId === variantId);
+
+      if (item) item.imeis = imeis;
+    },
+
     removeCartItem(state, action) {
       state.cart = state.cart.filter((i) => i.variantId !== action.payload);
     },
@@ -157,6 +166,7 @@ export const {
   increaseQty,
   decreaseQty,
   updateQty,
+  setItemImeis,
   removeCartItem,
   clearCart,
   setCart,

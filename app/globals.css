@@ -115,6 +115,59 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Admin panel theme (purple). Scoped so the storefront keeps its own colors. */
+.admin-theme {
+  --background: #f5f4fb;
+  --primary: #5b2ee0;
+  --primary-foreground: #ffffff;
+  --ring: #8b6cf6;
+  --accent: #efeafd;
+  --accent-foreground: #3b1c9e;
+  --sidebar: #24135f;
+  --sidebar-foreground: #d9d3f5;
+  --sidebar-primary: #5b2ee0;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-ring: #8b6cf6;
+}
+
+.dark .admin-theme,
+.dark.admin-theme {
+  --background: #0f0b1f;
+  --primary: #8b6cf6;
+  --primary-foreground: #ffffff;
+  --ring: #8b6cf6;
+  --accent: #221a45;
+  --accent-foreground: #ffffff;
+  --sidebar: #160c3d;
+}
+
+/* Dashboard chart roles (validated categorical palette, light + dark) */
+.dash-viz {
+  --viz-surface: #ffffff;
+  --viz-grid: #ecebf3;
+  --viz-axis: #6b6a78;
+  --viz-sales: #5b2ee0;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+}
+.dark .dash-viz {
+  --viz-surface: oklch(0.205 0 0);
+  --viz-grid: rgb(255 255 255 / 0.08);
+  --viz-axis: #a1a0ad;
+  --viz-sales: #8b6cf6;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

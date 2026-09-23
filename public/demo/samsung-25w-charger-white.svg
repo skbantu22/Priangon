@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<defs>
+  <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eeebf7"/>
+  </radialGradient>
+  <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="blur4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+  <linearGradient id="gloss" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".35" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e6e6e6"/></linearGradient>
+     <linearGradient id="prong" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a8d96"/><stop offset=".5" stop-color="#e3e5ea"/><stop offset="1" stop-color="#8a8d96"/></linearGradient>
+</defs>
+<rect width="400" height="400" fill="url(#bg)"/>
+<ellipse cx="200" cy="352" rx="120" ry="14" fill="#1e1b4b" opacity=".22" filter="url(#soft)"/>
+
+  <rect x="172" y="46" width="14" height="70" rx="4" fill="url(#prong)"/>
+  <rect x="214" y="46" width="14" height="70" rx="4" fill="url(#prong)"/>
+  <path d="M120 112 L150 96 H300 L270 112 Z" fill="#f0f0f0"/>
+  <path d="M270 112 L300 96 V300 L270 318 Z" fill="#dbdbdb"/>
+  <rect x="120" y="112" width="150" height="206" rx="14" fill="url(#front)" stroke="#d9dbe2" stroke-width="2"/>
+  <text x="195" y="222" font-family="Arial, sans-serif" font-size="40" font-weight="800" fill="#6b6f7b" fill-opacity=".85" text-anchor="middle">25W</text>
+  <rect x="173" y="276" width="44" height="14" rx="7" fill="#101014"/>
+  <rect x="120" y="112" width="150" height="206" rx="14" fill="url(#gloss)"/>
+</svg>

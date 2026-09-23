@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import slugify from "slugify";
-import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
-import { X, ImageIcon, Ruler, LayoutGrid, UploadCloud } from "lucide-react";
+import { ImageIcon, Tag, FileText } from "lucide-react";
 
 // UI Components
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
@@ -24,69 +23,54 @@ import { Input } from "@/components/ui/input";
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 import Select from "@/components/ui/Select";
 import Editor from "@/components/ui/Application/Admin/Editor";
-import MediaModal from "@/components/ui/Application/Admin/MediaModel";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
+import MobileSpecsCard from "@/components/ui/Application/Admin/products/MobileSpecsCard";
 
 // Utilities & Config
-import { ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
-import { zSchema } from "@/lib/zodschema";
+import { ADMIN_DASHBOARD, ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
+import { productFormSchema } from "@/lib/productFormSchema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
-import { z } from "zod";
 import { useRouter } from "next/navigation";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_CATEGORY_SHOW, label: "Products" },
+  { href: ADMIN_PRODUCT_SHOW, label: "Products" },
   { href: "#", label: "New Product" },
 ];
+
+// categories whose items are serialised (IMEI) and carry a warranty by default
+const SERIAL_CATEGORY = /phone|mobile|watch|tablet|tab\b|earbud|airpod/i;
 
 const AddProduct = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState([]);
-  const [sizeChartMedia, setSizeChartMedia] = useState(null);
   const [categoryOption, setCategoryOption] = useState([]);
   const [subCategoryOption, setSubCategoryOption] = useState([]);
   const [resetKey, setResetKey] = useState(0);
+  // once the user touches the warranty card we stop applying category defaults
+  const warrantyTouched = useRef(false);
 
   const router = useRouter();
-  // Schema with explicit sizeChart field
-  const formSchema = zSchema
-    .pick({
-      name: true,
-      slug: true,
-      category: true,
-
-      mrp: true,
-      sellingPrice: true,
-      discountPercentage: true,
-      description: true,
-      media: true,
-      freeDelivery: true,
-    })
-    .extend({
-      subcategory: z.string().optional().or(z.literal("")),
-
-      sizeChart: z.string().optional().or(z.literal("")),
-    });
 
   const form = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: "",
       slug: "",
       category: "",
       subcategory: "",
+      brand: "",
       mrp: "",
       sellingPrice: "",
       discountPercentage: "",
       description: "",
       media: [],
-      sizeChart: "",
       freeDelivery: false,
+      warrantyType: "none",
+      warrantyMonths: 0,
+      trackSerial: false,
     },
   });
 
@@ -122,19 +106,36 @@ const AddProduct = () => {
     }
   }, [getSubCategory]);
 
-  // Sync sizeChartMedia ID to form state whenever it changes
+  // phones / watches: default to 1 year official warranty + IMEI tracking
   useEffect(() => {
-    form.setValue("sizeChart", sizeChartMedia?._id || "", {
-      shouldValidate: true,
+    if (warrantyTouched.current || !watchedCategoryId) return;
+    const name =
+      categoryOption.find((c) => c.value === watchedCategoryId)?.label || "";
+    const serial = SERIAL_CATEGORY.test(name);
+    form.setValue("trackSerial", serial);
+    form.setValue("warrantyType", serial ? "official" : "none");
+    form.setValue("warrantyMonths", serial ? 12 : 0);
+  }, [watchedCategoryId, categoryOption, form]);
+
+  useEffect(() => {
+    // only real user edits count ("change"), not our own setValue defaults
+    const sub = form.watch((_, { name, type }) => {
+      if (
+        type === "change" &&
+        ["warrantyType", "warrantyMonths", "trackSerial"].includes(name)
+      ) {
+        warrantyTouched.current = true;
+      }
     });
-  }, [sizeChartMedia, form]);
+    return () => sub.unsubscribe();
+  }, [form]);
 
   // Sync Gallery media
   useEffect(() => {
     form.setValue(
       "media",
       selectedMedia.map((m) => m._id),
-      { shouldValidate: true },
+      { shouldValidate: selectedMedia.length > 0 },
     );
   }, [selectedMedia, form]);
 
@@ -180,14 +181,13 @@ const AddProduct = () => {
       );
 
       if (response?.success) {
-        showToast("success", "Listing Published!");
+        showToast("success", "Product saved. Now add its variants (color / storage).");
 
         form.reset();
         setSelectedMedia([]);
-        setSizeChartMedia(null);
         setResetKey((p) => p + 1);
+        warrantyTouched.current = false;
 
-        // ✅ SAFE EXTRACTION (based on backend fix)
         const createdProduct = response.data || response.product;
 
         if (!createdProduct?._id) {
@@ -207,48 +207,51 @@ const AddProduct = () => {
     }
   };
 
+  const cardClass = "gap-0 rounded-xl py-0 shadow-sm";
+  const headClass = "border-b py-3";
+  const titleClass = "flex items-center gap-2 text-sm font-semibold";
+
   return (
-    <div className="bg-[#f1f1f1] min-h-screen pb-20 lg:pb-10 font-sans">
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 space-y-6">
+    <div className="pb-20 lg:pb-10">
+      <div className="mx-auto max-w-[1200px] space-y-6 py-2">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
               <div className="space-y-1">
                 <BreadCrumb breadcrumbData={breadcrumbData} />
-                <h1 className="text-2xl font-black text-black tracking-tight uppercase">
-                  New Product
-                </h1>
+                <h1 className="text-2xl font-bold">New Product</h1>
+                <p className="text-sm text-muted-foreground">
+                  Save the product first, then add its colors / storage variants and stock.
+                </p>
               </div>
               <ButtonLoading
                 type="submit"
                 loading={loading}
-                text="PUBLISH PRODUCT"
-                className="bg-black text-white px-10 rounded-none h-12 shadow-xl tracking-widest"
+                text="Save Product"
+                className="h-11 rounded-lg px-8 shadow-md shadow-primary/30"
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
               {/* LEFT COLUMN */}
-              <div className="lg:col-span-8 space-y-6">
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase tracking-[0.2em]">
-                      Product Details
+              <div className="space-y-6 lg:col-span-8">
+                <Card className={cardClass}>
+                  <CardHeader className={headClass}>
+                    <CardTitle className={titleClass}>
+                      <FileText className="size-4 text-primary" /> Product Details
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-6">
+                  <CardContent className="space-y-6 p-6">
                     <FormField
                       control={form.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
-                            Product Name
-                          </FormLabel>
+                          <FormLabel>Product Name *</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Ex: Classic Fit Sweatshirt"
-                              className="h-11 border-black rounded-none"
+                              placeholder="Ex: Samsung Galaxy A55 5G"
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -261,11 +264,9 @@ const AddProduct = () => {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
-                            Description *
-                          </FormLabel>
+                          <FormLabel>Description / Specifications *</FormLabel>
                           <FormControl>
-                            <div className="border-2 border-black overflow-hidden bg-white">
+                            <div className="overflow-hidden rounded-lg border bg-white text-black">
                               <Editor
                                 key={resetKey}
                                 initialData={field.value}
@@ -275,6 +276,9 @@ const AddProduct = () => {
                               />
                             </div>
                           </FormControl>
+                          <p className="text-xs text-muted-foreground">
+                            Tip: display, chipset, RAM/ROM, camera, battery, what&apos;s in the box.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -282,48 +286,50 @@ const AddProduct = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4" /> Gallery
+                <Card className={cardClass}>
+                  <CardHeader className={headClass}>
+                    <CardTitle className={titleClass}>
+                      <ImageIcon className="size-4 text-primary" /> Photos
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
-                    <div className="flex justify-between items-center pt-4 border-t border-black/10">
-                      <UploadMedia
-                        isMultiple={true}
-                        queryClient={queryClient}
-                        selectedMedia={selectedMedia}
-                        setSelectedMedia={setSelectedMedia}
-                      />
-                    </div>
+                    <UploadMedia
+                      isMultiple={true}
+                      queryClient={queryClient}
+                      selectedMedia={selectedMedia}
+                      setSelectedMedia={setSelectedMedia}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="media"
+                      render={() => (
+                        <FormItem>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </CardContent>
                 </Card>
               </div>
 
               {/* RIGHT COLUMN */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase">
-                      Pricing & Category
+              <div className="space-y-6 lg:col-span-4">
+                <Card className={cardClass}>
+                  <CardHeader className={headClass}>
+                    <CardTitle className={titleClass}>
+                      <Tag className="size-4 text-primary" /> Price &amp; Category
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-5 space-y-5">
+                  <CardContent className="space-y-5 p-5">
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="mrp"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase">
-                              MRP
-                            </FormLabel>
-                            <Input
-                              className="h-10 border-black rounded-none"
-                              type="number"
-                              {...field}
-                            />
+                            <FormLabel>MRP (৳)</FormLabel>
+                            <Input type="number" {...field} />
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -332,29 +338,26 @@ const AddProduct = () => {
                         name="sellingPrice"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase">
-                              Sale Price
-                            </FormLabel>
+                            <FormLabel>Sale Price (৳)</FormLabel>
                             <Input
-                              className="h-10 border-black rounded-none font-bold text-blue-600"
                               type="number"
+                              className="font-semibold text-primary"
                               {...field}
                             />
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                    <div className="bg-zinc-100 border-2 border-black p-3 text-center uppercase font-black text-xs italic">
-                      Discount: {form.watch("discountPercentage") || 0}% OFF
+                    <div className="rounded-lg bg-primary/10 p-2.5 text-center text-sm font-semibold text-primary">
+                      Discount: {form.watch("discountPercentage") || 0}% off
                     </div>
                     <FormField
                       control={form.control}
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
-                            Category
-                          </FormLabel>
+                          <FormLabel>Category *</FormLabel>
                           <Select
                             options={categoryOption}
                             selected={field.value}
@@ -364,6 +367,7 @@ const AddProduct = () => {
                               )
                             }
                           />
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -372,9 +376,7 @@ const AddProduct = () => {
                       name="subcategory"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
-                            Sub-Category
-                          </FormLabel>
+                          <FormLabel>Sub-Category</FormLabel>
                           <Select
                             options={subCategoryOption}
                             selected={field.value}
@@ -391,89 +393,12 @@ const AddProduct = () => {
                   </CardContent>
                 </Card>
 
-                {/* FIXED SIZE CHART FIELD */}
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                      <Ruler className="w-4 h-4" /> Size Chart
-                    </CardTitle>
-                  </CardHeader>
-
-                  <CardContent className="p-5 space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="sizeChart"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            {sizeChartMedia ? (
-                              <div className="relative aspect-square border-2 border-black bg-zinc-50">
-                                <Image
-                                  src={
-                                    sizeChartMedia.url ||
-                                    sizeChartMedia.secure_url
-                                  }
-                                  fill
-                                  alt="Size Chart"
-                                  className="object-contain"
-                                />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSizeChartMedia(null);
-                                    field.onChange(""); // clear form value
-                                  }}
-                                  className="absolute top-1 right-1 bg-black text-white p-1"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <UploadMedia
-                                queryClient={queryClient}
-                                selectedMedia={
-                                  sizeChartMedia ? [sizeChartMedia] : []
-                                }
-                                setSelectedMedia={(items) =>
-                                  setSizeChartMedia(
-                                    items?.length ? items[0] : null,
-                                  )
-                                }
-                                isMultiple={false}
-                              />
-                            )}
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* removed Select Size Chart + Quick Upload section */}
-                  </CardContent>
-                </Card>
+                <MobileSpecsCard form={form} />
               </div>
             </div>
           </form>
         </Form>
       </div>
-
-      <MediaModal
-        open={open}
-        setOpen={setOpen}
-        selectedMedia={selectedMedia}
-        setSelectedMedia={setSelectedMedia}
-        isMultiple={true}
-      />
-      <MediaModal
-        open={sizeChartOpen}
-        setOpen={setSizeChartOpen}
-        selectedMedia={sizeChartMedia ? [sizeChartMedia] : []}
-        setSelectedMedia={(items) =>
-          setSizeChartMedia(items.length > 0 ? items[items.length - 1] : null)
-        }
-        isMultiple={false}
-      />
     </div>
   );
 };

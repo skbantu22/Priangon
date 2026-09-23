@@ -5,6 +5,8 @@ import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { connectDB } from "@/lib/databaseconnection";
 import { NextResponse } from "next/server";
 import Customer from "@/models/Customer.model";
+import Product from "@/models/Product.model";
+import { warrantyExpiryDate } from "@/lib/warranty";
 /* =========================
    GET ORDER
 ========================= */
@@ -84,6 +86,57 @@ export async function POST(req) {
     if (!items?.length) throw new Error("Cart is empty");
     if (!showroomId) throw new Error("Showroom required");
 
+    /* =========================
+       🛡️ WARRANTY + IMEI
+       (warranty terms come from the product, never from the client)
+    ========================= */
+    const productDocs = await Product.find({
+      _id: { $in: items.map((i) => i.productId) },
+    })
+      .select("warranty trackSerial")
+      .lean();
+    const productMap = new Map(productDocs.map((p) => [String(p._id), p]));
+    const sellDate = saleDate ? new Date(saleDate) : new Date();
+
+    const allImeis = [];
+    for (const item of items) {
+      const product = productMap.get(String(item.productId));
+      const imeis = (item.imeis || [])
+        .map((s) => String(s).trim())
+        .filter(Boolean);
+
+      if (product?.trackSerial && imeis.length !== Number(item.qty)) {
+        throw new Error(
+          `${item.productName}: enter ${item.qty} IMEI / serial number(s)`,
+        );
+      }
+
+      const months = Number(product?.warranty?.months) || 0;
+      item.imeis = imeis;
+      item.warrantyType = months ? product.warranty.type : "none";
+      item.warrantyMonths = months;
+      item.warrantyExpiry = warrantyExpiryDate(sellDate, months);
+      allImeis.push(...imeis);
+    }
+
+    if (new Set(allImeis).size !== allImeis.length) {
+      throw new Error("The same IMEI / serial is entered twice");
+    }
+    if (allImeis.length) {
+      const sold = await Posorder.findOne({
+        "items.imeis": { $in: allImeis },
+        status: "completed",
+      })
+        .select("orderNumber items.imeis")
+        .lean();
+      if (sold) {
+        const dup = sold.items
+          .flatMap((i) => i.imeis || [])
+          .find((s) => allImeis.includes(s));
+        throw new Error(`IMEI ${dup} was already sold (${sold.orderNumber})`);
+      }
+    }
+
     const seq = await getNextInvoiceNumber("pos_invoice");
     const orderNumber = `INV-${String(seq).padStart(6, "0")}`;
 
@@ -140,6 +193,23 @@ export async function POST(req) {
             },
           ];
 
+    const paidAmount = cleanPayments.reduce(
+      (sum, p) => sum + (Number(p.amount) || 0),
+      0,
+    );
+    // rounded to paisa so VAT fractions don't leave a phantom due
+    const dueAmount = Math.max(
+      0,
+      Math.round(
+        (Number(total || 0) + Number(deliveryCharge || 0) - paidAmount) * 100,
+      ) / 100,
+    );
+
+    // a due (বাকি) sale must be traceable to a customer
+    if (dueAmount > 0 && !customer) {
+      throw new Error("Customer phone is required for a due sale");
+    }
+
     /* =========================
        STOCK UPDATE
     ========================= */
@@ -192,6 +262,9 @@ export async function POST(req) {
       vat: vat || 0,
 
       payments: cleanPayments,
+
+      paidAmount,
+      dueAmount,
 
       deliveryCharge: deliveryCharge || 0,
 

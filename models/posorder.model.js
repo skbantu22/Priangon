@@ -71,6 +71,24 @@ const POSOrderSchema = new mongoose.Schema(
           required: true,
           min: 0,
         },
+
+        // 🛡️ warranty: one IMEI / serial per unit sold
+        imeis: {
+          type: [String],
+          default: [],
+        },
+        warrantyType: {
+          type: String,
+          default: "none",
+        },
+        warrantyMonths: {
+          type: Number,
+          default: 0,
+        },
+        warrantyExpiry: {
+          type: Date,
+          default: null,
+        },
       },
     ],
 
@@ -150,6 +168,20 @@ const POSOrderSchema = new mongoose.Schema(
         },
       },
     ],
+
+    // what the customer actually paid, and what is left as due (বাকি)
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    dueAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true,
+    },
 
     paymentDetails: {
       transactionId: String,
@@ -294,6 +326,9 @@ const POSOrderSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+// warranty look-up by IMEI / serial
+POSOrderSchema.index({ "items.imeis": 1 });
 
 export default mongoose.models.POSOrder ||
   mongoose.model("POSOrder", POSOrderSchema);

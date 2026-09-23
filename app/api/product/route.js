@@ -50,6 +50,7 @@ export async function GET(request) {
             $or: [
               { name: { $regex: globalFilter, $options: "i" } },
               { slug: { $regex: globalFilter, $options: "i" } },
+              { brand: { $regex: globalFilter, $options: "i" } },
               { "categoryData.name": { $regex: globalFilter, $options: "i" } },
 
               // numeric field search (mrp) by converting to string
@@ -125,6 +126,9 @@ export async function GET(request) {
               $project: {
                 name: 1,
                 slug: 1,
+                brand: 1,
+                warranty: 1,
+                trackSerial: 1,
                 mrp: 1,
                 sellingPrice: 1,
                 discountPercentage: 1,

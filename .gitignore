@@ -29,3 +29,5 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+# local database backups (contain customer data)
+/backups

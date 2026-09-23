@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
@@ -16,6 +17,13 @@ export default function Layout({ children }) {
   const isPos =
     pathname.startsWith("/admin/pos") || pathname.startsWith("/admin/payment");
 
+  // Dialogs and dropdowns are portalled to <body>, so the admin theme
+  // has to live there too (the wrapper div below covers the first paint).
+  useEffect(() => {
+    document.body.classList.add("admin-theme");
+    return () => document.body.classList.remove("admin-theme");
+  }, []);
+
   return (
     <GlobalStoreProvider>
       <ThemeProvider
@@ -26,20 +34,25 @@ export default function Layout({ children }) {
       >
         <NetworkStatus />
 
-        {isPos ? (
-          <main className="w-screen h-screen overflow-hidden">{children}</main>
-        ) : (
+        <div className="admin-theme bg-background">
           <SidebarProvider>
             <Appsidebar />
 
-            <main className="border-2 md:w-[calc(100vw-16rem)] w-full">
-              <div className="pt-17.5 md:px-8 px-5 min-h-[calc(100vh-40px)] pb-10">
-                <Topbar />
+            {isPos ? (
+              // POS has its own top bar and fills the screen
+              <main className="flex-1 min-w-0 h-screen overflow-hidden">
                 {children}
-              </div>
-            </main>
+              </main>
+            ) : (
+              <main className="flex-1 min-w-0">
+                <div className="pt-20 md:px-8 px-5 min-h-[calc(100vh-40px)] pb-10">
+                  <Topbar />
+                  {children}
+                </div>
+              </main>
+            )}
           </SidebarProvider>
-        )}
+        </div>
 
         <ToastContainer />
       </ThemeProvider>

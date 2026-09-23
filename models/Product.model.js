@@ -24,6 +24,23 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
+    brand: { type: String, trim: true, default: "", index: true },
+
+    // =========================
+    // 🛡️ WARRANTY
+    // =========================
+    warranty: {
+      type: {
+        type: String,
+        enum: ["none", "official", "brand", "shop"],
+        default: "none",
+      },
+      months: { type: Number, min: 0, default: 0 },
+    },
+
+    // phones / watches: each unit sold must carry its IMEI or serial number
+    trackSerial: { type: Boolean, default: false },
+
     mrp: { type: Number, required: true, min: 0 },
     sellingPrice: { type: Number, required: true, min: 0 },
 

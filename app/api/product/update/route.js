@@ -3,6 +3,7 @@ import { response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
+import { cleanMobileFields } from "@/lib/productMobileFields";
 
 export async function PUT(request) {
   try {
@@ -61,6 +62,11 @@ export async function PUT(request) {
     product.discountPercentage = data.discountPercentage;
     product.description = encode(data.description);
     product.media = data.media;
+
+    const mobile = cleanMobileFields(payload);
+    product.brand = mobile.brand;
+    product.warranty = mobile.warranty;
+    product.trackSerial = mobile.trackSerial;
 
     await product.save();
 

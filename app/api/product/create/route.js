@@ -3,6 +3,7 @@ import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
+import { cleanMobileFields } from "@/lib/productMobileFields";
 
 export async function POST(request) {
   try {
@@ -23,7 +24,6 @@ export async function POST(request) {
       media: true,
       offers: true,
       freeDelivery: true,
-      sizeChart: true,
     });
 
     const validate = schema.safeParse(payload);
@@ -70,10 +70,7 @@ export async function POST(request) {
       description: encode(productData.description),
       media: productData.media,
 
-      sizeChart:
-        productData.sizeChart && productData.sizeChart !== ""
-          ? productData.sizeChart
-          : null,
+      ...cleanMobileFields(payload),
 
       freeDelivery: productData.freeDelivery || false,
     });

@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
+import PosPrefetch from "@/components/ui/Application/PosPrefetch";
 import SupportChannels from "@/components/ui/Application/website/SupportChannels";
 
 const geistSans = Geist({
@@ -26,7 +27,10 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <GlobalStoreProvider>{children}</GlobalStoreProvider>
+        <GlobalStoreProvider>
+          <PosPrefetch />
+          {children}
+        </GlobalStoreProvider>
 
         <SupportChannels />
 

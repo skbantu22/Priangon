@@ -133,7 +133,7 @@ export default function VariantModal({ product, setOpenProduct, addToCart }) {
                       fill
                       sizes="40px"
                       className="object-cover"
-                      unoptimized={variantImg.includes("cloudinary.com")}
+                      unoptimized={skipOptimize(variantImg)}
                     />
                   </div>
 

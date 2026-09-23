@@ -41,6 +41,9 @@ showroomStockSchema.index(
   },
 );
 
+// POS stock lookup without a showroom (admin "all") filters by variantId only
+showroomStockSchema.index({ variantId: 1 });
+
 const ShowroomStock =
   mongoose.models.ShowroomStock ||
   mongoose.model("ShowroomStock", showroomStockSchema);

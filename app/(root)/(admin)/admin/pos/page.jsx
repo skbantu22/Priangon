@@ -2,20 +2,62 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { showToast } from "@/lib/showToast";
-import ProductGallery from "@/components/ui/Application/Admin/pos/ProductGallery";
+import ProductGallery, {
+  findByBarcode,
+} from "@/components/ui/Application/Admin/pos/ProductGallery";
 import CartSidebar from "@/components/ui/Application/Admin/pos/CartSidebar";
 import VariantModal from "@/components/ui/Application/Admin/pos/VariantModal";
-import { useDispatch, useSelector } from "react-redux";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import PosTopbar from "@/components/ui/Application/Admin/pos/PosTopbar";
+import CheckoutModal from "@/components/ui/Application/Admin/pos/CheckoutModal";
+import ExchangeModal from "@/components/ui/Application/Admin/pos/ExchangeModal";
+import { shallowEqual, useDispatch, useSelector } from "react-redux";
+import {
+  useInfiniteQuery,
+  useIsRestoring,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  posBrandsQueryOptions,
+  posCategoriesQueryOptions,
+  posProductsQueryKey,
+  posProductsQueryOptions,
+  posShowroomsQueryOptions,
+} from "@/lib/posProducts";
 
 import {
   addToCart as addToCartAction,
-  increaseQty as increaseQtyAction,
-  decreaseQty as decreaseQtyAction,
   removeCartItem as removeCartItemAction,
   clearCart,
+  setCart,
+  setCustomer,
+  setDiscount as setDiscountAction,
+  setVat as setVatAction,
+  selectPosSummary,
 } from "@/store/reducer/posCartSlice";
 import PosFooter from "@/components/ui/Application/Admin/PosFooter";
+
+// pages (20 products each) that are loaded in the background without scrolling
+const MAX_EAGER_PAGES = 20;
+
+// Held (parked) sales live only on this device, like a paper slip at the till
+const HELD_SALES_KEY = "pos-held-sales";
+
+const readHeldSales = () => {
+  try {
+    return JSON.parse(localStorage.getItem(HELD_SALES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const writeHeldSales = (list) => {
+  try {
+    localStorage.setItem(HELD_SALES_KEY, JSON.stringify(list));
+  } catch {
+    // storage full or blocked: the in-memory list still works for this session
+  }
+};
 
 export default function POSPage() {
   const dispatch = useDispatch();
@@ -27,20 +69,36 @@ export default function POSPage() {
   // Core States
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(""); // 🚀 Debounce Search State
-  const [showrooms, setShowrooms] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [selectedShowroomId, setSelectedShowroomId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [sort, setSort] = useState("latest");
+  const [lastOrderId, setLastOrderId] = useState(null);
+  // bumped after each sale so the cart panel resets its payment inputs
+  const [saleKey, setSaleKey] = useState(0);
   const [openProduct, setOpenProduct] = useState(null);
 
-  // Exchange & Discount States
-  const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [exchangeData, setExchangeData] = useState(null);
-  const [discountType, setDiscountType] = useState("amount");
-  const [vat, setVat] = useState(0);
-  const [vatType, setVatType] = useState("percent");
-  const [discount, setDiscount] = useState(0);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Checkout / exchange modals
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isExchangeMode, setIsExchangeMode] = useState(false);
+  const [isExchangeOpen, setIsExchangeOpen] = useState(false);
+  const [localExchangeTotal, setLocalExchangeTotal] = useState(0);
+  const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
+
+  // Parked carts (F3), restored from the top bar
+  const [heldSales, setHeldSales] = useState([]);
+  useEffect(() => setHeldSales(readHeldSales()), []);
+
+  // Discount / VAT are edited in the cart panel and kept in Redux
+  const posCartState = useSelector((state) => state.posCart);
+  const {
+    subtotal: subTotal,
+    discount: discountAmount,
+    vat: vatAmount,
+    total,
+  } = useSelector(selectPosSummary, shallowEqual);
 
   const searchInputRef = useRef(null);
   const currentUser = useMemo(
@@ -59,96 +117,57 @@ export default function POSPage() {
 
   // ==========================
   // 🚀 OPTIMIZED USEINFINITEQUERY
+  // (options are shared with PosPrefetch, so a prefetched page is a cache hit)
   // ==========================
+  const isRestoring = useIsRestoring();
+
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     isLoading,
+    isError,
     refetch,
   } = useInfiniteQuery({
-    queryKey: [
-      "pos-products",
-      debouncedSearch,
-      selectedShowroomId,
-      selectedCategoryId,
-      currentUser?._id,
-      currentUser?.role,
-    ],
-
-    queryFn: async ({ pageParam = 1 }) => {
-      if (!user)
-        return { items: [], page: 1, limit: 20, total: 0, hasMore: false };
-
-      const params = new URLSearchParams();
-      params.set("page", pageParam.toString());
-      params.set("limit", "20");
-
-      if (debouncedSearch) params.set("q", debouncedSearch);
-      if (selectedCategoryId) params.set("categoryId", selectedCategoryId);
-
-      const showroomId =
-        currentUser?.role === "admin"
-          ? selectedShowroomId
-          : currentUser?.showroomId;
-
-      if (currentUser?.role === "admin" && !selectedShowroomId) {
-        params.set("showroomId", "all");
-      } else if (showroomId) {
-        params.set("showroomId", showroomId);
-      }
-
-      const res = await fetch(`/api/pos?${params.toString()}`, {
-        method: "GET",
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-        },
-        cache: "no-store",
-      });
-
-      const resData = await res.json();
-
-      const formatted = (resData.items ?? []).map(
-        ({ productId = {}, variants = [], _id }) => {
-          const productVariants = variants.map((v) => ({
-            ...v,
-            stock: v.showroomStock || 0,
-            showroomStock: v.showroomStock || 0,
-            sellingPrice: v.sellingPrice || productId.sellingPrice || 0,
-            image: v.image || productId.image || "/placeholder.png",
-          }));
-
-          return {
-            _id: productId._id || _id,
-            name: productId.name,
-            image: productId.image,
-            sellingPrice: productId.sellingPrice,
-            variants: productVariants,
-            media: productId.image ? [{ secure_url: productId.image }] : [],
-            totalStock: productVariants.reduce((a, b) => a + b.stock, 0),
-          };
-        },
-      );
-
-      return {
-        items: formatted,
-        page: resData.page || pageParam,
-        limit: resData.limit || 20,
-        total: resData.total || 0,
-        hasMore: resData.hasMore ?? false,
-      };
-    },
-
-    initialPageParam: 1,
-
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.page + 1 : undefined,
-
+    ...posProductsQueryOptions({
+      search: debouncedSearch,
+      showroomId: selectedShowroomId,
+      categoryId: selectedCategoryId,
+      brand: selectedBrand,
+      sort,
+      currentUser,
+    }),
     enabled: !!user,
-    staleTime: 1000 * 60 * 3, // 🚀 ৩ মিনিট পর্যন্ত ব্যাকগ্রাউন্ড ক্যাস ধরে রাখবে
-    gcTime: 1000 * 60 * 10, // 🚀 ১০ মিনিট ডাটা মেমোরিতে সেভ থাকবে
     refetchOnWindowFocus: false, // 🚀 উইন্ডো ফোকাস পরিবর্তন হলে রিলোড বন্ধ
+  });
+
+  // Keep loading the remaining pages in the background, one at a time, so
+  // scrolling (and barcode scans over the loaded list) never has to wait.
+  // It waits for any running fetch first, so it never cancels a stock refresh.
+  useEffect(() => {
+    if (isRestoring || !hasNextPage || isFetching || isError) return;
+    if ((data?.pages.length ?? 0) >= MAX_EAGER_PAGES) return;
+
+    fetchNextPage();
+  }, [data, hasNextPage, isFetching, isError, isRestoring, fetchNextPage]);
+
+  // Showrooms & categories rarely change: cached (and persisted), so revisits are instant
+  const { data: showrooms = [] } = useQuery({
+    ...posShowroomsQueryOptions(),
+    enabled: currentUser?.role === "admin",
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: categories = [] } = useQuery({
+    ...posCategoriesQueryOptions(),
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: brands = [] } = useQuery({
+    ...posBrandsQueryOptions(),
+    refetchOnWindowFocus: false,
   });
 
   // 🚀 Memoized Flat Products List
@@ -157,58 +176,20 @@ export default function POSPage() {
     [data],
   );
 
-  // 🚀 Memoized Cart Calculations
-  const subTotal = useMemo(
-    () => cart.reduce((s, item) => s + item.price * item.qty, 0),
-    [cart],
-  );
-
-  const discountAmount = useMemo(
-    () =>
-      discountType === "percent"
-        ? (subTotal * Number(discount || 0)) / 100
-        : Number(discount || 0),
-    [subTotal, discount, discountType],
-  );
-
-  const afterDiscount = useMemo(
-    () => Math.max(0, subTotal - discountAmount),
-    [subTotal, discountAmount],
-  );
-
-  const vatAmount = useMemo(
-    () =>
-      vatType === "percent"
-        ? (afterDiscount * Number(vat || 0)) / 100
-        : Number(vat || 0),
-    [afterDiscount, vat, vatType],
-  );
-
-  const total = useMemo(
-    () => afterDiscount + vatAmount,
-    [afterDiscount, vatAmount],
-  );
-  const totalQty = useMemo(
-    () => cart.reduce((s, item) => s + item.qty, 0),
-    [cart],
-  );
-
   // 🚀 Optimized Handlers with useCallback
   const addToCart = useCallback(
     (product, variant, qty = 1) => {
-      console.log("PRODUCT", product);
-      console.log("VARIANT", variant);
       if (!variant) return;
 
       if (variant.stock <= 0) {
-        showToast("❌ Out of stock! This item cannot be added.");
+        showToast("error", "❌ Out of stock! This item cannot be added.");
         return;
       }
 
       const existing = cart.find((i) => i.variantId === variant._id);
 
       if (existing && existing.qty + qty > variant.stock) {
-        showToast("Not enough stock ❌");
+        showToast("error", "Not enough stock ❌");
         return;
       }
 
@@ -222,7 +203,14 @@ export default function POSPage() {
           size: variant.size,
           price: variant.sellingPrice,
           qty,
-          image: product.media?.[0]?.secure_url || "/placeholder.png",
+          image:
+            variant.image ||
+            product.media?.[0]?.secure_url ||
+            "/placeholder.png",
+          warrantyType: product.warranty?.type || "none",
+          warrantyMonths: product.warranty?.months || 0,
+          trackSerial: !!product.trackSerial,
+          imeis: [],
         }),
       );
     },
@@ -232,31 +220,6 @@ export default function POSPage() {
   const removeCartItem = useCallback(
     (variantId) => {
       dispatch(removeCartItemAction(variantId));
-    },
-    [dispatch],
-  );
-
-  const increaseQty = useCallback(
-    (variantId) => {
-      const item = cart.find((i) => i.variantId === variantId);
-      if (!item) return;
-
-      const parentProduct = products.find((p) => p._id === item.productId);
-      const vMeta = parentProduct?.variants?.find((v) => v._id === variantId);
-
-      if (vMeta && item.qty + 1 > vMeta.stock) {
-        showToast("Not enough stock ❌");
-        return;
-      }
-
-      dispatch(increaseQtyAction(variantId));
-    },
-    [cart, products, dispatch],
-  );
-
-  const decreaseQty = useCallback(
-    (variantId) => {
-      dispatch(decreaseQtyAction(variantId));
     },
     [dispatch],
   );
@@ -273,7 +236,7 @@ export default function POSPage() {
     const exchange = dataClean.exchangeData || {};
 
     if (!isExchange && !cart.length) {
-      showToast("Cart is empty");
+      showToast("error", "Cart is empty");
       return;
     }
 
@@ -281,6 +244,11 @@ export default function POSPage() {
       currentUser?.role === "admin"
         ? selectedShowroomId
         : currentUser?.showroomId || selectedShowroomId;
+
+    if (!showroomId) {
+      showToast("error", "Select a showroom from the top bar first");
+      return;
+    }
 
     try {
       setCheckoutLoading(true);
@@ -295,6 +263,7 @@ export default function POSPage() {
         qty: Number(i.qty),
         price: Number(i.price),
         subtotal: Number(i.price) * Number(i.qty),
+        imeis: (i.imeis || []).slice(0, Number(i.qty)),
       }));
 
       const exchangeItems = (exchange.newItems || [])
@@ -342,7 +311,7 @@ export default function POSPage() {
         phone: dataClean.phone || "",
         address: dataClean.address || "",
         saleDate: dataClean.saleDate || new Date().toISOString(),
-        subTotal: finalBillAmount,
+        subTotal: isExchange ? finalBillAmount : Number(subTotal),
         discount: isExchange ? 0 : Number(discountAmount),
         vat: isExchange ? 0 : Number(vatAmount),
         total: finalBillAmount,
@@ -382,33 +351,30 @@ export default function POSPage() {
       const resData = await res.json();
 
       if (!resData.success) {
-        showToast(resData.message || "Checkout failed");
+        showToast("error", resData.message || "Checkout failed");
         return;
       }
 
       showToast(
+        "success",
         isExchange
           ? "Exchange completed successfully ✅"
           : "Order created successfully ✅",
       );
 
       dispatch(clearCart());
-      setDiscount(0);
-      setVat(0);
       setSearch("");
-      setExchangeOpen(false);
-      setExchangeData(null);
 
       // 🔥 Instant Cache Update for Zero Loading Time
       queryClient.setQueryData(
-        [
-          "pos-products",
-          debouncedSearch,
-          selectedShowroomId,
-          selectedCategoryId,
-          currentUser?._id,
-          currentUser?.role,
-        ],
+        posProductsQueryKey({
+          search: debouncedSearch,
+          showroomId: selectedShowroomId,
+          categoryId: selectedCategoryId,
+          brand: selectedBrand,
+          sort,
+          currentUser,
+        }),
         (oldData) => {
           if (!oldData) return oldData;
 
@@ -440,17 +406,21 @@ export default function POSPage() {
         },
       );
 
-      await queryClient.invalidateQueries({
+      // not awaited: refetch runs in background, don't hold up the print window
+      queryClient.invalidateQueries({
         queryKey: ["pos-products"],
       });
 
+      setSaleKey((k) => k + 1);
+
       const printId = resData.exchangeOrder?._id || resData.order?._id;
       if (printId) {
+        setLastOrderId(printId);
         window.open(`/admin/print/${printId}`, "_blank");
       }
     } catch (err) {
       console.error("CHECKOUT ERROR:", err);
-      showToast("Server Error");
+      showToast("error", "Server Error");
     } finally {
       setCheckoutLoading(false);
     }
@@ -473,25 +443,23 @@ export default function POSPage() {
       const result = await res.json();
 
       if (!result.success) {
-        showToast(result.message || "Exchange failed");
+        showToast("error", result.message || "Exchange failed");
         return;
       }
 
-      showToast("Exchange completed successfully ✅");
+      showToast("success", "Exchange completed successfully ✅");
 
       dispatch(clearCart());
-      setExchangeOpen(false);
-      setExchangeData(null);
 
       queryClient.setQueryData(
-        [
-          "pos-products",
-          debouncedSearch,
-          selectedShowroomId,
-          selectedCategoryId,
-          currentUser?._id,
-          currentUser?.role,
-        ],
+        posProductsQueryKey({
+          search: debouncedSearch,
+          showroomId: selectedShowroomId,
+          categoryId: selectedCategoryId,
+          brand: selectedBrand,
+          sort,
+          currentUser,
+        }),
         (oldData) => {
           if (!oldData) return oldData;
 
@@ -535,114 +503,264 @@ export default function POSPage() {
       });
     } catch (err) {
       console.error(err);
-      showToast("Server Error");
+      showToast("error", "Server Error");
     }
   };
 
-  // Fetch Showrooms
-  useEffect(() => {
-    const fetchShowrooms = async () => {
-      if (currentUser?.role !== "admin") return;
-      const res = await fetch("/api/showrooms");
-      const data = await res.json();
-      setShowrooms(data.showrooms || []);
-    };
-    fetchShowrooms();
-  }, [currentUser]);
+  // ==========================
+  // CART ACTIONS
+  // ==========================
+  const openExchange = () => setIsExchangeOpen(true);
 
-  // Fetch Categories
+  const printLastInvoice = () => {
+    if (!lastOrderId) {
+      showToast("info", "No sale completed yet");
+      return;
+    }
+    window.open(`/admin/print/${lastOrderId}`, "_blank");
+  };
+
+  const handleClearCart = () => {
+    if (!cart.length) return;
+    if (confirm("Are you sure you want to clear the cart?")) {
+      dispatch(clearCart());
+    }
+  };
+
+  const saveHeldSales = (list) => {
+    setHeldSales(list);
+    writeHeldSales(list);
+  };
+
+  const holdSale = () => {
+    if (!cart.length) {
+      showToast("error", "Cart is empty");
+      return;
+    }
+
+    saveHeldSales([
+      {
+        id: Date.now().toString(36),
+        createdAt: new Date().toISOString(),
+        cart,
+        total,
+        discountType: posCartState.discountType,
+        discountValue: posCartState.discountValue,
+        vatType: posCartState.vatType,
+        vatValue: posCartState.vatValue,
+        customer: posCartState.customer,
+      },
+      ...heldSales,
+    ]);
+    dispatch(clearCart());
+    showToast("success", "Sale put on hold");
+  };
+
+  const restoreHeldSale = (id) => {
+    const held = heldSales.find((h) => h.id === id);
+    if (!held) return;
+
+    if (cart.length && !confirm("Replace the current cart with this held sale?"))
+      return;
+
+    dispatch(clearCart());
+    dispatch(setCart(held.cart));
+    dispatch(
+      setDiscountAction({ type: held.discountType, value: held.discountValue }),
+    );
+    dispatch(setVatAction({ type: held.vatType, value: held.vatValue }));
+    if (held.customer) dispatch(setCustomer(held.customer));
+    saveHeldSales(heldSales.filter((h) => h.id !== id));
+  };
+
+  const deleteHeldSale = (id) =>
+    saveHeldSales(heldSales.filter((h) => h.id !== id));
+
+  // Barcode scanners end with Enter: add the exact match right away
+  const handleSearchKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+
+    const found = findByBarcode(products, search.trim());
+    if (!found) return;
+
+    addToCart(found.product, found.variant, 1);
+    setSearch("");
+  };
+
+  // ==========================
+  // KEYBOARD SHORTCUTS
+  // ==========================
+  // the listener is registered once, so it reads the latest handlers from a ref
+  const shortcutsRef = useRef({});
+  shortcutsRef.current = {
+    holdSale,
+    openExchange,
+    printLastInvoice,
+    modalOpen: isCheckoutOpen || isExchangeOpen || !!openProduct,
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch("/api/category");
-        const data = await res.json();
-        setCategories(data.categories || data.data || []);
-      } catch (err) {
-        console.error("Fetch categories error:", err);
+    const onKeyDown = (e) => {
+      const actions = shortcutsRef.current;
+      const focusSearch = () => {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      };
+
+      if (e.key === "F1") return focusSearch();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")
+        return focusSearch();
+
+      if (actions.modalOpen) return;
+
+      if (e.key === "F2") {
+        e.preventDefault();
+        // the cart panel owns the payment inputs, so it completes the sale
+        window.dispatchEvent(new Event("pos:complete-sale"));
+      } else if (e.key === "F3") {
+        e.preventDefault();
+        actions.holdSale();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        actions.printLastInvoice();
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        actions.openExchange();
       }
     };
-    fetchCategories();
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const isAdmin = currentUser?.role === "admin";
+  const activeShowroomId = selectedShowroomId || currentUser?.showroomId;
+  const showroomName = showrooms.find((s) => s._id === activeShowroomId)?.name;
+
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
-      {/* Main */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full lg:grid lg:grid-cols-12 overflow-hidden">
-          {!cartExpanded && (
-            <ProductGallery
-              products={products}
-              loading={isLoading}
-              search={search}
-              setSearch={setSearch}
-              setOpenProduct={setOpenProduct}
-              addToCart={addToCart}
-              inputRef={searchInputRef}
-              fetchNextPage={fetchNextPage}
-              hasNextPage={hasNextPage}
-              isFetchingNextPage={isFetchingNextPage}
-              categories={categories}
-              selectedCategoryId={selectedCategoryId}
-              setSelectedCategoryId={setSelectedCategoryId}
-            />
-          )}
+    <div className="flex h-screen flex-col bg-background">
+      <PosTopbar
+        search={search}
+        setSearch={setSearch}
+        inputRef={searchInputRef}
+        onSearchKeyDown={handleSearchKeyDown}
+        isAdmin={isAdmin}
+        showrooms={showrooms}
+        selectedShowroomId={selectedShowroomId}
+        setSelectedShowroomId={setSelectedShowroomId}
+        heldSales={heldSales}
+        onRestoreHeld={restoreHeldSale}
+        onDeleteHeld={deleteHeldSale}
+        onExchange={openExchange}
+      />
 
-          <div className={cartExpanded ? "lg:col-span-12" : "lg:col-span-6"}>
-            <CartSidebar
-              products={products}
-              addToCart={addToCart}
-              searchTerm={search}
-              setSearchTerm={setSearch}
-              expanded={cartExpanded}
-              setExpanded={setCartExpanded}
-              cart={cart}
-              user={user}
-              selectedShowroomId={selectedShowroomId}
-              setSelectedShowroomId={setSelectedShowroomId}
-              showrooms={showrooms}
-              search={search}
-              subTotal={subTotal}
-              discount={discount}
-              setDiscount={setDiscount}
-              discountType={discountType}
-              setDiscountType={setDiscountType}
-              vat={vat}
-              setVat={setVat}
-              vatType={vatType}
-              setVatType={setVatType}
-              discountAmount={discountAmount}
-              vatAmount={vatAmount}
-              total={total}
-              totalQty={totalQty}
-              removeCartItem={removeCartItem}
-              increaseQty={increaseQty}
-              decreaseQty={decreaseQty}
-              handleCheckout={handleCheckout}
-              checkoutLoading={checkoutLoading}
-              handleExchange={handleExchange}
-            />
-          </div>
+      {/* Main: products on the left, current sale on the right */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {!cartExpanded && (
+          <ProductGallery
+            products={products}
+            loading={isLoading || isRestoring}
+            isError={isError}
+            onRetry={() => refetch()}
+            search={search}
+            setSearch={setSearch}
+            setOpenProduct={setOpenProduct}
+            addToCart={addToCart}
+            inputRef={searchInputRef}
+            fetchNextPage={fetchNextPage}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            setSelectedCategoryId={setSelectedCategoryId}
+            brands={brands}
+            selectedBrand={selectedBrand}
+            setSelectedBrand={setSelectedBrand}
+            sort={sort}
+            setSort={setSort}
+          />
+        )}
 
-          {openProduct && (
-            <VariantModal
-              product={openProduct}
-              setOpenProduct={setOpenProduct}
-              addToCart={addToCart}
-            />
-          )}
-        </div>
+        <CartSidebar
+          key={saleKey}
+          products={products}
+          expanded={cartExpanded}
+          setExpanded={setCartExpanded}
+          cart={cart}
+          removeCartItem={removeCartItem}
+          onComplete={(paymentData) => handleCheckout(paymentData)}
+          onHold={holdSale}
+          onClear={handleClearCart}
+          onPrint={printLastInvoice}
+          canPrint={!!lastOrderId}
+          checkoutLoading={checkoutLoading}
+        />
       </div>
 
-      {/* Footer */}
-      <PosFooter
-        onBack={() => window.history.back()}
-        onHold={() => {}}
-        handleCheckout={handleCheckout}
-        checkoutLoading={checkoutLoading}
-        handleExchange={handleExchange}
-        user={user}
-        selectedShowroomId={selectedShowroomId}
+      <PosFooter showroomName={showroomName} />
+
+      {openProduct && (
+        <VariantModal
+          product={openProduct}
+          setOpenProduct={setOpenProduct}
+          addToCart={addToCart}
+        />
+      )}
+
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          setIsExchangeMode(false);
+          setExchangePayloadCache(null);
+        }}
+        total={isExchangeMode ? localExchangeTotal : total}
+        cashierName={currentUser?.name}
+        isExchangeMode={isExchangeMode}
+        cart={cart}
+        onCheckout={(modalFormData) => {
+          const finalPayload = isExchangeMode
+            ? {
+                ...exchangePayloadCache,
+                ...modalFormData,
+                isExchangeMode: true,
+                total: localExchangeTotal,
+              }
+            : {
+                ...modalFormData,
+                isExchangeMode: false,
+                total,
+              };
+
+          handleCheckout(finalPayload);
+          setIsCheckoutOpen(false);
+          setIsExchangeMode(false);
+          setLocalExchangeTotal(0);
+          setExchangePayloadCache(null);
+        }}
+      />
+
+      <ExchangeModal
+        isOpen={isExchangeOpen}
+        onClose={() => setIsExchangeOpen(false)}
+        showroomId={activeShowroomId}
+        currentPosCart={cart}
+        onOpenCheckout={(checkoutPayload) => {
+          setIsExchangeMode(true);
+          setLocalExchangeTotal(checkoutPayload?.total ?? 0);
+          setExchangePayloadCache(checkoutPayload);
+
+          if (checkoutPayload?.exchangeData) {
+            handleExchange(checkoutPayload.exchangeData);
+          }
+
+          setIsExchangeOpen(false);
+          setIsCheckoutOpen(true);
+        }}
       />
     </div>
   );
 }
+

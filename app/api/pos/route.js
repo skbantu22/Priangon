@@ -2,8 +2,9 @@ import { connectDB } from "@/lib/databaseconnection";
 import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import ProductVariant from "@/models/ProductVariant.model ";
+import Media from "@/models/Media.model";
 
-import "@/models/Media.model";
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export async function GET(req) {
   const start = performance.now();
@@ -19,7 +20,36 @@ export async function GET(req) {
 
     const showroomId = searchParams.get("showroomId");
     const categoryId = searchParams.get("categoryId");
+    const brand = (searchParams.get("brand") || "").trim();
+    const sort = searchParams.get("sort") || "latest";
     const q = (searchParams.get("q") || "").trim();
+
+    const hasShowroom = !!showroomId && showroomId !== "all";
+
+    // Independent look-ups go out together, so one round-trip to the DB
+    const [matchedVariants, showroomProductIds] = await Promise.all([
+      q
+        ? ProductVariant.find({
+            $or: [
+              { barcode: { $regex: escapeRegex(q), $options: "i" } },
+              { sku: { $regex: escapeRegex(q), $options: "i" } },
+            ],
+          })
+            .select("product")
+            .lean()
+        : null,
+      hasShowroom ? ShowroomStock.distinct("productId", { showroomId }) : null,
+    ]);
+
+    if (hasShowroom && !showroomProductIds.length) {
+      return Response.json({
+        success: true,
+        items: [],
+        page,
+        limit,
+        hasMore: false,
+      });
+    }
 
     const query = {
       deletedAt: null,
@@ -29,89 +59,41 @@ export async function GET(req) {
       query.category = categoryId;
     }
 
+    if (brand) {
+      query.brand = { $regex: `^${escapeRegex(brand)}$`, $options: "i" };
+    }
+
     if (q) {
-      const matchedVariants = await ProductVariant.find({
-        $or: [
-          {
-            barcode: {
-              $regex: q,
-              $options: "i",
-            },
-          },
-          {
-            sku: {
-              $regex: q,
-              $options: "i",
-            },
-          },
-        ],
-      })
-        .select("product")
-        .lean();
-
-      const variantProductIds = matchedVariants
-        .map((v) => v.product?.toString())
-        .filter(Boolean);
-
       query.$or = [
-        {
-          name: {
-            $regex: q,
-            $options: "i",
-          },
-        },
+        { name: { $regex: escapeRegex(q), $options: "i" } },
         {
           _id: {
-            $in: variantProductIds,
+            $in: matchedVariants.map((v) => v.product).filter(Boolean),
           },
         },
       ];
     }
-    // Showroom wise product filter
-    if (showroomId && showroomId !== "all") {
-      const showroomProducts = await ShowroomStock.find({
-        showroomId,
-      })
-        .select("productId")
-        .lean();
 
-      const productIds = [
-        ...new Set(
-          showroomProducts
-            .map((item) => item.productId?.toString())
-            .filter(Boolean),
-        ),
-      ];
-
-      if (!productIds.length) {
-        return Response.json({
-          success: true,
-          items: [],
-          page,
-          limit,
-          hasMore: false,
-        });
-      }
-
-      query._id = {
-        $in: productIds,
-      };
+    if (hasShowroom) {
+      query._id = { $in: showroomProductIds };
     }
 
-    console.log("showroomId:", showroomId);
+    // No populate: variant and media ids are already on the product,
+    // so they are fetched below in parallel with the stock
+    const sortBy =
+      {
+        latest: { _id: -1 },
+        oldest: { _id: 1 },
+        "price-asc": { sellingPrice: 1, _id: 1 },
+        "price-desc": { sellingPrice: -1, _id: 1 },
+        name: { name: 1, _id: 1 },
+      }[sort] || { _id: -1 };
 
     const products = await Product.find(query)
-      .select("name sellingPrice media variants")
+      .select("name brand sellingPrice media variants warranty trackSerial")
+      .sort(sortBy)
       .skip(skip)
       .limit(limit)
-      .populate({
-        path: "media",
-        select: "secure_url",
-      })
-      .populate({
-        path: "variants",
-        select: "color size sku barcode mrp sellingPrice media",
-      })
       .lean();
 
     if (!products.length) {
@@ -125,11 +107,11 @@ export async function GET(req) {
     }
 
     const variantIds = [];
+    const mediaIds = [];
 
     for (const product of products) {
-      for (const variant of product.variants || []) {
-        variantIds.push(variant._id);
-      }
+      variantIds.push(...(product.variants || []));
+      mediaIds.push(...(product.media || []));
     }
 
     const stockQuery = {
@@ -137,13 +119,22 @@ export async function GET(req) {
     };
 
     // showroom filter
-    if (showroomId && showroomId !== "all") {
+    if (hasShowroom) {
       stockQuery.showroomId = showroomId;
     }
 
-    const stocks = await ShowroomStock.find(stockQuery)
-      .select("variantId stock")
-      .lean();
+    const [variants, mediaDocs, stocks] = await Promise.all([
+      ProductVariant.find({ _id: { $in: variantIds } })
+        .select("color size sku barcode mrp sellingPrice media")
+        .lean(),
+      Media.find({ _id: { $in: mediaIds } })
+        .select("secure_url")
+        .lean(),
+      ShowroomStock.find(stockQuery).select("variantId stock").lean(),
+    ]);
+
+    const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
+    const mediaMap = new Map(mediaDocs.map((m) => [m._id.toString(), m]));
 
     const stockMap = new Map();
 
@@ -153,32 +144,47 @@ export async function GET(req) {
       stockMap.set(key, (stockMap.get(key) || 0) + Number(stock.stock || 0));
     }
 
-    const items = products.map((product) => ({
-      productId: {
-        _id: product._id,
-        name: product.name,
-        sellingPrice: product.sellingPrice,
-        image: product.media?.[0]?.secure_url || "/placeholder.png",
-      },
+    const items = products.map((product) => {
+      // first media that still exists, same as populate used to give
+      const productImage =
+        (product.media || [])
+          .map((id) => mediaMap.get(id.toString())?.secure_url)
+          .find(Boolean) || "/placeholder.png";
 
-      variants: (product.variants || []).map((variant) => ({
-        _id: variant._id,
-        color: variant.color,
-        size: variant.size,
-        sku: variant.sku,
-        barcode: variant.barcode,
-        mrp: variant.mrp,
-        sellingPrice: variant.sellingPrice,
+      return {
+        productId: {
+          _id: product._id,
+          name: product.name,
+          brand: product.brand || "",
+          warranty: product.warranty || { type: "none", months: 0 },
+          trackSerial: !!product.trackSerial,
+          sellingPrice: product.sellingPrice,
+          image: productImage,
+        },
 
-        // showroom wise stock (or all showroom total)
-        showroomStock: stockMap.get(variant._id.toString()) ?? 0,
+        variants: (product.variants || [])
+          .map((id) => variantMap.get(id.toString()))
+          .filter(Boolean)
+          .map((variant) => ({
+            _id: variant._id,
+            color: variant.color,
+            size: variant.size,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            mrp: variant.mrp,
+            sellingPrice: variant.sellingPrice,
 
-        image:
-          variant.media?.[0]?.secure_url ||
-          product.media?.[0]?.secure_url ||
-          "/placeholder.png",
-      })),
-    }));
+            // showroom wise stock (or all showroom total)
+            showroomStock: stockMap.get(variant._id.toString()) ?? 0,
+
+            // variant media holds either a Media doc or a plain image URL
+            image:
+              (typeof variant.media?.[0] === "string"
+                ? variant.media[0]
+                : variant.media?.[0]?.secure_url) || productImage,
+          })),
+      };
+    });
 
     console.log(
       "TOTAL Execution:",

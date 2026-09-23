@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import LogoutButton from './LogoutButton'
 
-const UserDropDown = () => {
+const UserDropDown = ({ showDetails = false }) => {
   // Extract user data from Redux
   const user = useSelector((store) => store.authStore.auth?.user || store.authStore.auth?.data?.user);
 
@@ -38,16 +38,36 @@ const UserDropDown = () => {
     <div className="flex items-center gap-2">
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-            <Avatar className="h-10 w-10">
-              <AvatarImage 
-                src={user?.image || user?.avatar} 
-                alt={user?.name || "User"} 
-              />
-              <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
-            </Avatar>
-            {/* Online Status Badge */}
-            <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-600 ring-2 ring-white" />
+          <Button
+            variant="ghost"
+            className={
+              showDetails
+                ? "h-11 gap-2.5 rounded-lg px-1.5 text-white hover:bg-white/10 hover:text-white"
+                : "relative h-10 w-10 rounded-full"
+            }
+          >
+            <span className="relative">
+              <Avatar className="h-10 w-10">
+                <AvatarImage
+                  src={user?.image || user?.avatar?.url || user?.avatar}
+                  alt={user?.name || "User"}
+                />
+                <AvatarFallback className="bg-white/90 font-semibold text-primary">
+                  {getInitials(user?.name)}
+                </AvatarFallback>
+              </Avatar>
+              {/* Online Status Badge */}
+              <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-600 ring-2 ring-white" />
+            </span>
+
+            {showDetails && (
+              <span className="hidden lg:flex flex-col items-start leading-tight">
+                <span className="text-sm font-semibold">{user?.name}</span>
+                <span className="text-[11px] font-normal capitalize text-white/70">
+                  {user?.role}
+                </span>
+              </span>
+            )}
           </Button>
         </DropdownMenuTrigger>
 

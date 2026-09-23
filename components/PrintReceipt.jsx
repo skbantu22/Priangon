@@ -3,6 +3,14 @@
 import { useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { warrantyLabel } from "@/lib/warranty";
+
+const WARRANTY_NOTES = [
+  "Warranty covers manufacturing defects only.",
+  "Physical, liquid or burn damage and broken seals are not covered.",
+  "Keep this invoice: it is required for any warranty claim.",
+  "Exchange within 3 days only if the box and accessories are intact.",
+];
 
 function numberToWords(num) {
   const a = [
@@ -81,17 +89,42 @@ export default function PrintReceipt({ order }) {
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
 
-  const showroomName = "Mini Thailand";
-  const showroomAddress =
-    order.showroom?.address ||
-    "Sahabuddin plaza Shop no- 43, Level-3\nRing Road, Adabor, Mohammadpur.";
-  const showroomPhone = order.showroom?.phone || "01400209876";
-  const showroomEmail = order.showroom?.email || "minithailand@gmail.com";
+  const showroomName = "MobiZone";
+  const showroomAddress = order.showroom?.address || "Dhaka, Bangladesh";
+  const showroomPhone = order.showroom?.phone || "01700000001";
+  const showroomEmail = order.showroom?.email || "support@mobizone.com.bd";
 
   const totalAmount = order.total || 0;
-  const totalPaid = order.paidAmount || totalAmount;
+  // older orders have no paidAmount: they were paid in full
+  const totalPaid = order.paidAmount ?? totalAmount;
+  const dueAmount = Number(order.dueAmount || 0);
   const cashReceive = order.cashReceive || totalPaid;
   const changeAmount = cashReceive - totalPaid;
+  const payment = order.payments?.[0];
+  const paymentMethod =
+    order.paymentMethod ||
+    [payment?.type, payment?.option].filter(Boolean).join(" - ") ||
+    "Cash";
+
+  // name + variant + IMEI + warranty lines for one invoice row
+  const itemLines = (item) => {
+    const lines = [];
+    const variant = [item.size, item.color].filter(Boolean).join(" / ");
+    if (variant) lines.push(variant);
+    if (item.imeis?.length) lines.push(`IMEI/SN: ${item.imeis.join(", ")}`);
+    const w = warrantyLabel(item);
+    if (w) {
+      const till = item.warrantyExpiry
+        ? new Date(item.warrantyExpiry).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "";
+      lines.push(till ? `${w} (till ${till})` : w);
+    }
+    return lines;
+  };
   const totalInWords = numberToWords(Math.round(totalAmount));
 
   const saleDate = order.saleDate ? new Date(order.saleDate) : new Date();
@@ -189,7 +222,7 @@ export default function PrintReceipt({ order }) {
       const itemName = item.name || item.title || item.productName || "Item";
       return [
         index + 1,
-        itemName + (item.code ? `\n(${item.code})` : ""),
+        [itemName, ...itemLines(item)].join("\n"),
         Number(item.price || 0).toLocaleString("en-US", {
           minimumFractionDigits: 2,
         }),
@@ -241,8 +274,12 @@ export default function PrintReceipt({ order }) {
       ["Subtotal :", Number(order.subTotal || totalAmount)],
       ["Total :", Number(totalAmount)],
       ["Paid :", Number(totalPaid)],
-      ["Cash Receive:", Number(cashReceive)],
-      ["Change :", Number(changeAmount)],
+      ...(dueAmount > 0
+        ? [["Due :", dueAmount]]
+        : [
+            ["Cash Receive:", Number(cashReceive)],
+            ["Change :", Number(changeAmount)],
+          ]),
     ];
 
     doc.setFontSize(8);
@@ -276,7 +313,7 @@ export default function PrintReceipt({ order }) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.text(
-      `${order.paymentMethod || "Cash"} =              TK ${Number(totalPaid).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      `${paymentMethod} =              TK ${Number(totalPaid).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
       margin + 3,
       y + 9,
     );
@@ -285,25 +322,14 @@ export default function PrintReceipt({ order }) {
     // Footer Notes
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "italic");
-    doc.text(
-      "Note: No return policy. Exchange is allowed within three days from buying date.",
-      pageWidth / 2,
-      y,
-      { align: "center", maxWidth: contentWidth },
-    );
-    y += 4;
-    doc.text(
-      "Items purchased with discounts are not eligible for exchange.",
-      pageWidth / 2,
-      y,
-      { align: "center", maxWidth: contentWidth },
-    );
-    y += 3;
-    doc.text("Hijab items cannot be exchanged.", pageWidth / 2, y, {
-      align: "center",
-      maxWidth: contentWidth,
+    WARRANTY_NOTES.forEach((note) => {
+      doc.text(note, pageWidth / 2, y, {
+        align: "center",
+        maxWidth: contentWidth,
+      });
+      y += 3.5;
     });
-    y += 4;
+    y += 1;
 
     doc.setFont("helvetica", "bold");
     doc.text(
@@ -326,7 +352,7 @@ export default function PrintReceipt({ order }) {
 
     const invoiceLink = `${window.location.origin}/invoice/${order.orderNumber}`;
 
-    const message = `🛍️ Thank you for shopping with Mini Thailand!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
+    const message = `📱 Thank you for shopping with MobiZone!\nYour invoice is ready:\n${invoiceLink}\n\nThank you ❤️`;
     window.open(
       `https://wa.me/88${phone}?text=${encodeURIComponent(message)}`,
       "_blank",
@@ -454,14 +480,17 @@ export default function PrintReceipt({ order }) {
               >
                 <td className="py-1 text-gray-800">{index + 1}</td>
                 <td className="py-1 pr-1 break-words">
-                  <span className="block lowercase text-gray-800">
-                    {item.name}
+                  <span className="block font-medium text-gray-800">
+                    {item.name || item.productName}
                   </span>
-                  {item.code && (
-                    <span className="block text-[10px] tracking-wide text-gray-600">
-                      {item.code}
+                  {itemLines(item).map((line) => (
+                    <span
+                      key={line}
+                      className="block text-[10px] leading-3.5 text-gray-600"
+                    >
+                      {line}
                     </span>
-                  )}
+                  ))}
                 </td>
                 <td className="text-right py-1 align-bottom text-gray-800">
                   {Number(item.price).toLocaleString("en-US", {
@@ -514,6 +543,17 @@ export default function PrintReceipt({ order }) {
               })}
             </span>
           </div>
+          {dueAmount > 0 && (
+            <div className="flex justify-end space-x-4 text-red-700">
+              <span className="w-28 text-right font-bold">Due :</span>
+              <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5 font-bold">
+                {dueAmount.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          )}
           <div className="flex justify-end space-x-4">
             <span className="w-28 text-right font-bold">Cash Receive:</span>
             <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
@@ -546,7 +586,7 @@ export default function PrintReceipt({ order }) {
           </div>
           <div className="p-1 px-2 space-y-0.5">
             <div className="flex justify-between text-gray-800">
-              <span>{order.paymentMethod || "Cash"}</span>
+              <span>{paymentMethod}</span>
               <span>
                 =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
                 {Number(totalPaid).toLocaleString("en-US", {
@@ -570,12 +610,12 @@ export default function PrintReceipt({ order }) {
 
         {/* Footer Notes */}
         <div className="text-center mt-5 px-1 space-y-1 text-[9px] leading-3 text-gray-600 font-sans font-medium italic opacity-90">
-          <p className="border-t border-dashed border-black/20 pt-2">
-            Note: No return policy. Exchange is allowed within three days from
-            the buying date.
+          <p className="border-t border-dashed border-black/20 pt-2 font-bold not-italic text-gray-800">
+            Warranty Terms
           </p>
-          <p>Items purchased with discounts are not eligible for exchange.</p>
-          <p>Hijab items cannot be exchanged.</p>
+          {WARRANTY_NOTES.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
           <p className="text-black font-semibold not-italic mt-2">
             This is a computer generated copy. No signature is required from the
             company.

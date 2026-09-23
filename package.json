@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:mobile": "node --env-file=.env.local scripts/seed-mobile-demo.mjs",
+    "images:demo": "node scripts/render-demo-images.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-react": "^11.0.1",

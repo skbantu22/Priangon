@@ -6,8 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import slugify from "slugify";
 import Image from "next/image";
-import { X, ImageIcon, LayoutGrid } from "lucide-react";
-import { z } from "zod";
+import { ImageIcon, Tag, FileText } from "lucide-react";
 
 // UI Components
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
@@ -27,16 +26,21 @@ import Editor from "@/components/ui/Application/Admin/Editor";
 import MediaModal from "@/components/ui/Application/Admin/MediaModel";
 
 // Utilities & Config
-import { ADMIN_CATEGORY_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
+import { ADMIN_DASHBOARD, ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { zSchema } from "@/lib/zodschema";
+import {
+  mobileFieldsFromProduct,
+  productFormSchema,
+} from "@/lib/productFormSchema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
 import VariantManager from "@/components/ui/Application/Admin/products/modals/VariantManager";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
+import MobileSpecsCard from "@/components/ui/Application/Admin/products/MobileSpecsCard";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_CATEGORY_SHOW, label: "Products" },
+  { href: ADMIN_PRODUCT_SHOW, label: "Products" },
   { href: "#", label: "Edit Product" },
 ];
 
@@ -52,22 +56,7 @@ const EditProduct = ({ params }) => {
   const prevCategoryRef = useRef("");
   const productSubRef = useRef("");
 
-  const formSchema = zSchema
-    .pick({
-      _id: true,
-      name: true,
-      slug: true,
-      category: true,
-      mrp: true,
-      sellingPrice: true,
-      discountPercentage: true,
-      description: true,
-      media: true,
-      freeDelivery: true,
-    })
-    .extend({
-      subcategory: z.string().optional().or(z.literal("")),
-    });
+  const formSchema = productFormSchema.extend(zSchema.pick({ _id: true }).shape);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -83,6 +72,7 @@ const EditProduct = ({ params }) => {
       description: "",
       media: [],
       freeDelivery: false,
+      ...mobileFieldsFromProduct(null),
     },
   });
 
@@ -138,6 +128,9 @@ const EditProduct = ({ params }) => {
         sellingPrice: product?.sellingPrice || "",
         discountPercentage: product?.discountPercentage || "",
         description: product?.description || "",
+        media: (product?.media || []).map((m) => m._id || m),
+        freeDelivery: !!product?.freeDelivery,
+        ...mobileFieldsFromProduct(product),
       });
 
       if (product?.media?.length) {
@@ -202,7 +195,7 @@ const EditProduct = ({ params }) => {
     try {
       const { data: response } = await axios.put("/api/product/update", values);
       if (response?.success) {
-        showToast("success", "Listing Updated!");
+        showToast("success", "Product updated!");
       }
     } catch (error) {
       showToast("error", error.response?.data?.message || "Update failed");
@@ -212,33 +205,33 @@ const EditProduct = ({ params }) => {
   };
 
   return (
-    <div className="bg-[#f1f1f1] min-h-screen pb-20 lg:pb-10 font-sans">
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 space-y-6">
+    <div className="pb-20 lg:pb-10">
+      <div className="mx-auto max-w-300 space-y-6 py-2">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <BreadCrumb breadcrumbData={breadcrumbData} />
-                <h1 className="text-2xl font-black text-black tracking-tight uppercase">
+                <h1 className="text-2xl font-bold">
                   Edit Product
                 </h1>
               </div>
               <ButtonLoading
                 type="submit"
                 loading={loading}
-                text="UPDATE PRODUCT"
-                className="bg-black hover:bg-zinc-800 text-white font-black px-10 rounded-none h-12 shadow-xl tracking-widest"
+                text="Update Product"
+                className="h-11 rounded-lg px-8 shadow-md shadow-primary/30"
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* LEFT COLUMN */}
               <div className="lg:col-span-8 space-y-6">
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase tracking-[0.2em]">
-                      Core Information
+                <Card className="gap-0 rounded-xl py-0 shadow-sm">
+                  <CardHeader className="border-b py-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <FileText className="size-4 text-primary" /> Product Details
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
@@ -247,12 +240,12 @@ const EditProduct = ({ params }) => {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
+                          <FormLabel>
                             Product Name
                           </FormLabel>
                           <FormControl>
                             <Input
-                              className="h-11 border-black rounded-none"
+                              className="h-11"
                               {...field}
                             />
                           </FormControl>
@@ -266,11 +259,11 @@ const EditProduct = ({ params }) => {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
+                          <FormLabel>
                             Description *
                           </FormLabel>
                           <FormControl>
-                            <div className="border-2 border-black overflow-hidden bg-white min-h-[300px]">
+                            <div className="min-h-75 overflow-hidden rounded-lg border bg-white text-black">
                               {!getProductLoading && getProduct?.success && (
                                 <Editor
                                   initialData={field.value}
@@ -289,10 +282,10 @@ const EditProduct = ({ params }) => {
                 </Card>
 
                 {/* Media Gallery */}
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4" /> Gallery
+                <Card className="gap-0 rounded-xl py-0 shadow-sm">
+                  <CardHeader className="border-b py-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <ImageIcon className="size-4 text-primary" /> Photos
                     </CardTitle>
                   </CardHeader>
 
@@ -308,10 +301,10 @@ const EditProduct = ({ params }) => {
 
               {/* RIGHT COLUMN */}
               <div className="lg:col-span-4 space-y-6">
-                <Card className="border-2 border-black rounded-none shadow-none bg-white">
-                  <CardHeader className="bg-black py-3 rounded-none">
-                    <CardTitle className="text-xs font-bold text-white uppercase">
-                      Pricing & Category
+                <Card className="gap-0 rounded-xl py-0 shadow-sm">
+                  <CardHeader className="border-b py-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                      <Tag className="size-4 text-primary" /> Price &amp; Category
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-5 space-y-5">
@@ -321,11 +314,11 @@ const EditProduct = ({ params }) => {
                         name="mrp"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase">
-                              MRP
+                            <FormLabel>
+                              MRP (৳)
                             </FormLabel>
                             <Input
-                              className="h-10 border-black rounded-none"
+                              
                               type="number"
                               {...field}
                             />
@@ -337,11 +330,11 @@ const EditProduct = ({ params }) => {
                         name="sellingPrice"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase">
-                              Sale Price
+                            <FormLabel>
+                              Sale Price (৳)
                             </FormLabel>
                             <Input
-                              className="h-10 border-black rounded-none font-bold text-blue-600"
+                              className="font-semibold text-primary"
                               type="number"
                               {...field}
                             />
@@ -350,8 +343,8 @@ const EditProduct = ({ params }) => {
                       />
                     </div>
 
-                    <div className="bg-zinc-100 border-2 border-black p-3 text-center uppercase font-black text-xs italic">
-                      Discount: {form.watch("discountPercentage") || 0}% OFF
+                    <div className="rounded-lg bg-primary/10 p-2.5 text-center text-sm font-semibold text-primary">
+                      Discount: {form.watch("discountPercentage") || 0}% off
                     </div>
 
                     <FormField
@@ -359,7 +352,7 @@ const EditProduct = ({ params }) => {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
+                          <FormLabel>
                             Category
                           </FormLabel>
                           <Select
@@ -380,7 +373,7 @@ const EditProduct = ({ params }) => {
                       name="subcategory"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[10px] font-black uppercase">
+                          <FormLabel>
                             Sub-Category
                           </FormLabel>
                           <Select
@@ -398,6 +391,8 @@ const EditProduct = ({ params }) => {
                     />
                   </CardContent>
                 </Card>
+
+                <MobileSpecsCard form={form} />
               </div>
             </div>
           </form>
