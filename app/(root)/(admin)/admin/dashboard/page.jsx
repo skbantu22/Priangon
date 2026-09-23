@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { MotionConfig, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { MotionConfig, animate, motion, useMotionValue, useTransform } from "framer-motion";
 import Image from "next/image";
 import { skipOptimize } from "@/lib/imageSrc";
 import Link from "next/link";
@@ -70,11 +70,23 @@ const TONES = {
 };
 
 // tiles fade up one after another; panels slide in as they scroll into view
-const tileList = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
+const EASE = [0.16, 1, 0.3, 1];
+const tileList = { hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } } };
 const tileItem = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 260, damping: 24 } },
+  hidden: { opacity: 0, y: -22 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
 };
+
+// counts from the last shown value (0 on first load) up to the new one
+function CountUp({ value, format = (n) => Math.round(n).toLocaleString("en-US") }) {
+  const mv = useMotionValue(0);
+  const text = useTransform(mv, (v) => format(v));
+  useEffect(() => {
+    const controls = animate(mv, Number(value) || 0, { duration: 1.6, ease: EASE });
+    return () => controls.stop();
+  }, [value, mv]);
+  return <motion.span>{text}</motion.span>;
+}
 
 function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
   const body = (
@@ -104,10 +116,10 @@ function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
 function Panel({ title, action, children, className = "" }) {
   return (
     <motion.section
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: -20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.7, ease: EASE }}
       className={`flex flex-col rounded-2xl border border-gray-200/70 bg-card p-5 shadow-sm dark:border-white/10 ${className}`}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -198,7 +210,12 @@ export default function Dashboard() {
   return (
     <MotionConfig reducedMotion="user">
     <div className="dash-viz space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: -24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: EASE }}
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
@@ -206,7 +223,7 @@ export default function Dashboard() {
             {isFetching && <Loader2 className="ml-2 inline size-3.5 animate-spin" />}
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {/* ================= KPI TILES ================= */}
       <motion.div
@@ -218,7 +235,7 @@ export default function Dashboard() {
         <Kpi
           icon={Store}
           tone="orange"
-          value={k.pendingDealerOrders ?? 0}
+          value={<CountUp value={k.pendingDealerOrders ?? 0} />}
           label="New Dealer Orders"
           sub="Waiting to be invoiced"
           href="/admin/partner-orders"
@@ -226,7 +243,7 @@ export default function Dashboard() {
         <Kpi
           icon={TrendingUp}
           tone="emerald"
-          value={money(k.todaySales)}
+          value={<CountUp value={k.todaySales} format={money} />}
           label="Today's Sales"
           sub={`${k.todayOrders} invoices · ${k.todayUnits} items`}
           href="/admin/all-orders/pos-orders"
@@ -234,35 +251,35 @@ export default function Dashboard() {
         <Kpi
           icon={Wallet}
           tone="amber"
-          value={money(k.todayReceived)}
+          value={<CountUp value={k.todayReceived} format={money} />}
           label="Today's Money Received"
           sub={k.todayDueAdded > 0 ? `${money(k.todayDueAdded)} added to due today` : "No new due today"}
         />
         <Kpi
           icon={UserRoundX}
           tone="indigo"
-          value={money(k.customersDue)}
+          value={<CountUp value={k.customersDue} format={money} />}
           label="Customers Due"
           sub={`${k.dueCustomers} customers owe money`}
         />
         <Kpi
           icon={Smartphone}
           tone="violet"
-          value={k.todayPhones}
+          value={<CountUp value={k.todayPhones} />}
           label="Phones / Serial Items Sold Today"
           sub="Counted by IMEI / serial"
         />
         <Kpi
           icon={CalendarRange}
           tone="cyan"
-          value={money(k.monthSales)}
+          value={<CountUp value={k.monthSales} format={money} />}
           label="This Month's Sales"
           sub={`${k.monthOrders} invoices`}
         />
         <Kpi
           icon={Boxes}
           tone="rose"
-          value={money(k.stockValue)}
+          value={<CountUp value={k.stockValue} format={money} />}
           label="Stock Value (selling price)"
           sub={`${k.stockUnits.toLocaleString()} units · ${k.lowStockCount} low`}
           href="/admin/Stock-Overview"
@@ -270,7 +287,7 @@ export default function Dashboard() {
         <Kpi
           icon={ShieldCheck}
           tone="red"
-          value={k.openClaims}
+          value={<CountUp value={k.openClaims} />}
           label="Open Warranty Claims"
           sub={`${k.readyClaims} ready to deliver · ${k.expiringSoon} expiring in 30 days`}
           href="/admin/warranty"
