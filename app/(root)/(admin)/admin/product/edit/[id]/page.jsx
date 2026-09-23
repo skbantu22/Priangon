@@ -37,6 +37,8 @@ import useFetch from "@/hooks/useFetch";
 import VariantManager from "@/components/ui/Application/Admin/products/modals/VariantManager";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import MobileSpecsCard from "@/components/ui/Application/Admin/products/MobileSpecsCard";
+import PriceListCard from "@/components/ui/Application/Admin/products/PriceListCard";
+import { tierPricesFromProduct } from "@/lib/priceTiers";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -73,6 +75,7 @@ const EditProduct = ({ params }) => {
       media: [],
       freeDelivery: false,
       ...mobileFieldsFromProduct(null),
+      ...tierPricesFromProduct(null),
     },
   });
 
@@ -131,6 +134,7 @@ const EditProduct = ({ params }) => {
         media: (product?.media || []).map((m) => m._id || m),
         freeDelivery: !!product?.freeDelivery,
         ...mobileFieldsFromProduct(product),
+        ...tierPricesFromProduct(product),
       });
 
       if (product?.media?.length) {
@@ -391,6 +395,8 @@ const EditProduct = ({ params }) => {
                     />
                   </CardContent>
                 </Card>
+
+                <PriceListCard form={form} />
 
                 <MobileSpecsCard form={form} />
               </div>

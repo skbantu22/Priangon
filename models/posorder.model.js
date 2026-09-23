@@ -66,6 +66,9 @@ const POSOrderSchema = new mongoose.Schema(
           min: 0,
         },
 
+        // cost at the time of sale, for profit reports
+        purchasePrice: { type: Number, min: 0, default: 0 },
+
         subtotal: {
           type: Number,
           required: true,
@@ -127,6 +130,12 @@ const POSOrderSchema = new mongoose.Schema(
       ref: "Customer",
       default: null,
       index: true,
+    },
+    // rate of the price list the sale was made at
+    customerType: {
+      type: String,
+      enum: ["retail", "dealer", "subDealer", "retailer"],
+      default: "retail",
     },
     customerName: {
       type: String,

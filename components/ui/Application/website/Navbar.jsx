@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import logo from "@/public/assets/logo.png";
+import logo from "@/public/assets/sbt-logo-wide.png";
 import Image from "next/image";
 import axios from "axios";
 
@@ -93,10 +93,10 @@ const Navbar = () => {
           <Link href={WEBSITE_HOME} className="flex items-center">
             <Image
               src={logo}
-              alt="Minithiland"
-              width={44}
-              height={44}
-              className="h-11 w-11 lg:h-14 lg:w-14 object-contain"
+              alt="SB Telecom"
+              width={140}
+              height={110}
+              className="h-11 w-auto lg:h-14 object-contain"
               priority
             />
           </Link>

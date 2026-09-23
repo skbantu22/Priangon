@@ -18,6 +18,14 @@ const CustomerSchema = new mongoose.Schema(
       default: "",
     },
 
+    // which rate of the price list this customer buys at
+    type: {
+      type: String,
+      enum: ["retail", "dealer", "subDealer", "retailer"],
+      default: "retail",
+      index: true,
+    },
+
     totalOrders: {
       type: Number,
       default: 0,

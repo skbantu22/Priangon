@@ -10,6 +10,12 @@ export async function proxy(request) {
 
   const isAuthRoute = pathname.startsWith("/auth");
 
+  // no storefront: the home page opens the login screen
+  // (logged-in staff are sent on to their dashboard / POS from there)
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/auth/login", request.url));
+  }
+
   // PUBLIC ROUTES
   const isPublicRoute =
     pathname === "/" ||
@@ -86,5 +92,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/my-account/:path*", "/auth/:path*"],
+  matcher: ["/", "/admin/:path*", "/my-account/:path*", "/auth/:path*"],
 };

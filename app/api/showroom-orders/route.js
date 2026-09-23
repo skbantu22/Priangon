@@ -5,6 +5,7 @@ import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { connectDB } from "@/lib/databaseconnection";
 import { NextResponse } from "next/server";
 import Customer from "@/models/Customer.model";
+import { normalizeCustomerType } from "@/lib/priceTiers";
 import Product from "@/models/Product.model";
 import { warrantyExpiryDate } from "@/lib/warranty";
 /* =========================
@@ -79,6 +80,7 @@ export async function POST(req) {
       saleDate,
       isExchangeMode,
     } = body;
+    const customerType = normalizeCustomerType(body.customerType);
 
     /* =========================
        VALIDATION
@@ -93,7 +95,7 @@ export async function POST(req) {
     const productDocs = await Product.find({
       _id: { $in: items.map((i) => i.productId) },
     })
-      .select("warranty trackSerial")
+      .select("warranty trackSerial purchasePrice")
       .lean();
     const productMap = new Map(productDocs.map((p) => [String(p._id), p]));
     const sellDate = saleDate ? new Date(saleDate) : new Date();
@@ -116,6 +118,8 @@ export async function POST(req) {
       item.warrantyType = months ? product.warranty.type : "none";
       item.warrantyMonths = months;
       item.warrantyExpiry = warrantyExpiryDate(sellDate, months);
+      // cost at the time of sale, for profit reports
+      item.purchasePrice = Number(product?.purchasePrice) || 0;
       allImeis.push(...imeis);
     }
 
@@ -137,6 +141,23 @@ export async function POST(req) {
       }
     }
 
+    const paidAmount = (payments || []).length
+      ? payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+      : Number(total || 0);
+    // rounded to paisa so VAT fractions don't leave a phantom due
+    const dueAmount = Math.max(
+      0,
+      Math.round(
+        (Number(total || 0) + Number(deliveryCharge || 0) - paidAmount) * 100,
+      ) / 100,
+    );
+
+    // a due (বাকি) sale must be traceable to a customer; checked before an
+    // invoice number is taken so a rejected sale leaves no gap in the numbers
+    if (dueAmount > 0 && !phone?.trim()) {
+      throw new Error("Customer phone is required for a due sale");
+    }
+
     const seq = await getNextInvoiceNumber("pos_invoice");
     const orderNumber = `INV-${String(seq).padStart(6, "0")}`;
 
@@ -152,6 +173,7 @@ export async function POST(req) {
       if (customer) {
         customer.name = customerName || customer.name;
         customer.address = address || customer.address;
+        customer.type = customerType;
         customer.totalOrders += 1;
         customer.totalSpent += Number(total || 0);
 
@@ -163,6 +185,7 @@ export async function POST(req) {
               name: customerName || "Walk In Customer",
               phone,
               address,
+              type: customerType,
               totalOrders: 1,
               totalSpent: Number(total || 0),
             },
@@ -192,23 +215,6 @@ export async function POST(req) {
               amount: Number(total),
             },
           ];
-
-    const paidAmount = cleanPayments.reduce(
-      (sum, p) => sum + (Number(p.amount) || 0),
-      0,
-    );
-    // rounded to paisa so VAT fractions don't leave a phantom due
-    const dueAmount = Math.max(
-      0,
-      Math.round(
-        (Number(total || 0) + Number(deliveryCharge || 0) - paidAmount) * 100,
-      ) / 100,
-    );
-
-    // a due (বাকি) sale must be traceable to a customer
-    if (dueAmount > 0 && !customer) {
-      throw new Error("Customer phone is required for a due sale");
-    }
 
     /* =========================
        STOCK UPDATE
@@ -273,6 +279,7 @@ export async function POST(req) {
       soldBy: soldBy || "Counter Guest",
 
       customerName,
+      customerType,
       phone,
       address,
 

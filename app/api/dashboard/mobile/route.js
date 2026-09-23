@@ -105,7 +105,7 @@ export async function GET(req) {
       { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
     ];
 
-    const [orderFacets] = await POSOrder.aggregate([
+    const orderAgg = POSOrder.aggregate([
       {
         $facet: {
           today: [
@@ -264,7 +264,7 @@ export async function GET(req) {
 
     // ---- stock (value, low stock) ----
     const stockMatch = showroom ? { showroomId: showroom } : {};
-    const [stockFacets] = await ShowroomStock.aggregate([
+    const stockAgg = ShowroomStock.aggregate([
       { $match: stockMatch },
       { $group: { _id: "$variantId", productId: { $first: "$productId" }, stock: { $sum: "$stock" } } },
       {
@@ -316,9 +316,15 @@ export async function GET(req) {
 
     // ---- warranty claims ----
     const claimMatch = showroom ? { showroomId: showroom } : {};
-    const claimCounts = await WarrantyClaim.aggregate([
+    const claimAgg = WarrantyClaim.aggregate([
       { $match: claimMatch },
       { $group: { _id: "$status", n: { $sum: 1 } } },
+    ]);
+    // the three reads are independent: run them together (one DB round trip instead of three)
+    const [[orderFacets], [stockFacets], claimCounts] = await Promise.all([
+      orderAgg,
+      stockAgg,
+      claimAgg,
     ]);
     const claims = Object.fromEntries(claimCounts.map((c) => [c._id, c.n]));
 

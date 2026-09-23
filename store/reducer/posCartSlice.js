@@ -1,4 +1,13 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { normalizeCustomerType, rateForType } from "@/lib/priceTiers";
+
+// every line is charged at the rate of the customer's type (dealer, retailer...)
+const repriceCart = (state) => {
+  const type = normalizeCustomerType(state.customer?.type);
+  for (const item of state.cart) {
+    if (item.rates) item.price = rateForType(item.rates, type);
+  }
+};
 
 const initialState = {
   cart: [],
@@ -40,6 +49,9 @@ const posCartSlice = createSlice({
       } else {
         state.cart.push({
           ...item,
+          price: item.rates
+            ? rateForType(item.rates, state.customer?.type)
+            : item.price,
           qty: Number(item.qty) || 1,
         });
       }
@@ -108,11 +120,15 @@ const posCartSlice = createSlice({
     // ==========================
 
     setCustomer(state, action) {
+      const before = normalizeCustomerType(state.customer?.type);
       state.customer = action.payload;
+      if (normalizeCustomerType(state.customer?.type) !== before) repriceCart(state);
     },
 
     clearCustomer(state) {
+      const before = normalizeCustomerType(state.customer?.type);
       state.customer = null;
+      if (before !== "retail") repriceCart(state);
     },
 
     // ==========================

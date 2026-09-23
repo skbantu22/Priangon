@@ -32,6 +32,7 @@ import {
   selectPosSummary,
 } from "@/store/reducer/posCartSlice";
 import { showToast } from "@/lib/showToast";
+import { CUSTOMER_TYPES, normalizeCustomerType } from "@/lib/priceTiers";
 import { isValidSerial, warrantyLabel } from "@/lib/warranty";
 
 // IMEI / serial inputs, one per unit, for phones and other tracked items
@@ -142,6 +143,8 @@ function CustomerPicker() {
         name: c.name || "",
         phone: c.phone || "",
         address: c.address || "",
+        // dealer / retailer... : the cart switches to that rate
+        type: normalizeCustomerType(c.type),
       }),
     );
     setQuery("");
@@ -190,11 +193,32 @@ function CustomerPicker() {
               <X className="size-4" />
             </button>
           </div>
-          {customer._id && (
-            <p className="mt-1 px-0.5 text-[11px] text-primary">
-              Existing customer
-            </p>
-          )}
+          <div className="mt-1.5 flex items-center gap-2">
+            <select
+              value={normalizeCustomerType(customer.type)}
+              onChange={(e) =>
+                dispatch(setCustomer({ ...customer, type: e.target.value }))
+              }
+              title="Customer type: sets the rate"
+              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-[12px] font-medium outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+            >
+              {Object.entries(CUSTOMER_TYPES).map(([key, t]) => (
+                <option key={key} value={key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            {normalizeCustomerType(customer.type) !== "retail" && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                {CUSTOMER_TYPES[normalizeCustomerType(customer.type)].short} rate applied
+              </span>
+            )}
+            {customer._id && (
+              <span className="ml-auto text-[11px] text-primary">
+                Existing customer
+              </span>
+            )}
+          </div>
         </div>
       ) : (
         <label className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary dark:border-white/10 dark:bg-transparent">
@@ -225,7 +249,12 @@ function CustomerPicker() {
                 </span>
                 <span className="text-[11px] text-gray-500">{c.phone}</span>
               </span>
-              <span className="shrink-0 text-[11px] text-gray-400">
+              <span className="shrink-0 text-right text-[11px] text-gray-400">
+                {normalizeCustomerType(c.type) !== "retail" && (
+                  <span className="block font-semibold text-emerald-600">
+                    {CUSTOMER_TYPES[normalizeCustomerType(c.type)].short}
+                  </span>
+                )}
                 {c.totalOrders || 0} orders
               </span>
             </button>
@@ -381,6 +410,7 @@ export default function CartSidebar({
       customerName: customer?.name || "Walk-in Customer",
       phone: customer?.phone || "",
       address: customer?.address || "",
+      customerType: normalizeCustomerType(customer?.type),
     });
   };
 
@@ -401,9 +431,9 @@ export default function CartSidebar({
       }`}
     >
       {/* ================= HEADER ================= */}
-      <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-4">
+      <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-3">
         <ShoppingBag className="size-5 text-primary" strokeWidth={2.5} />
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
           Current Sale
         </h2>
 
@@ -441,7 +471,7 @@ export default function CartSidebar({
       </div>
 
       {/* ================= ITEMS ================= */}
-      <div className="mx-3 flex min-h-[150px] flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
+      <div className="mx-3 flex min-h-30 flex-1 flex-col overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
         <div className="grid shrink-0 grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-2.5 text-[12px] font-semibold text-gray-600 dark:bg-white/5 dark:text-gray-300">
           <span>#</span>
           <span>Product</span>
@@ -529,12 +559,12 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-3 px-4 pb-4 pt-3">
+      <div className="shrink-0 space-y-2.5 px-4 pt-2.5">
         {/* ================= CUSTOMER ================= */}
         <CustomerPicker />
 
         {/* ================= SUMMARY ================= */}
-        <div className="space-y-2 border-t border-gray-100 pt-3 text-[13px] dark:border-white/10">
+        <div className="space-y-1.5 border-t border-gray-100 pt-2 text-[13px] dark:border-white/10">
           <div className="flex justify-between text-gray-600 dark:text-gray-300">
             <span>
               Subtotal ({totalQty} items)
@@ -605,9 +635,9 @@ export default function CartSidebar({
         </div>
 
         {/* ================= TOTAL ================= */}
-        <div className="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
-          <span className="text-lg font-bold text-primary">Total Amount</span>
-          <span className="text-[26px] font-extrabold leading-none text-primary">
+        <div className="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-2">
+          <span className="text-base font-bold text-primary">Total Amount</span>
+          <span className="text-[24px] font-extrabold leading-none text-primary">
             {money(total)}
           </span>
         </div>
@@ -619,7 +649,7 @@ export default function CartSidebar({
               key={key}
               type="button"
               onClick={() => chooseMethod(key)}
-              className={`flex h-10 items-center justify-center gap-1.5 rounded-lg border px-1 text-[12px] font-medium transition ${
+              className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border px-1 text-[12px] font-medium transition ${
                 method === key
                   ? "border-primary bg-primary text-white shadow-md shadow-primary/30"
                   : "border-gray-200 bg-white text-gray-700 hover:border-primary/50 dark:border-white/10 dark:bg-transparent dark:text-gray-200"
@@ -650,40 +680,45 @@ export default function CartSidebar({
           </div>
         )}
 
-        <div className="grid grid-cols-[120px_1fr] items-center gap-2 text-[13px]">
-          <span className="text-gray-700 dark:text-gray-300">
-            {method === "Due" ? "Paid Now" : "Received Amount"}
-          </span>
-          <label className="flex h-10 items-center gap-1.5 rounded-lg border border-gray-200 px-3 focus-within:border-primary dark:border-white/10">
-            <span className="text-gray-500">৳</span>
-            <input
-              type="number"
-              min="0"
-              value={receivedInput ?? defaultReceived}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setReceivedInput(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-[14px] outline-none"
-            />
+        <div className="grid grid-cols-2 gap-2 text-[12px]">
+          <label className="block">
+            <span className="text-gray-600 dark:text-gray-300">
+              {method === "Due" ? "Paid Now" : "Received Amount"}
+            </span>
+            <span className="mt-0.5 flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 focus-within:border-primary dark:border-white/10">
+              <span className="text-gray-500">৳</span>
+              <input
+                type="number"
+                min="0"
+                value={receivedInput ?? defaultReceived}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setReceivedInput(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-[14px] font-semibold outline-none"
+              />
+            </span>
           </label>
-
-          <span className="text-gray-700 dark:text-gray-300">
-            {due > 0 ? "Due Amount" : "Change Amount"}
-          </span>
-          <span
-            className={`text-right text-xl font-extrabold ${
-              due > 0 ? "text-red-500" : "text-emerald-600"
-            }`}
-          >
-            {money(due > 0 ? due : change)}
-          </span>
+          <div className="text-right">
+            <span className="text-gray-600 dark:text-gray-300">
+              {due > 0 ? "Due Amount" : "Change Amount"}
+            </span>
+            <p
+              className={`mt-0.5 flex h-9 items-center justify-end text-xl font-extrabold ${
+                due > 0 ? "text-red-500" : "text-emerald-600"
+              }`}
+            >
+              {money(due > 0 ? due : change)}
+            </p>
+          </div>
         </div>
+      </div>
 
-        {/* ================= ACTIONS ================= */}
+      {/* ================= ACTIONS (always visible at the bottom) ================= */}
+      <div className="sticky bottom-0 z-10 mt-auto shrink-0 space-y-2 border-t border-gray-100 bg-white px-4 py-3 shadow-[0_-6px_16px_-10px_rgba(0,0,0,0.25)] dark:border-white/10 dark:bg-card">
         <button
           type="button"
           onClick={complete}
           disabled={checkoutLoading || cart.length === 0}
-          className="flex h-13 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[17px] font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-[16px] font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
           <CheckCircle2 className="size-5" />
           {checkoutLoading ? "Processing..." : "Complete Sale (F2)"}
@@ -694,7 +729,7 @@ export default function CartSidebar({
             type="button"
             onClick={onHold}
             disabled={cart.length === 0}
-            className="flex h-11 items-center justify-center gap-2 rounded-xl bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
           >
             <Pause className="size-4" strokeWidth={3} />
             Save &amp; Hold (F3)
@@ -704,7 +739,7 @@ export default function CartSidebar({
             onClick={onPrint}
             disabled={!canPrint}
             title={canPrint ? "Print last invoice" : "No sale completed yet"}
-            className="flex h-11 items-center justify-center gap-2 rounded-xl bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-primary/10 text-[13px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
           >
             <Printer className="size-4" />
             Print Invoice (F4)

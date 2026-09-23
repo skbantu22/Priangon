@@ -25,6 +25,8 @@ import Select from "@/components/ui/Select";
 import Editor from "@/components/ui/Application/Admin/Editor";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import MobileSpecsCard from "@/components/ui/Application/Admin/products/MobileSpecsCard";
+import PriceListCard from "@/components/ui/Application/Admin/products/PriceListCard";
+import { tierPricesFromProduct } from "@/lib/priceTiers";
 
 // Utilities & Config
 import { ADMIN_DASHBOARD, ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
@@ -71,6 +73,7 @@ const AddProduct = () => {
       warrantyType: "none",
       warrantyMonths: 0,
       trackSerial: false,
+      ...tierPricesFromProduct(null),
     },
   });
 
@@ -392,6 +395,8 @@ const AddProduct = () => {
                     />
                   </CardContent>
                 </Card>
+
+                <PriceListCard form={form} />
 
                 <MobileSpecsCard form={form} />
               </div>

@@ -20,7 +20,7 @@ export async function GET(req) {
       const customers = await Customer.find({
         $or: [{ name: rx }, { phone: rx }],
       })
-        .select("name phone address totalOrders totalSpent")
+        .select("name phone address type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(8)
         .lean();

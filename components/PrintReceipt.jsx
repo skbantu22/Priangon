@@ -405,6 +405,7 @@ export default function PrintReceipt({ order }) {
 
         {/* Header Info */}
         <div className="text-center mb-3">
+          <img src="/assets/sbt-logo-wide.png" alt="SB Telecom" className="mx-auto mb-1 h-16 w-auto object-contain" />
           <h2 className="font-serif font-bold text-[22px] tracking-wide text-gray-800">
             {showroomName}
           </h2>

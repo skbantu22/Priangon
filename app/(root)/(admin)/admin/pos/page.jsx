@@ -12,18 +12,22 @@ import CheckoutModal from "@/components/ui/Application/Admin/pos/CheckoutModal";
 import ExchangeModal from "@/components/ui/Application/Admin/pos/ExchangeModal";
 import { shallowEqual, useDispatch, useSelector } from "react-redux";
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useIsRestoring,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  filterPosProducts,
   posBrandsQueryOptions,
   posCategoriesQueryOptions,
-  posProductsQueryKey,
   posProductsQueryOptions,
   posShowroomsQueryOptions,
+  resolvePosShowroomId,
+  writePosShowroom,
 } from "@/lib/posProducts";
+import { ratesFor } from "@/lib/priceTiers";
 
 import {
   addToCart as addToCartAction,
@@ -69,7 +73,8 @@ export default function POSPage() {
   // Core States
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(""); // 🚀 Debounce Search State
-  const [selectedShowroomId, setSelectedShowroomId] = useState("");
+  // admin: showroom picked in the top bar (empty = not picked yet)
+  const [pickedShowroomId, setPickedShowroomId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [sort, setSort] = useState("latest");
@@ -106,6 +111,26 @@ export default function POSPage() {
     [user],
   );
 
+  // Showrooms rarely change: cached (and persisted), so revisits are instant
+  const { data: showrooms = [] } = useQuery({
+    ...posShowroomsQueryOptions(),
+    enabled: currentUser?.role === "admin",
+    refetchOnWindowFocus: false,
+  });
+
+  // an admin always sells from one showroom: the picked one, else the one
+  // used last time on this device, else the first
+  const selectedShowroomId = resolvePosShowroomId({
+    currentUser,
+    picked: pickedShowroomId,
+    showrooms,
+  });
+
+  const pickShowroom = useCallback((id) => {
+    setPickedShowroomId(id);
+    writePosShowroom(id);
+  }, []);
+
   // 🚀 Debounce Search Effect (দ্রুত টাইপিংয়ে বারবার API কল হওয়া আটকাবে)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -116,49 +141,99 @@ export default function POSPage() {
   }, [search]);
 
   // ==========================
-  // 🚀 OPTIMIZED USEINFINITEQUERY
-  // (options are shared with PosPrefetch, so a prefetched page is a cache hit)
+  // 🚀 ZERO LOADING PRODUCT LIST
+  // The full (unfiltered) list of the showroom is loaded once and cached; search,
+  // category, brand and sort are applied to it in the browser, so they are instant.
+  // (options are shared with PosPrefetch, so a prefetched list is a cache hit)
   // ==========================
   const isRestoring = useIsRestoring();
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isFetching,
-    isLoading,
-    isError,
-    refetch,
-  } = useInfiniteQuery({
-    ...posProductsQueryOptions({
-      search: debouncedSearch,
-      showroomId: selectedShowroomId,
-      categoryId: selectedCategoryId,
-      brand: selectedBrand,
-      sort,
-      currentUser,
-    }),
+  const baseQuery = useInfiniteQuery({
+    ...posProductsQueryOptions({ showroomId: selectedShowroomId, currentUser }),
     enabled: !!user,
+    // switching showroom keeps the old list on screen until the new one is in
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false, // 🚀 উইন্ডো ফোকাস পরিবর্তন হলে রিলোড বন্ধ
   });
 
   // Keep loading the remaining pages in the background, one at a time, so
   // scrolling (and barcode scans over the loaded list) never has to wait.
   // It waits for any running fetch first, so it never cancels a stock refresh.
+  const {
+    data: baseData,
+    hasNextPage: baseHasNext,
+    isFetching: baseFetching,
+    isError: baseError,
+    isPlaceholderData: baseIsPlaceholder,
+    fetchNextPage: fetchNextBasePage,
+  } = baseQuery;
+
   useEffect(() => {
-    if (isRestoring || !hasNextPage || isFetching || isError) return;
-    if ((data?.pages.length ?? 0) >= MAX_EAGER_PAGES) return;
+    if (isRestoring || baseIsPlaceholder || !baseHasNext || baseFetching || baseError) return;
+    if ((baseData?.pages.length ?? 0) >= MAX_EAGER_PAGES) return;
 
-    fetchNextPage();
-  }, [data, hasNextPage, isFetching, isError, isRestoring, fetchNextPage]);
+    fetchNextBasePage();
+  }, [baseData, baseHasNext, baseFetching, baseError, baseIsPlaceholder, isRestoring, fetchNextBasePage]);
 
-  // Showrooms & categories rarely change: cached (and persisted), so revisits are instant
-  const { data: showrooms = [] } = useQuery({
-    ...posShowroomsQueryOptions(),
-    enabled: currentUser?.role === "admin",
+  const allProducts = useMemo(
+    () => baseQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [baseQuery.data],
+  );
+
+  const listFilters = {
+    search,
+    categoryId: selectedCategoryId,
+    brand: selectedBrand,
+    sort,
+  };
+  const hasFilter = !!(
+    search.trim() ||
+    selectedCategoryId ||
+    selectedBrand ||
+    sort !== "latest"
+  );
+
+  const localProducts = useMemo(
+    () => filterPosProducts(allProducts, listFilters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allProducts, search, selectedCategoryId, selectedBrand, sort],
+  );
+
+  // Only when the shop has more products than the eager load holds does a
+  // filter also ask the server; the local result is shown meanwhile.
+  const needServer = hasFilter && !!baseQuery.data && !!baseQuery.hasNextPage;
+
+  const serverQuery = useInfiniteQuery({
+    ...posProductsQueryOptions({
+      ...listFilters,
+      search: debouncedSearch,
+      showroomId: selectedShowroomId,
+      currentUser,
+    }),
+    enabled: !!user && needServer,
     refetchOnWindowFocus: false,
   });
+
+  const useServer = needServer && !!serverQuery.data;
+  const activeQuery = useServer ? serverQuery : baseQuery;
+
+  const products = useMemo(
+    () =>
+      useServer
+        ? serverQuery.data.pages.flatMap((page) => page.items)
+        : localProducts,
+    [useServer, serverQuery.data, localProducts],
+  );
+
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isError,
+    refetch,
+  } = activeQuery;
+  // a spinner only on a truly empty cache (first ever visit)
+  const isLoading = !baseData && (isRestoring || baseFetching);
 
   const { data: categories = [] } = useQuery({
     ...posCategoriesQueryOptions(),
@@ -169,12 +244,6 @@ export default function POSPage() {
     ...posBrandsQueryOptions(),
     refetchOnWindowFocus: false,
   });
-
-  // 🚀 Memoized Flat Products List
-  const products = useMemo(
-    () => data?.pages.flatMap((page) => page.items) ?? [],
-    [data],
-  );
 
   // 🚀 Optimized Handlers with useCallback
   const addToCart = useCallback(
@@ -202,6 +271,8 @@ export default function POSPage() {
           color: variant.color,
           size: variant.size,
           price: variant.sellingPrice,
+          // all rates, so the slice charges the customer type's rate
+          rates: ratesFor(product, variant),
           qty,
           image:
             variant.image ||
@@ -310,6 +381,7 @@ export default function POSPage() {
         customerName: dataClean.customerName || "Walk-in Customer",
         phone: dataClean.phone || "",
         address: dataClean.address || "",
+        customerType: dataClean.customerType || "retail",
         saleDate: dataClean.saleDate || new Date().toISOString(),
         subTotal: isExchange ? finalBillAmount : Number(subTotal),
         discount: isExchange ? 0 : Number(discountAmount),
@@ -366,15 +438,8 @@ export default function POSPage() {
       setSearch("");
 
       // 🔥 Instant Cache Update for Zero Loading Time
-      queryClient.setQueryData(
-        posProductsQueryKey({
-          search: debouncedSearch,
-          showroomId: selectedShowroomId,
-          categoryId: selectedCategoryId,
-          brand: selectedBrand,
-          sort,
-          currentUser,
-        }),
+      queryClient.setQueriesData(
+        { queryKey: ["pos-products"] },
         (oldData) => {
           if (!oldData) return oldData;
 
@@ -451,15 +516,8 @@ export default function POSPage() {
 
       dispatch(clearCart());
 
-      queryClient.setQueryData(
-        posProductsQueryKey({
-          search: debouncedSearch,
-          showroomId: selectedShowroomId,
-          categoryId: selectedCategoryId,
-          brand: selectedBrand,
-          sort,
-          currentUser,
-        }),
+      queryClient.setQueriesData(
+        { queryKey: ["pos-products"] },
         (oldData) => {
           if (!oldData) return oldData;
 
@@ -649,7 +707,7 @@ export default function POSPage() {
         isAdmin={isAdmin}
         showrooms={showrooms}
         selectedShowroomId={selectedShowroomId}
-        setSelectedShowroomId={setSelectedShowroomId}
+        setSelectedShowroomId={pickShowroom}
         heldSales={heldSales}
         onRestoreHeld={restoreHeldSale}
         onDeleteHeld={deleteHeldSale}
@@ -661,7 +719,7 @@ export default function POSPage() {
         {!cartExpanded && (
           <ProductGallery
             products={products}
-            loading={isLoading || isRestoring}
+            loading={isLoading}
             isError={isError}
             onRetry={() => refetch()}
             search={search}

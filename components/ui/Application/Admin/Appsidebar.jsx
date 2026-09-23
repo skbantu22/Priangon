@@ -2,10 +2,12 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
+import sbtMark from "@/public/assets/sbt-mark.png";
 import { usePathname } from "next/navigation";
 import { LuChevronRight } from "react-icons/lu";
 import { IoMdClose } from "react-icons/io";
-import { IoPhonePortraitOutline, IoCartOutline } from "react-icons/io5";
+import { IoCartOutline } from "react-icons/io5";
 import { useSelector, useDispatch } from "react-redux";
 
 import {
@@ -76,15 +78,15 @@ export default function Appsidebar() {
       <SidebarHeader className="h-16 p-0 border-b border-sidebar-border">
         <div className="flex h-full items-center justify-between px-4">
           <Link href="/admin/dashboard" className="flex items-center gap-2.5">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#7c4dff] to-[#5b2ee0] text-white shadow-lg shadow-black/30">
-              <IoPhonePortraitOutline className="size-5" />
+            <span className="relative size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-lg shadow-black/30">
+              <Image src={sbtMark} alt="SB Telecom" fill sizes="40px" className="object-contain p-0.5" priority />
             </span>
             <span className="flex flex-col leading-tight">
               <span className="text-xl font-extrabold tracking-wide text-white">
-                Mobi<span className="text-[#a78bfa]">Zone</span>
+                SB <span className="text-[#e0415e]">Telecom</span>
               </span>
               <span className="text-[11px] text-sidebar-foreground/70">
-                Mobiles &amp; Accessories
+                Global Connectivity Solutions
               </span>
             </span>
           </Link>

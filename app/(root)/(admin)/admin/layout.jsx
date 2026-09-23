@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
 import Appsidebar from "@/components/ui/Application/Admin/Appsidebar";
 import ThemeProvider from "@/components/ui/Application/Admin/ThemeProvider";
 import Topbar from "@/components/ui/Application/Admin/Topbar";
@@ -24,8 +23,10 @@ export default function Layout({ children }) {
     return () => document.body.classList.remove("admin-theme");
   }, []);
 
+  // the store / query cache come from the root layout: a second provider here
+  // would restore the whole saved cache again every time admin opens
   return (
-    <GlobalStoreProvider>
+    <>
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
@@ -56,6 +57,6 @@ export default function Layout({ children }) {
 
         <ToastContainer />
       </ThemeProvider>
-    </GlobalStoreProvider>
+    </>
   );
 }

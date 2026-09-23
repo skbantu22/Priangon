@@ -5,6 +5,7 @@ import {
   Plus,
   PackageSearch,
   Search,
+  ChevronLeft,
   ChevronRight,
   LayoutGrid,
   List,
@@ -78,6 +79,72 @@ const stockLabel = (stock) =>
     : stock <= LOW_STOCK
       ? [`Low Stock (${stock})`, "text-amber-600"]
       : [`In Stock (${stock})`, "text-emerald-600"];
+
+// Horizontal chip row with ‹ › buttons that only show when there is more to see
+function ScrollRow({ label, children }) {
+  const rowRef = useRef(null);
+  const [edges, setEdges] = useState({ start: true, end: true });
+
+  const measure = () => {
+    const el = rowRef.current;
+    if (!el) return;
+    setEdges({
+      start: el.scrollLeft <= 4,
+      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4,
+    });
+  };
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // chips arrive later (brands / categories load async): re-check the edges
+  useEffect(() => {
+    const id = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(id);
+  }, [children]);
+
+  const scroll = (dir) =>
+    rowRef.current?.scrollBy({
+      left: dir * rowRef.current.clientWidth * 0.7,
+      behavior: "smooth",
+    });
+
+  const arrow =
+    "absolute z-10 flex size-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-md hover:text-primary dark:border-white/10 dark:bg-card";
+
+  return (
+    <div className="relative flex shrink-0 items-center">
+      {!edges.start && (
+        <>
+          <div className="pointer-events-none absolute left-0 z-5 h-full w-12 bg-linear-to-r from-background to-transparent" />
+          <button type="button" onClick={() => scroll(-1)} className={`${arrow} left-0`} title={`Previous ${label}`}>
+            <ChevronLeft className="size-4" />
+          </button>
+        </>
+      )}
+      <div
+        ref={rowRef}
+        onScroll={measure}
+        className="flex gap-2 overflow-x-auto scroll-smooth [scrollbar-width:none]"
+      >
+        {children}
+      </div>
+      {!edges.end && (
+        <>
+          <div className="pointer-events-none absolute right-0 z-5 h-full w-12 bg-linear-to-l from-background to-transparent" />
+          <button type="button" onClick={() => scroll(1)} className={`${arrow} right-0`} title={`More ${label}`}>
+            <ChevronRight className="size-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 function AddButton({ disabled, onClick }) {
   return (
@@ -234,7 +301,6 @@ export default function ProductGallery({
   const focusLock = useRef(false);
   const loaderRef = useRef(null);
   const scrollRef = useRef(null);
-  const brandRowRef = useRef(null);
 
   // quick filter over the loaded list (the top bar search goes to the server)
   const [localFilter, setLocalFilter] = useState("");
@@ -333,7 +399,7 @@ export default function ProductGallery({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4">
       {/* ---------------- CATEGORY CHIPS ---------------- */}
-      <div className="flex shrink-0 gap-2 overflow-x-auto [scrollbar-width:none]">
+      <ScrollRow label="categories">
         <button
           type="button"
           onClick={() => setSelectedCategoryId("")}
@@ -351,15 +417,11 @@ export default function ProductGallery({
             {cat.name || cat.title}
           </button>
         ))}
-      </div>
+      </ScrollRow>
 
       {/* ---------------- BRAND CHIPS ---------------- */}
       {brands.length > 0 && (
-        <div className="relative flex shrink-0 items-center">
-          <div
-            ref={brandRowRef}
-            className="flex gap-2 overflow-x-auto scroll-smooth pr-10 [scrollbar-width:none]"
-          >
+        <ScrollRow label="brands">
             <button
               type="button"
               onClick={() => setSelectedBrand("")}
@@ -377,18 +439,7 @@ export default function ProductGallery({
                 <BrandLogo brand={b} />
               </button>
             ))}
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              brandRowRef.current?.scrollBy({ left: 300, behavior: "smooth" })
-            }
-            className="absolute right-0 flex size-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm hover:text-primary dark:border-white/10 dark:bg-card"
-            title="More brands"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+        </ScrollRow>
       )}
 
       {/* ---------------- PRODUCTS PANEL ---------------- */}

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import { skipOptimize } from "@/lib/imageSrc";
 
 export default function VariantModal({ product, setOpenProduct, addToCart }) {
   // 🚀 Safe Data Parsing (Handles nested productId or flat objects)

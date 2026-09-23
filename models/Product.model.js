@@ -44,6 +44,12 @@ const productSchema = new mongoose.Schema(
     mrp: { type: Number, required: true, min: 0 },
     sellingPrice: { type: Number, required: true, min: 0 },
 
+    // price list per buyer type (0 = not set, the selling price is used)
+    purchasePrice: { type: Number, min: 0, default: 0 },
+    dealerPrice: { type: Number, min: 0, default: 0 },
+    subDealerPrice: { type: Number, min: 0, default: 0 },
+    retailerPrice: { type: Number, min: 0, default: 0 },
+
     discountPercentage: { type: Number, min: 0, max: 100 },
 
     offers: {

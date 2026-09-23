@@ -108,7 +108,6 @@ export default function PosTopbar({
             onChange={(e) => setSelectedShowroomId(e.target.value)}
             className="max-w-28 xl:max-w-44 bg-transparent text-sm text-white outline-none [&>option]:text-gray-900"
           >
-            <option value="">All showrooms (pick one to sell)</option>
             {showrooms.map((s) => (
               <option key={s._id} value={s._id}>
                 {s.name}

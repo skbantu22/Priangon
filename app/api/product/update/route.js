@@ -4,6 +4,7 @@ import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
 import { cleanMobileFields } from "@/lib/productMobileFields";
+import { cleanTierPrices } from "@/lib/priceTiers";
 
 export async function PUT(request) {
   try {
@@ -67,6 +68,8 @@ export async function PUT(request) {
     product.brand = mobile.brand;
     product.warranty = mobile.warranty;
     product.trackSerial = mobile.trackSerial;
+
+    Object.assign(product, cleanTierPrices(payload));
 
     await product.save();
 

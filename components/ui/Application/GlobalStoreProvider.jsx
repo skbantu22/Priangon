@@ -11,7 +11,9 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { persister } from "@/lib/reactQueryPersister";
 
-const CACHE_MAX_AGE = 1000 * 60 * 30;
+// saved lists are shown straight away on open (then refreshed in the background),
+// so keep them for a day: otherwise the first open of the day starts cold
+const CACHE_MAX_AGE = 1000 * 60 * 60 * 24;
 
 const queryClient = new QueryClient({
   defaultOptions: {

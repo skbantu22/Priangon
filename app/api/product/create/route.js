@@ -4,6 +4,7 @@ import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
 import { cleanMobileFields } from "@/lib/productMobileFields";
+import { cleanTierPrices } from "@/lib/priceTiers";
 
 export async function POST(request) {
   try {
@@ -71,6 +72,7 @@ export async function POST(request) {
       media: productData.media,
 
       ...cleanMobileFields(payload),
+      ...cleanTierPrices(payload),
 
       freeDelivery: productData.freeDelivery || false,
     });
