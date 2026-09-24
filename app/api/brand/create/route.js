@@ -3,6 +3,7 @@ import slugify from "slugify";
 import BrandModel from "@/models/Brand.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function POST(req) {
   try {
@@ -28,7 +29,7 @@ export async function POST(req) {
 
     // A soft deleted brand still owns its name, so match those too
     const existingBrand = await BrandModel.findOne({
-      $or: [{ name: new RegExp(`^${name}$`, "i") }, { slug }],
+      $or: [{ name: exactRegex(name) }, { slug }],
     });
 
     if (existingBrand) {

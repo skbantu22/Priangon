@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
+import { useSelector } from "react-redux";
 import { FiCheckCircle, FiDollarSign, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
@@ -57,6 +58,11 @@ const paymentVariant = {
 };
 
 const PurchasePage = () => {
+  // Cancelling a purchase is admin only on the API side, while this page
+  // is open to managers too — so don't offer a button that answers 403.
+  const auth = useSelector((state) => state.authStore.auth);
+  const isAdmin = (auth?.data?.user || auth?.user)?.role === "admin";
+
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -355,7 +361,8 @@ const PurchasePage = () => {
                               </Button>
                             )}
 
-                          {purchase.status !== "cancelled" &&
+                          {isAdmin &&
+                            purchase.status !== "cancelled" &&
                             purchase.paidAmount === 0 && (
                               <Button
                                 size="sm"

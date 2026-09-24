@@ -43,13 +43,21 @@ const breadcrumbData = [
   { href: ADMIN_REPORT_PROFIT_LOSS, label: "Profit & Loss" },
 ];
 
+// toISOString() reads the UTC date, which in Bangladesh (UTC+6) is still
+// yesterday until 6am — a date picker that defaults to yesterday hides the
+// rows just entered. These read the date as the browser sees it.
+const isoDay = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+
 const daysAgo = (days) => {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+  return isoDay(date);
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => isoDay(new Date());
 
 // A single series, so the legend is the chart title and no second hue
 // is needed. --chart-2 clears 3:1 contrast on both the light and the

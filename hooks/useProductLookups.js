@@ -18,8 +18,16 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
   const [brands, setBrands] = useState(fallbackBrands);
   const [units, setUnits] = useState(PRODUCT_UNITS);
 
+  // Callers pass `data = []` straight out of a query, so while that query
+  // is still loading this is a brand new array on every render. Depending
+  // on the array itself would re-run the effect after each setBrands and
+  // fetch in a loop; the joined names only change when the names do.
+  const fallbackKey = fallbackBrands.join("\u0000");
+
   useEffect(() => {
     let cancelled = false;
+
+    const fallbackList = fallbackKey ? fallbackKey.split("\u0000") : [];
 
     const merge = (managed, fallback) => {
       const seen = new Set();
@@ -50,7 +58,7 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
           setBrands(
             merge(
               brandRes.data.data.map((brand) => brand.name),
-              fallbackBrands,
+              fallbackList,
             ),
           );
         }
@@ -73,7 +81,7 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [fallbackBrands]);
+  }, [fallbackKey]);
 
   return { brands, units };
 }

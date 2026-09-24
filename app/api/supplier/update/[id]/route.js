@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import SupplierModel from "@/models/Supplier.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function PUT(req, { params }) {
   try {
@@ -26,7 +27,7 @@ export async function PUT(req, { params }) {
 
     const duplicate = await SupplierModel.findOne({
       _id: { $ne: id },
-      name: new RegExp(`^${name}$`, "i"),
+      name: exactRegex(name),
       phone,
     });
 

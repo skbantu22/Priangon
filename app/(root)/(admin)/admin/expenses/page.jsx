@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import { useSelector } from "react-redux";
 import { FiEdit2, FiPlus, FiSearch, FiTag, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
@@ -39,13 +40,21 @@ const breadcrumbData = [
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
+// toISOString() reads the UTC date, which in Bangladesh (UTC+6) is still
+// yesterday until 6am — a date picker that defaults to yesterday hides the
+// rows just entered. These read the date as the browser sees it.
+const isoDay = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+
 const firstOfMonth = () => {
   const date = new Date();
   date.setDate(1);
-  return date.toISOString().slice(0, 10);
+  return isoDay(date);
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => isoDay(new Date());
 
 const emptyForm = {
   categoryId: "",
@@ -58,6 +67,11 @@ const emptyForm = {
 };
 
 const ExpensePage = () => {
+  // Deleting a voucher and editing the category list are admin only on the
+  // API side, so a manager must not be offered buttons that answer 403.
+  const auth = useSelector((state) => state.authStore.auth);
+  const isAdmin = (auth?.data?.user || auth?.user)?.role === "admin";
+
   const [expenses, setExpenses] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [categories, setCategories] = useState([]);
@@ -135,7 +149,7 @@ const ExpensePage = () => {
       categoryId: expense.categoryId,
       title: expense.title,
       amount: expense.amount,
-      expenseDate: new Date(expense.expenseDate).toISOString().slice(0, 10),
+      expenseDate: isoDay(new Date(expense.expenseDate)),
       paymentMethod: expense.paymentMethod,
       reference: expense.reference || "",
       note: expense.note || "",
@@ -280,10 +294,12 @@ const ExpensePage = () => {
               className="w-auto"
             />
 
-            <Button variant="outline" onClick={() => setCategoryOpen(true)}>
-              <FiTag className="mr-2" />
-              Categories
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setCategoryOpen(true)}>
+                <FiTag className="mr-2" />
+                Categories
+              </Button>
+            )}
 
             <Button onClick={openCreate}>
               <FiPlus className="mr-2" />
@@ -359,13 +375,15 @@ const ExpensePage = () => {
                             <FiEdit2 />
                           </Button>
 
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => deleteExpense(expense)}
-                          >
-                            <FiTrash2 />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteExpense(expense)}
+                            >
+                              <FiTrash2 />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

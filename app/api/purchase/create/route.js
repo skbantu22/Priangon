@@ -166,9 +166,20 @@ export async function POST(req) {
 
     await purchase.save();
 
-    // Stock moves only after the purchase itself is safely stored
+    // Stock moves only after the purchase itself is safely stored. If that
+    // fails part way the purchase must not stay marked received, or the
+    // rows that did go in can never be received again — same rollback the
+    // receive route does.
     if (purchase.status === "received") {
-      await applyPurchaseToStock(purchase, { createdBy: purchase.createdBy });
+      try {
+        await applyPurchaseToStock(purchase, { createdBy: purchase.createdBy });
+      } catch (stockError) {
+        purchase.status = "pending";
+        purchase.receivedAt = null;
+        await purchase.save();
+
+        throw stockError;
+      }
     }
 
     return NextResponse.json(

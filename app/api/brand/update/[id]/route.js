@@ -3,6 +3,7 @@ import slugify from "slugify";
 import BrandModel from "@/models/Brand.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function PUT(req, { params }) {
   try {
@@ -31,7 +32,7 @@ export async function PUT(req, { params }) {
     // Another brand must not already hold this name or slug
     const duplicate = await BrandModel.findOne({
       _id: { $ne: id },
-      $or: [{ name: new RegExp(`^${name}$`, "i") }, { slug }],
+      $or: [{ name: exactRegex(name) }, { slug }],
     });
 
     if (duplicate) {

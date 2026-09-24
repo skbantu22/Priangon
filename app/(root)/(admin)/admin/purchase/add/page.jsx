@@ -43,7 +43,15 @@ const breadcrumbData = [
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-const today = () => new Date().toISOString().slice(0, 10);
+// toISOString() reads the UTC date, which in Bangladesh (UTC+6) is still
+// yesterday until 6am — a date picker that defaults to yesterday hides the
+// rows just entered. These read the date as the browser sees it.
+const isoDay = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+
+const today = () => isoDay(new Date());
 
 const AddPurchasePage = () => {
   const router = useRouter();

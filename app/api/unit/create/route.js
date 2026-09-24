@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import UnitModel from "@/models/Unit.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function POST(req) {
   try {
@@ -25,7 +26,7 @@ export async function POST(req) {
     }
 
     const existingUnit = await UnitModel.findOne({
-      name: new RegExp(`^${name}$`, "i"),
+      name: exactRegex(name),
     });
 
     if (existingUnit) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import AttributeModel, { ATTRIBUTE_SLOTS } from "@/models/Attribute.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 import { cleanValues } from "../../create/route";
 
 export async function PUT(req, { params }) {
@@ -25,7 +26,7 @@ export async function PUT(req, { params }) {
 
     const duplicate = await AttributeModel.findOne({
       _id: { $ne: id },
-      name: new RegExp(`^${name}$`, "i"),
+      name: exactRegex(name),
     });
 
     if (duplicate) {

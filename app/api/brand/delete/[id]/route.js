@@ -3,6 +3,7 @@ import BrandModel from "@/models/Brand.model";
 import ProductModel from "@/models/Product.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function DELETE(req, { params }) {
   try {
@@ -27,7 +28,7 @@ export async function DELETE(req, { params }) {
 
     // Products still store the brand by name, so block deleting a brand in use
     const inUse = await ProductModel.countDocuments({
-      brand: new RegExp(`^${brand.name}$`, "i"),
+      brand: exactRegex(brand.name),
       deletedAt: null,
     });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import AttributeModel, { ATTRIBUTE_SLOTS } from "@/models/Attribute.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 const cleanValues = (input) => {
   const rows = Array.isArray(input) ? input : [];
@@ -45,7 +46,7 @@ export async function POST(req) {
     }
 
     const existing = await AttributeModel.findOne({
-      name: new RegExp(`^${name}$`, "i"),
+      name: exactRegex(name),
     });
 
     if (existing) {

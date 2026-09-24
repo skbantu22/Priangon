@@ -3,6 +3,7 @@ import UnitModel from "@/models/Unit.model";
 import ProductModel from "@/models/Product.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { exactRegex } from "@/lib/escapeRegex";
 
 export async function DELETE(req, { params }) {
   try {
@@ -27,7 +28,7 @@ export async function DELETE(req, { params }) {
 
     // Products store the unit by name, so block deleting a unit in use
     const inUse = await ProductModel.countDocuments({
-      unit: new RegExp(`^${unit.name}$`, "i"),
+      unit: exactRegex(unit.name),
       deletedAt: null,
     });
 

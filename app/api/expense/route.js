@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import ExpenseModel from "@/models/Expense.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
@@ -14,11 +15,17 @@ export async function GET(req) {
 
     const filter = { deletedAt: null };
 
+    // find() casts these for us, aggregate() does not — so store them as
+    // real ObjectIds, otherwise the total below silently comes back as 0
     const categoryId = searchParams.get("categoryId");
-    if (categoryId) filter.categoryId = categoryId;
+    if (mongoose.isValidObjectId(categoryId)) {
+      filter.categoryId = new mongoose.Types.ObjectId(categoryId);
+    }
 
     const showroomId = searchParams.get("showroomId");
-    if (showroomId) filter.showroomId = showroomId;
+    if (mongoose.isValidObjectId(showroomId)) {
+      filter.showroomId = new mongoose.Types.ObjectId(showroomId);
+    }
 
     const from = searchParams.get("from");
     const to = searchParams.get("to");
