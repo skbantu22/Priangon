@@ -30,7 +30,7 @@ import MediaModal from "@/components/ui/Application/Admin/MediaModel";
 import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
-import { sizes } from "@/lib/utils";
+import { useVariantSizeOptions } from "@/hooks/useVariantSizeOptions";
 import { Button } from "@/components/ui/button";
 
 const breadcrumbData = [
@@ -40,6 +40,8 @@ const breadcrumbData = [
 ];
 
 const AddProductVariant = () => {
+  const { options: sizeOptions } = useVariantSizeOptions();
+
   const [loading, setLoading] = useState(false);
   const [productOption, setProductOption] = useState([]);
   const [open, setOpen] = useState(false);
@@ -341,7 +343,7 @@ const AddProductVariant = () => {
                             Size
                           </FormLabel>
                           <Select
-                            options={sizes}
+                            options={sizeOptions}
                             selected={field.value}
                             setSelected={field.onChange}
                           />

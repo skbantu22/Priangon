@@ -77,3 +77,6 @@ export const ADMIN_SYSTEM_SETTINGS = "/admin/settings/system";
 
 // Support routes
 export const ADMIN_SUPPORT_TICKETS = "/admin/support-tickets";
+
+// Attribute routes
+export const ADMIN_ATTRIBUTE_SHOW = "/admin/attributes";

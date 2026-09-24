@@ -32,7 +32,7 @@ import {
 import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
-import { sizes } from "@/lib/utils";
+import { useVariantSizeOptions } from "@/hooks/useVariantSizeOptions";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -42,6 +42,8 @@ const breadcrumbData = [
 
 const EditProductVarient = ({ params }) => {
   const { id } = use(params);
+
+  const { options: sizeOptions } = useVariantSizeOptions();
 
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -362,7 +364,7 @@ const EditProductVarient = ({ params }) => {
                             Size
                           </FormLabel>
                           <Select
-                            options={sizes}
+                            options={sizeOptions}
                             selected={field.value}
                             setSelected={field.onChange}
                             isMulti={false}
