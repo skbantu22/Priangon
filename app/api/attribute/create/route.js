@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import AttributeModel, { ATTRIBUTE_SLOTS } from "@/models/Attribute.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 const cleanValues = (input) => {
   const rows = Array.isArray(input) ? input : [];
@@ -28,6 +29,9 @@ const cleanValues = (input) => {
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

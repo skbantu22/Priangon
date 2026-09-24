@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import SupportTicketModel from "@/models/SupportTicket.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 import { normalizeBdMobile } from "@/lib/bdFormat";
 
 export async function GET(req) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);

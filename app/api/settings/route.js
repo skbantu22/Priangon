@@ -3,9 +3,14 @@ import { NextResponse } from "next/server";
 import SettingModel, { getSettings } from "@/models/Setting.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { isValidBIN, isValidTIN, isValidBdMobile } from "@/lib/bdFormat";
+import { requireRoles, ADMIN_ONLY, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function GET() {
   try {
+    // the POS reads the VAT rate and the invoice header from here
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const settings = await getSettings();
@@ -53,6 +58,9 @@ const EDITABLE = [
 
 export async function PUT(req) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

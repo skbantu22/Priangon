@@ -5,6 +5,7 @@ import SupplierModel from "@/models/Supplier.model";
 import PurchaseModel from "@/models/Purchase.model";
 import POSOrderModel from "@/models/posorder.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 
 /**
  * Who we owe and who owes us.
@@ -14,6 +15,9 @@ import { connectDB } from "@/lib/databaseconnection";
  */
 export async function GET(req) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);

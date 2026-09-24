@@ -5,11 +5,15 @@ import PurchaseModel from "@/models/Purchase.model";
 import SupplierModel from "@/models/Supplier.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { applyPurchaseToStock } from "@/lib/purchaseService";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

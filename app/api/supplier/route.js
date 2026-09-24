@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import SupplierModel from "@/models/Supplier.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 
 export async function GET(req) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);

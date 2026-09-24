@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import slugify from "slugify";
 import BrandModel from "@/models/Brand.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function PUT(req, { params }) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { id } = await params; // ✅ Next.js 15/16

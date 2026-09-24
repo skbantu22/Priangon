@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import slugify from "slugify";
 import BrandModel from "@/models/Brand.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

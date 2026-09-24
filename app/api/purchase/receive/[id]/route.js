@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 import { applyPurchaseToStock } from "@/lib/purchaseService";
 
 export async function POST(req, { params }) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { id } = await params; // ✅ Next.js 15/16

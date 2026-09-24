@@ -4,10 +4,14 @@ import mongoose from "mongoose";
 import ExpenseModel from "@/models/Expense.model";
 import ExpenseCategoryModel from "@/models/ExpenseCategory.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();
