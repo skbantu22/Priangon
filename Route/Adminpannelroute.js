@@ -50,3 +50,9 @@ export const ADMIN_ORDER_DETAILS = (order_id) =>
 
 export const ADMIN_ORDER_EDIT = (order_id) =>
   order_id ? `/admin/all-orders/edit/${order_id}` : "";
+
+// Brand routes
+export const ADMIN_BRAND_SHOW = "/admin/brand";
+
+// Unit routes
+export const ADMIN_UNIT_SHOW = "/admin/unit";
