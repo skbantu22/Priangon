@@ -83,7 +83,7 @@ export default function PosFooter({ showroomName }) {
           </>
         )}
 
-        <span className="hidden xl:inline text-gray-400">MobiZone POS v1.0</span>
+        <span className="hidden xl:inline text-gray-400">SB Telecom POS v1.0</span>
       </div>
     </footer>
   );

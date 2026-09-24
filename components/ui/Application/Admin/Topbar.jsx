@@ -31,7 +31,7 @@ const Topbar = () => {
         </button>
 
         <span className="md:hidden text-lg font-extrabold">
-          Mobi<span className="text-[#a78bfa]">Zone</span>
+          SB <span className="text-[#f06a8a]">Telecom</span>
         </span>
 
         {/* Desktop search opens the existing search modal */}
