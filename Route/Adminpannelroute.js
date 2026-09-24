@@ -63,3 +63,10 @@ export const ADMIN_SUPPLIER_SHOW = "/admin/supplier";
 // Purchase routes
 export const ADMIN_PURCHASE_SHOW = "/admin/purchase";
 export const ADMIN_PURCHASE_ADD = "/admin/purchase/add";
+
+// Expense routes
+export const ADMIN_EXPENSE_SHOW = "/admin/expenses";
+
+// Report routes
+export const ADMIN_REPORT_DUE = "/admin/reports/due";
+export const ADMIN_REPORT_PROFIT_LOSS = "/admin/reports/profit-loss";
