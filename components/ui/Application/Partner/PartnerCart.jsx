@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-// The order a dealer / retailer is putting together in the portal.
+// The order a dealer / wholesaler is putting together in the portal.
 // Kept in localStorage so a refresh or closed tab doesn't lose it.
 const KEY = "partner-cart";
 const CartContext = createContext(null);

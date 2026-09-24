@@ -37,7 +37,7 @@ const TYPE_STYLE = {
   retail: "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
   dealer: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200",
   subDealer: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200",
-  retailer: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
+  wholesaler: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200",
 };
 
 const TypeBadge = ({ type }) => {

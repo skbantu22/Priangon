@@ -134,7 +134,7 @@ const POSOrderSchema = new mongoose.Schema(
     // rate of the price list the sale was made at
     customerType: {
       type: String,
-      enum: ["retail", "dealer", "subDealer", "retailer"],
+      enum: ["retail", "dealer", "subDealer", "wholesaler"],
       default: "retail",
     },
     customerName: {

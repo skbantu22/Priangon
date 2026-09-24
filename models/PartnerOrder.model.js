@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-// An order placed by a dealer / sub dealer / retailer from the partner portal.
+// An order placed by a dealer / sub dealer / wholesaler from the partner portal.
 // Staff turn it into a real invoice (POSOrder) at the POS, where IMEIs are
 // scanned and stock is taken.
 export const PARTNER_ORDER_STATUSES = [
@@ -23,7 +23,7 @@ const partnerOrderSchema = new mongoose.Schema(
     },
     customerType: {
       type: String,
-      enum: ["dealer", "subDealer", "retailer"],
+      enum: ["dealer", "subDealer", "wholesaler"],
       required: true,
     },
     customerName: { type: String, trim: true, default: "" },

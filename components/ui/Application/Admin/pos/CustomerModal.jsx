@@ -120,7 +120,7 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
         <DialogHeader>
           <DialogTitle>Customer</DialogTitle>
           <DialogDescription>
-            Dealer, sub dealer and retailer customers get their own rate in the cart.
+            Dealer, sub dealer and wholesaler customers get their own rate in the cart.
           </DialogDescription>
         </DialogHeader>
 

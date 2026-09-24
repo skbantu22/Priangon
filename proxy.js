@@ -4,7 +4,7 @@ import { jwtVerify } from "jose";
 const SECRET = new TextEncoder().encode(process.env.SECRET_KEY);
 
 // kept here (not imported) so the proxy bundle stays tiny
-const PARTNER_ROLES = ["dealer", "subDealer", "retailer"];
+const PARTNER_ROLES = ["dealer", "subDealer", "wholesaler"];
 
 /* =========================
    TWO SURFACES, ONE CODEBASE
@@ -138,7 +138,7 @@ export async function proxy(request) {
     const role = payload?.role;
     const isPartner = PARTNER_ROLES.includes(role);
 
-    // dealer / sub dealer / retailer: only the partner portal
+    // dealer / sub dealer / wholesaler: only the partner portal
     if (
       isPartner &&
       (isAuthRoute ||

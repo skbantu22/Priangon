@@ -44,6 +44,7 @@ const EDITABLE = [
   "showAmountInWords",
   "warrantyTerms",
   "numberDigits",
+  "language",
   "fiscalYearStartMonth",
   "weekendDays",
   "lowStockAlert",

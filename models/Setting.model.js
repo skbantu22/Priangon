@@ -40,7 +40,7 @@ const settingSchema = new mongoose.Schema(
     // usual case for retail in Bangladesh
     vatInclusive: { type: Boolean, default: true },
 
-    // Mushak 6.3 is the VAT challan retailers issue
+    // Mushak 6.3 is the VAT challan wholesalers issue
     mushakFormNo: { type: String, trim: true, default: "6.3" },
     showMushakLine: { type: Boolean, default: false },
 
@@ -59,6 +59,14 @@ const settingSchema = new mongoose.Schema(
       type: String,
       enum: ["latin", "bengali"],
       default: "latin",
+    },
+
+    // Whether screens name things in both languages — "Dealer (ডিলার)" —
+    // or in English alone
+    language: {
+      type: String,
+      enum: ["bn-en", "en"],
+      default: "bn-en",
     },
 
     // Bangladesh's fiscal year runs July to June

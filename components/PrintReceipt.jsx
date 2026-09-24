@@ -108,7 +108,7 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
   const showroomEmail =
     order.showroom?.email || company.email || "support@sbtelecom.com.bd";
 
-  // Mushak 6.3 is the VAT challan a registered retailer issues
+  // Mushak 6.3 is the VAT challan a registered wholesaler issues
   const vatLine =
     company.showMushakLine && company.bin
       ? `BIN ${company.bin}${company.mushakFormNo ? ` · Mushak ${company.mushakFormNo}` : ""}`

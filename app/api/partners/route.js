@@ -13,7 +13,7 @@ const adminOnly = async () => {
 const fail = (message, status = 400) =>
   NextResponse.json({ success: false, message }, { status });
 
-// GET: all dealer / sub dealer / retailer logins with their balance
+// GET: all dealer / sub dealer / wholesaler logins with their balance
 export async function GET() {
   if (!(await adminOnly())) return fail("Unauthorized", 403);
   await connectDB();

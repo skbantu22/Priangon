@@ -58,7 +58,7 @@ export async function POST(req) {
 
     const [products, stocks, showroom] = await Promise.all([
       Product.find({ _id: { $in: variants.map((v) => v.product) }, deletedAt: null })
-        .select("name sellingPrice dealerPrice subDealerPrice retailerPrice media")
+        .select("name sellingPrice dealerPrice subDealerPrice wholesalerPrice media")
         .lean(),
       ShowroomStock.aggregate([
         { $match: { variantId: { $in: variants.map((v) => v._id) } } },

@@ -21,7 +21,7 @@ const CustomerSchema = new mongoose.Schema(
     // which rate of the price list this customer buys at
     type: {
       type: String,
-      enum: ["retail", "dealer", "subDealer", "retailer"],
+      enum: ["retail", "dealer", "subDealer", "wholesaler"],
       default: "retail",
       index: true,
     },

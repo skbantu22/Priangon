@@ -108,7 +108,7 @@ export default function PartnerOrdersAdmin() {
       <div>
         <h1 className="text-2xl font-bold">Dealer Orders</h1>
         <p className="text-sm text-muted-foreground">
-          Orders placed by dealers, sub dealers and retailers from the partner portal. &quot;Make invoice in POS&quot; loads the order at their price so you can scan IMEIs and complete the sale.
+          Orders placed by dealers, sub dealers and wholesalers from the partner portal. &quot;Make invoice in POS&quot; loads the order at their price so you can scan IMEIs and complete the sale.
         </p>
       </div>
 

@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema(
         // partner logins: buy at their price list through /partner
         "dealer",
         "subDealer",
-        "retailer",
+        "wholesaler",
       ],
       default: "customer",
     },

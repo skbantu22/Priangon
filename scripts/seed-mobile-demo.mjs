@@ -77,7 +77,7 @@ const CUSTOMERS = [
   ["Rahim Uddin", "01811111111", "Mirpur 10, Dhaka", "retail"],
   ["Karim Traders", "01822222222", "Gulistan, Dhaka", "dealer"],
   ["Nusrat Jahan", "01933333333", "Banani, Dhaka", "retail"],
-  ["Sabbir Telecom", "01644444444", "Savar, Dhaka", "retailer"],
+  ["Sabbir Telecom", "01644444444", "Savar, Dhaka", "wholesaler"],
   ["Hasan Mobile Point", "01755555555", "Mohammadpur, Dhaka", "subDealer"],
 ];
 
@@ -88,12 +88,12 @@ const STAFF = [
   { name: "Cashier", email: "cashier@mobizone.com", password: "cashier1234", role: "cashier", showroom: 0 },
   { name: "Abdul Karim", email: "dealer@mobizone.com", password: "dealer1234", role: "dealer", customer: 1 },
   { name: "Hasan Ali", email: "subdealer@mobizone.com", password: "subdealer1234", role: "subDealer", customer: 4 },
-  { name: "Sabbir Hossain", email: "retailer@mobizone.com", password: "retailer1234", role: "retailer", customer: 3 },
+  { name: "Sabbir Hossain", email: "wholesaler@mobizone.com", password: "wholesaler1234", role: "wholesaler", customer: 3 },
 ];
 
 // price list of each product, as a share of its retail price (rounded to ৳10)
-const TIER_RATIO = { purchasePrice: 0.85, dealerPrice: 0.9, subDealerPrice: 0.93, retailerPrice: 0.96 };
-const TIER_FIELD = { dealer: "dealerPrice", subDealer: "subDealerPrice", retailer: "retailerPrice" };
+const TIER_RATIO = { purchasePrice: 0.85, dealerPrice: 0.9, subDealerPrice: 0.93, wholesalerPrice: 0.96 };
+const TIER_FIELD = { dealer: "dealerPrice", subDealer: "subDealerPrice", wholesaler: "wholesalerPrice" };
 const round10 = (n) => Math.round(n / 10) * 10;
 // same rule as lib/priceTiers.js: a dearer variant keeps the product's ratio
 const priceFor = (product, variant, type) => {
@@ -274,7 +274,7 @@ async function main() {
       mrp: firstMrp,
       sellingPrice: firstPrice,
       discountPercentage: Math.round(((firstMrp - firstPrice) / firstMrp) * 100),
-      // price list: purchase / dealer / sub dealer / retailer (retail = sellingPrice)
+      // price list: purchase / dealer / sub dealer / wholesaler (retail = sellingPrice)
       ...Object.fromEntries(Object.entries(TIER_RATIO).map(([f, r]) => [f, round10(firstPrice * r)])),
       offers: [],
       freeDelivery: false,
@@ -338,7 +338,7 @@ async function main() {
         color: v.color,
         size: v.size,
         qty,
-        // dealers / retailers bought at their own price list
+        // dealers / wholesalers bought at their own price list
         price: priceFor(product, v, customer.type),
         subtotal: priceFor(product, v, customer.type) * qty,
         imeis: product.trackSerial ? Array.from({ length: qty }, () => makeSerial(kind)) : [],

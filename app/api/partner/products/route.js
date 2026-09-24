@@ -30,7 +30,7 @@ export async function GET(req) {
 
     const products = await Product.find(query)
       .select(
-        "name brand category sellingPrice mrp dealerPrice subDealerPrice retailerPrice media variants warranty",
+        "name brand category sellingPrice mrp dealerPrice subDealerPrice wholesalerPrice media variants warranty",
       )
       .sort({ name: 1 })
       .skip((page - 1) * PAGE_SIZE)

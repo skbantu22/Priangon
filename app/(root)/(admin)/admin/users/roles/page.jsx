@@ -12,7 +12,7 @@ const GROUP_STYLE = {
   Customer: "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300",
 };
 
-const PARTNER_KEYS = ["dealer", "subDealer", "retailer"];
+const PARTNER_KEYS = ["dealer", "subDealer", "wholesaler"];
 
 export default function RoleList() {
   const [search, setSearch] = useState("");

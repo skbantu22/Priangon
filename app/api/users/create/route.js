@@ -21,7 +21,7 @@ export async function POST(req) {
     const body = await req.json();
 
     // ================= VALIDATION =================
-    // dealers / retailers are created from /api/partners (they need a customer account)
+    // dealers / wholesalers are created from /api/partners (they need a customer account)
     if (!STAFF_ROLES.includes(body.role)) {
       throw new Error("Choose Admin, Manager or Cashier");
     }

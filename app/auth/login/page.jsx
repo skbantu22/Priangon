@@ -72,7 +72,7 @@ export default function Login() {
         router.push(
           role === "admin"
             ? ADMIN_DASHBOARD
-            : ["dealer", "subDealer", "retailer"].includes(role)
+            : ["dealer", "subDealer", "wholesaler"].includes(role)
               ? "/partner"
               : "/admin/pos",
         );

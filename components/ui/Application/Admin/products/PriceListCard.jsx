@@ -9,7 +9,7 @@ const ROWS = [
   { name: "purchasePrice", label: "Purchase Rate", bn: "ক্রয় মূল্য" },
   { name: "dealerPrice", label: "Dealer", bn: "ডিলার" },
   { name: "subDealerPrice", label: "Sub Dealer", bn: "সাব ডিলার" },
-  { name: "retailerPrice", label: "Wholesaler", bn: "পাইকারি" },
+  { name: "wholesalerPrice", label: "Wholesaler", bn: "পাইকারি" },
 ];
 
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-BD")}`;

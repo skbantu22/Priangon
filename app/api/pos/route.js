@@ -94,7 +94,7 @@ export async function GET(req) {
       }[sort] || { _id: -1 };
 
     const products = await Product.find(query)
-      .select("name brand category sellingPrice dealerPrice subDealerPrice retailerPrice media variants warranty trackSerial")
+      .select("name brand category sellingPrice dealerPrice subDealerPrice wholesalerPrice media variants warranty trackSerial")
       .sort(sortBy)
       .skip(skip)
       .limit(limit)
@@ -168,7 +168,7 @@ export async function GET(req) {
           tierPrices: {
             dealerPrice: product.dealerPrice || 0,
             subDealerPrice: product.subDealerPrice || 0,
-            retailerPrice: product.retailerPrice || 0,
+            wholesalerPrice: product.wholesalerPrice || 0,
           },
           image: productImage,
         },

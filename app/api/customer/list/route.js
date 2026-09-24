@@ -14,7 +14,7 @@ const SORTS = {
   orders: { totalOrders: -1 },
 };
 
-// Admin customer list (POS buyers, dealers, retailers...) with each one's due
+// Admin customer list (POS buyers, dealers, wholesalers...) with each one's due
 // GET ?q=&type=&sort=&page=&limit=
 export async function GET(request) {
   try {

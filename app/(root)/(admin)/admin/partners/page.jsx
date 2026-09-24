@@ -10,7 +10,7 @@ import { showToast } from "@/lib/showToast";
 const ROLE_OPTIONS = [
   ["dealer", "Dealer (ডিলার)"],
   ["subDealer", "Sub Dealer (সাব ডিলার)"],
-  ["retailer", "Wholesaler (পাইকারি)"],
+  ["wholesaler", "Wholesaler (পাইকারি)"],
 ];
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 const EMPTY = { role: "dealer", business: "", name: "", phone: "", address: "", email: "", password: "" };

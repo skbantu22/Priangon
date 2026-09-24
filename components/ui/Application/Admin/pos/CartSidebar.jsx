@@ -22,6 +22,8 @@ import {
   UserPlus,
   ShieldCheck,
   ArrowLeft,
+  Minus,
+  Plus,
 } from "lucide-react";
 import {
   setDiscount,
@@ -103,7 +105,7 @@ function CustomerPicker() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
-  // full customer modal: search, add new, set dealer / retailer type
+  // full customer modal: search, add new, set dealer / wholesaler type
   const [modalOpen, setModalOpen] = useState(false);
   const boxRef = useRef(null);
 
@@ -147,7 +149,7 @@ function CustomerPicker() {
         name: c.name || "",
         phone: c.phone || "",
         address: c.address || "",
-        // dealer / retailer... : the cart switches to that rate
+        // dealer / wholesaler... : the cart switches to that rate
         type: normalizeCustomerType(c.type),
       }),
     );
@@ -502,7 +504,7 @@ export default function CartSidebar({
 
       {/* ================= ITEMS ================= */}
       <div className="mx-3 flex min-h-[220px] flex-1 flex-col lg:min-h-[260px] overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
-        <div className="grid shrink-0 grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:bg-white/5 dark:text-gray-300">
+        <div className="hidden shrink-0 grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 lg:grid dark:bg-white/5 dark:text-gray-300">
           <span>#</span>
           <span>Product</span>
           <span className="text-center">Qty</span>
@@ -524,7 +526,7 @@ export default function CartSidebar({
               return (
                 <div
                   key={id || idx}
-                  className="grid grid-cols-[18px_minmax(0,1fr)_52px_62px_66px_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-1 first:border-t-0 dark:border-white/10"
+                  className="grid grid-cols-[18px_minmax(0,1fr)_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-2 first:border-t-0 lg:grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] lg:py-1 dark:border-white/10"
                 >
                   <span className="text-[12px] text-gray-500">{idx + 1}</span>
 
@@ -557,22 +559,48 @@ export default function CartSidebar({
                     </div>
                   </div>
 
-                  <input
-                    type="number"
-                    min={1}
-                    value={item.qty}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => changeQty(item, e.target.value)}
-                    className="h-7 w-full rounded-md border border-gray-200 bg-white px-1 text-center text-[12px] font-semibold outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
-                  />
+                  {/* On a phone these drop to their own line under the
+                      name, so the product gets the full width; on a wide
+                      screen `contents` puts them back in their columns. */}
+                  <div className="col-span-3 col-start-1 flex items-center justify-between gap-2 pl-11 lg:contents">
+                    <div className="flex h-7 items-center rounded-md border border-gray-200 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => changeQty(item, (Number(item.qty) || 1) - 1)}
+                        disabled={(Number(item.qty) || 1) <= 1}
+                        aria-label="One less"
+                        className="flex size-7 items-center justify-center rounded-l-md text-gray-600 disabled:opacity-30 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+                      >
+                        <Minus className="size-3.5" strokeWidth={3} />
+                      </button>
 
-                  <span className="text-right text-[12px] text-gray-700 dark:text-gray-300">
-                    {money(item.price)}
-                  </span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.qty}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => changeQty(item, e.target.value)}
+                        className="h-7 w-9 border-x border-gray-200 bg-white text-center text-[12px] font-semibold outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+                      />
 
-                  <span className="text-right text-[12px] font-bold text-gray-900 dark:text-white">
-                    {money((Number(item.price) || 0) * (Number(item.qty) || 0))}
-                  </span>
+                      <button
+                        type="button"
+                        onClick={() => changeQty(item, (Number(item.qty) || 1) + 1)}
+                        aria-label="One more"
+                        className="flex size-7 items-center justify-center rounded-r-md text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+                      >
+                        <Plus className="size-3.5" strokeWidth={3} />
+                      </button>
+                    </div>
+
+                    <span className="text-right text-[12px] text-gray-700 dark:text-gray-300">
+                      {money(item.price)}
+                    </span>
+
+                    <span className="text-right text-[12px] font-bold text-gray-900 dark:text-white">
+                      {money((Number(item.price) || 0) * (Number(item.qty) || 0))}
+                    </span>
+                  </div>
 
                   <button
                     type="button"
