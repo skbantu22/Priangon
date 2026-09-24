@@ -43,7 +43,7 @@ export default function RoleList() {
           </div>
           <div className="flex gap-2">
             <Link href="/admin/partners" className="flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">
-              <UserPlus className="size-4" /> Add Dealer / Retailer
+              <UserPlus className="size-4" /> Add Dealer / Wholesaler
             </Link>
             <Link href="/admin/users" className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:brightness-110">
               <UserPlus className="size-4" /> Add Staff User

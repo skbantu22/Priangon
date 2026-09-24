@@ -48,7 +48,7 @@ export default function CreateUserPage() {
           href="/admin/partners"
           className="flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
         >
-          <Store className="size-4" /> Dealer / Sub Dealer / Retailer login
+          <Store className="size-4" /> Dealer / Sub Dealer / Wholesaler login
         </Link>
       </div>
 

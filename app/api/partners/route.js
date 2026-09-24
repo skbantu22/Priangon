@@ -79,7 +79,7 @@ export async function POST(req) {
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
 
-    if (!isPartnerRole(role)) throw new Error("Choose Dealer, Sub Dealer or Retailer");
+    if (!isPartnerRole(role)) throw new Error("Choose Dealer, Sub Dealer or Wholesaler");
     if (!business) throw new Error("Business / shop name is required");
     if (!/^01\d{9}$/.test(phone)) throw new Error("Phone must be 01XXXXXXXXX");
     if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Valid email is required");

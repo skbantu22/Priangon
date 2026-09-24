@@ -10,7 +10,7 @@ import { showToast } from "@/lib/showToast";
 const ROLE_OPTIONS = [
   ["dealer", "Dealer (ডিলার)"],
   ["subDealer", "Sub Dealer (সাব ডিলার)"],
-  ["retailer", "Retailer (রিটেইলার)"],
+  ["retailer", "Wholesaler (পাইকারি)"],
 ];
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 const EMPTY = { role: "dealer", business: "", name: "", phone: "", address: "", email: "", password: "" };
@@ -39,7 +39,7 @@ function NewPartnerForm({ onClose, onSaved, defaultRole }) {
   return (
     <form onSubmit={submit} className="rounded-2xl border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold">New Dealer / Retailer login</h2>
+        <h2 className="text-lg font-bold">New Dealer / Wholesaler login</h2>
         <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-white/10">
           <X className="size-4" />
         </button>
@@ -111,7 +111,7 @@ function Partners() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Dealers &amp; Retailers</h1>
+          <h1 className="text-2xl font-bold">Dealers &amp; Wholesalers</h1>
           <p className="text-sm text-muted-foreground">
             They log in to the partner portal, see their own prices and stock, order and download invoices.
           </p>
