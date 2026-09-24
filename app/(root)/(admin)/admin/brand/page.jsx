@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
 import { FiEdit2, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
+import { showToast } from "@/lib/showToast";
 import { ADMIN_BRAND_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
 
 import { Badge } from "@/components/ui/badge";
@@ -63,10 +63,10 @@ const BrandPage = () => {
       if (data.success) {
         setBrands(data.data);
       } else {
-        toast.error(data.message || "Could not load brands");
+        showToast("error", data.message || "Could not load brands");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not load brands");
+      showToast("error", error.response?.data?.message || "Could not load brands");
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,7 @@ const BrandPage = () => {
 
   const saveBrand = async () => {
     if (!form.name.trim()) {
-      toast.error("Brand name is required");
+      showToast("error", "Brand name is required");
       return;
     }
 
@@ -109,15 +109,15 @@ const BrandPage = () => {
         : await axios.post("/api/brand/create", form);
 
       if (!data.success) {
-        toast.error(data.message || "Could not save brand");
+        showToast("error", data.message || "Could not save brand");
         return;
       }
 
-      toast.success(editingId ? "Brand updated" : "Brand created");
+      showToast("success", editingId ? "Brand updated" : "Brand created");
       setOpen(false);
       loadBrands();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not save brand");
+      showToast("error", error.response?.data?.message || "Could not save brand");
     } finally {
       setSaving(false);
     }
@@ -130,14 +130,14 @@ const BrandPage = () => {
       const { data } = await axios.delete(`/api/brand/delete/${brand._id}`);
 
       if (!data.success) {
-        toast.error(data.message || "Could not delete brand");
+        showToast("error", data.message || "Could not delete brand");
         return;
       }
 
-      toast.success("Brand moved to trash");
+      showToast("success", "Brand moved to trash");
       loadBrands();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not delete brand");
+      showToast("error", error.response?.data?.message || "Could not delete brand");
     }
   };
 

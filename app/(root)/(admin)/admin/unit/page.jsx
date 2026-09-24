@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { toast } from "react-toastify";
 import { FiEdit2, FiPlus, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
+import { showToast } from "@/lib/showToast";
 import { ADMIN_DASHBOARD, ADMIN_UNIT_SHOW } from "@/Route/Adminpannelroute";
 
 import { Badge } from "@/components/ui/badge";
@@ -60,10 +60,10 @@ const UnitPage = () => {
       if (data.success) {
         setUnits(data.data);
       } else {
-        toast.error(data.message || "Could not load units");
+        showToast("error", data.message || "Could not load units");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not load units");
+      showToast("error", error.response?.data?.message || "Could not load units");
     } finally {
       setLoading(false);
     }
@@ -92,7 +92,7 @@ const UnitPage = () => {
 
   const saveUnit = async () => {
     if (!form.name.trim() || !form.shortName.trim()) {
-      toast.error("Unit name and short name are both required");
+      showToast("error", "Unit name and short name are both required");
       return;
     }
 
@@ -104,15 +104,15 @@ const UnitPage = () => {
         : await axios.post("/api/unit/create", form);
 
       if (!data.success) {
-        toast.error(data.message || "Could not save unit");
+        showToast("error", data.message || "Could not save unit");
         return;
       }
 
-      toast.success(editingId ? "Unit updated" : "Unit created");
+      showToast("success", editingId ? "Unit updated" : "Unit created");
       setOpen(false);
       loadUnits();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not save unit");
+      showToast("error", error.response?.data?.message || "Could not save unit");
     } finally {
       setSaving(false);
     }
@@ -125,14 +125,14 @@ const UnitPage = () => {
       const { data } = await axios.delete(`/api/unit/delete/${unit._id}`);
 
       if (!data.success) {
-        toast.error(data.message || "Could not delete unit");
+        showToast("error", data.message || "Could not delete unit");
         return;
       }
 
-      toast.success("Unit moved to trash");
+      showToast("success", "Unit moved to trash");
       loadUnits();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Could not delete unit");
+      showToast("error", error.response?.data?.message || "Could not delete unit");
     }
   };
 

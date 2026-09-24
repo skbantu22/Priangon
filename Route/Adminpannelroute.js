@@ -56,3 +56,10 @@ export const ADMIN_BRAND_SHOW = "/admin/brand";
 
 // Unit routes
 export const ADMIN_UNIT_SHOW = "/admin/unit";
+
+// Supplier routes
+export const ADMIN_SUPPLIER_SHOW = "/admin/supplier";
+
+// Purchase routes
+export const ADMIN_PURCHASE_SHOW = "/admin/purchase";
+export const ADMIN_PURCHASE_ADD = "/admin/purchase/add";
