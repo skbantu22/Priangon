@@ -4,8 +4,12 @@ import { zSchema } from "@/lib/zodschema";
 import CategoryModel from "@/models/category.model";
 import subcategories from "@/models/subcategory.model";
 import { NextResponse } from "next/server";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function PUT(request) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
 

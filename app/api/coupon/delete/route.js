@@ -1,11 +1,15 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import CouponModel from "@/models/Coupon.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 
 /* ================= PUT → Soft Delete / Restore ================= */
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const payload = await request.json();
@@ -41,6 +45,9 @@ export async function PUT(request) {
 /* ================= DELETE → Permanent Delete ================= */
 export async function DELETE(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const payload = await request.json();

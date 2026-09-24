@@ -3,9 +3,13 @@ import { response } from "@/lib/helperfunction";
 import UserModel from "@/models/User.model";
 import mongoose from "mongoose";
 import { z } from "zod";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const payload = await request.json();

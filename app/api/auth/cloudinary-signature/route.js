@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import cloudinary from "@/lib/cloudinary";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(request) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
 

@@ -3,9 +3,13 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductModel from "@/models/Product.model";
 import CategoryModel from "@/models/category.model";
 import SubCategoryModel from "@/models/subcategory.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function GET(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(request.url);

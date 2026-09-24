@@ -1,10 +1,14 @@
 import { connectDB } from "@/lib/databaseconnection";
 import MediaModel from "@/models/Media.model";
 import { catchError, response } from "@/lib/helperfunction";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 /* ===== PUT → Soft Delete / Restore ===== */
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     console.log("✅ MEDIA PUT HIT");
 
     await connectDB();
@@ -48,6 +52,9 @@ export async function PUT(request) {
 /* ===== DELETE → Permanent Delete ===== */
 export async function DELETE(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     console.log("✅ MEDIA DELETE HIT");
 
     await connectDB();

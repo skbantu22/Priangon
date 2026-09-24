@@ -3,10 +3,14 @@ import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import ProductVariant from "@/models/ProductVariant.model ";
 import Media from "@/models/Media.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export async function GET(req) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   const start = performance.now();
 
   try {

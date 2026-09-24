@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import ColorModel from "@/models/ColorModel";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

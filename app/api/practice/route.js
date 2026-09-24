@@ -4,10 +4,14 @@ import slugify from "slugify";
 
 import { connectDB } from "@/lib/databaseconnection";
 import PracticeModel from "@/models/practice.model";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 // ✅ GET: list all (optional search + pagination)
 export async function GET(request) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const searchParams = request.nextUrl.searchParams;
@@ -44,6 +48,9 @@ export async function GET(request) {
 // ✅ POST: create
 export async function POST(request) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await request.json();
@@ -99,6 +106,9 @@ export async function POST(request) {
 // ✅ PUT: update by id (query ?id=)
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(request.url);
@@ -143,6 +153,9 @@ export async function PUT(request) {
 // ✅ DELETE: hard delete by id (query ?id=)
 export async function DELETE(request) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(request.url);

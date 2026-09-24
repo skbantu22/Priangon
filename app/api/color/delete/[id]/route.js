@@ -1,8 +1,12 @@
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 // import { NextResponse } from "next/server";
 // import ColorModel from "@/models/ColorModel";
 // import { connectDB } from "@/lib/databaseconnection";
 
 // export async function DELETE(req, { params }) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
 //   try {
 //     await connectDB();
 

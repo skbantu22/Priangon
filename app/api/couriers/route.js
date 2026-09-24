@@ -1,11 +1,15 @@
 import { connectDB } from "@/lib/databaseconnection";
 import Courier from "@/models/Courier.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 /**
  * GET ALL COURIERS
  */
 export async function GET() {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const couriers = await Courier.find().sort({ createdAt: -1 });
@@ -33,6 +37,9 @@ export async function GET() {
  */
 export async function POST(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

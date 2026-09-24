@@ -6,9 +6,13 @@ import WarehouseStock from "@/models/WarehouseStock.model";
 import Order from "@/models/Order.model";
 
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function PUT(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { orderId, userId } = await req.json();

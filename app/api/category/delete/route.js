@@ -1,9 +1,13 @@
 import { connectDB } from "@/lib/databaseconnection";
 import CategoryModel from "@/models/category.model";
 import { catchError, response } from "@/lib/helperfunction";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 /* ================= PUT → Soft Delete / Restore ================= */
 export async function PUT(request) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
 
@@ -39,6 +43,9 @@ export async function PUT(request) {
 
 /* ================= DELETE → Permanent Delete ================= */
 export async function DELETE(request) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
 

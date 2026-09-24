@@ -2,11 +2,15 @@ import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import CouponModel from "@/models/Coupon.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 
 
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const payload = await request.json();

@@ -4,8 +4,12 @@ import MediaModel from "@/models/Media.model";
 import OrderModel from "@/models/Order.model";
 import ProductModel from "@/models/Product.model";
 import ProductVariantModel from "@/models/ProductVariant.model ";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 export async function GET(request, { params }) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { orderid } = await params;

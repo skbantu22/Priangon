@@ -9,11 +9,15 @@ import { normalizeCustomerType } from "@/lib/priceTiers";
 import Product from "@/models/Product.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import { warrantyExpiryDate } from "@/lib/warranty";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 /* =========================
    GET ORDER
 ========================= */
 export async function GET(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);
@@ -54,6 +58,9 @@ export async function GET(req) {
    POST ORDER (FINAL FIXED)
 ========================= */
 export async function POST(req) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   await connectDB();
 
   const session = await mongoose.startSession();

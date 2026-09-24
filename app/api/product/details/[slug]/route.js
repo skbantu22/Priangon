@@ -6,8 +6,12 @@ import MediaModel from "@/models/Media.model";
 import CategoryModel from "@/models/category.model";
 import SubCategoryModel from "@/models/subcategory.model";
 import { sizes as SIZE_MAP } from "@/lib/utils";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 export async function GET(request, { params }) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { slug } = await params;

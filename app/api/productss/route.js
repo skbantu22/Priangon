@@ -3,9 +3,13 @@ import { connectDB } from "@/lib/databaseconnection";
 import ProductModel from "@/models/Product.model";
 import CategoryModel from "@/models/category.model";
 import SubcategoryModel from "@/models/subcategory.model";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function GET() {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
    
       const sp = req.nextUrl.searchParams; 

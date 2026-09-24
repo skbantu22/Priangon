@@ -1,4 +1,8 @@
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 export async function GET(req) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category"); // "men" / "women" / "" / null
 

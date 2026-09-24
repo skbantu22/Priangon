@@ -4,8 +4,12 @@ import { connectDB } from "@/lib/databaseconnection";
 import CategoryModel from "@/models/category.model";
 import SubCategoryModel from "@/models/subcategory.model";
 import slugify from "slugify";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function POST(request) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
 

@@ -3,6 +3,7 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
 import WarehouseStock from "@/models/WarehouseStock.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 // SKU generator
 const generateSKU = (productId) => {
@@ -16,6 +17,9 @@ const generateBarcode = () => {
 };
 
 export async function POST(request) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   console.log("🔥 VARIANT CREATE API HIT");
 
   try {

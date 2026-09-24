@@ -1,9 +1,13 @@
 import { connectDB } from "@/lib/databaseconnection";
 import Product from "@/models/Product.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 // Brands that have at least one live product, for the POS brand filter
 export async function GET() {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const brands = await Product.distinct("brand", {

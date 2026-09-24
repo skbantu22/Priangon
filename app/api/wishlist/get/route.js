@@ -5,9 +5,13 @@ import ProductModel from "@/models/Product.model";
 
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import MediaModel from "@/models/Media.model";
+import { requireRoles, ANY_USER } from "@/lib/apiAuth";
 
 export async function GET(req) {
   try {
+    const auth = await requireRoles(ANY_USER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     // Get userId from query params

@@ -1,8 +1,12 @@
 import { connectDB } from "@/lib/databaseconnection";
 import Courier from "@/models/Courier.model";
 import axios from "axios";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   await connectDB();
 
   const { id } = await req.json();

@@ -3,8 +3,12 @@ import { connectDB } from "@/lib/databaseconnection";
 import Posorder from "@/models/posorder.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   await connectDB();
 
   const session = await mongoose.startSession();

@@ -3,9 +3,13 @@ import cloudinary from "@/lib/cloudinary";
 
 import Media from "@/models/Media.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const formData = await req.formData();

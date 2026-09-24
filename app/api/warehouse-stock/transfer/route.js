@@ -2,9 +2,13 @@ import { connectDB } from "@/lib/databaseconnection";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import StockTransfer from "@/models/StockTransfer.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

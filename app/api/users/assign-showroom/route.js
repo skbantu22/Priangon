@@ -1,8 +1,12 @@
 import { connectDB } from "@/lib/databaseconnection";
 import User from "@/models/User.model";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ADMIN_ONLY);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { userId, showroomId } = await req.json();

@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/databaseconnection";
 import WishlistModel from "@/models/wishlist.model";
+import { requireRoles, ANY_USER } from "@/lib/apiAuth";
 
 // ============================
 // ✅ GET Wishlist by User
 // ============================
 export async function GET(req) {
   try {
+    const auth = await requireRoles(ANY_USER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const url = new URL(req.url);
@@ -53,6 +57,9 @@ export async function GET(req) {
 // ============================
 export async function POST(req) {
   try {
+    const auth = await requireRoles(ANY_USER);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await req.json();

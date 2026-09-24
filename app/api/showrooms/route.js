@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/databaseconnection";
 import Showroom from "@/models/Showroom.model";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 // ================= GET ALL SHOWROOMS =================
 export async function GET() {
@@ -25,6 +26,9 @@ export async function GET() {
 
 // ================= CREATE SHOWROOM =================
 export async function POST(req) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
 

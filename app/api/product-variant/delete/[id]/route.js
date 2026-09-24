@@ -4,9 +4,13 @@ import { response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock"; // থাকলে
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function DELETE(request, { params }) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { id } = await params;

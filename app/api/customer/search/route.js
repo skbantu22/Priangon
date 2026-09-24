@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/databaseconnection";
 import Customer from "@/models/Customer.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -9,6 +10,9 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // ?recent=1      -> the 10 most recent customers
 export async function GET(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);

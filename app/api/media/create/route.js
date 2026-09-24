@@ -2,18 +2,18 @@ import cloudinary from "@/lib/cloudinary";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import MediaModel from "@/models/Media.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
 const payload=await request.json()
 
 await connectDB();
 
 
-    // const auth = await isAuthenticated("admin");
-    // if (!auth.isAuth) {
-    //   return response(false, 403, "Unauthorized.");
-    // }
 
     
 

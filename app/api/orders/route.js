@@ -3,16 +3,13 @@ import { isAuthenticated } from "@/lib/auth.server";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError } from "@/lib/helperfunction";
 import OrderModel from "@/models/Order.model";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 
 export async function GET(request) {
   try {
-    // const auth = await isAuthenticated("admin");
-    // if (!auth.isAuth) {
-    //   return NextResponse.json(
-    //     { success: false, message: "Unauthorized." },
-    //     { status: 403 }
-    //   );
-    // }
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
 
     await connectDB();
 

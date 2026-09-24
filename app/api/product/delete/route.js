@@ -5,11 +5,15 @@ import ProductModel from "@/models/Product.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import WishlistModel from "@/models/wishlist.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 /* ================= PUT → Soft Delete / Restore ================= */
 
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await request.json();
@@ -51,6 +55,9 @@ export async function PUT(request) {
 
 export async function DELETE(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { ids = [], deleteType } = await request.json();

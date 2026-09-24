@@ -2,9 +2,13 @@ import { connectDB } from "@/lib/databaseconnection";
 import { response, catchError } from "@/lib/helperfunction";
 import OrderModel from "@/models/Order.model";
 import WarehouseStock from "@/models/WarehouseStock.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function PUT(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const body = await request.json();

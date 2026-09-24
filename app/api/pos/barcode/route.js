@@ -5,9 +5,13 @@ import ShowroomStock from "@/models/ShowroomStock";
 import "@/models/Product.model";
 import "@/models/ProductVariant.model ";
 import "@/models/Media.model";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function GET(req) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const { searchParams } = new URL(req.url);

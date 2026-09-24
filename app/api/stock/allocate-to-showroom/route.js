@@ -3,8 +3,12 @@ import { connectDB } from "@/lib/databaseconnection";
 
 import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(req) {
+  const auth = await requireRoles(STAFF_ROLES);
+  if (auth.response) return auth.response;
+
   await connectDB();
 
   const { showroomId, productId, variantId, qty } = await req.json();

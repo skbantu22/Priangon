@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import Banner from "@/models/Banner.model"; 
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 // UPDATE BANNER
 export async function PUT(req, { params }) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
     const { id } =  await params;
@@ -27,6 +31,9 @@ export async function PUT(req, { params }) {
 
 // DELETE BANNER
 export async function DELETE(req, { params }) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
     const { id } =await params;

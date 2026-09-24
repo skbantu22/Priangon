@@ -5,9 +5,13 @@ import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import Showroom from "@/models/Showroom.model";
 import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function GET() {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     // --------------------------

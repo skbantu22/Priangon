@@ -1,9 +1,13 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function PUT(request, context) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     // ✅ Next 15 safe params

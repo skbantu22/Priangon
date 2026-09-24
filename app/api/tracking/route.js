@@ -1,6 +1,7 @@
 // app/api/admin/tracking/route.js
 import { connectDB } from "@/lib/databaseconnection";
 import FBTrackingSettingsModel from "@/models/FbTrackingSetting.model";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
 
 export async function GET() {
   try {
@@ -24,6 +25,9 @@ export async function GET() {
 }
 
 export async function POST(req) {
+  const auth = await requireRoles(ADMIN_ONLY);
+  if (auth.response) return auth.response;
+
   try {
     await connectDB();
     const body = await req.json();

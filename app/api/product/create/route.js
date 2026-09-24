@@ -6,9 +6,13 @@ import { encode } from "entities";
 import { cleanMobileFields } from "@/lib/productMobileFields";
 import { cleanTierPrices } from "@/lib/priceTiers";
 import { cleanExtraFields } from "@/lib/productExtraFields";
+import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function POST(request) {
   try {
+    const auth = await requireRoles(STAFF_ROLES);
+    if (auth.response) return auth.response;
+
     await connectDB();
 
     const payload = await request.json();
