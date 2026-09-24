@@ -14,6 +14,7 @@ import { connectDB } from "@/lib/databaseconnection";
 // ✅ আপনার ইমপোর্ট করা মডেলের নাম অনুযায়ী এটি ব্যবহার করুন
 import FBTrackingSetting from "@/models/FbTrackingSetting.model";
 import AnnouncementBar from "@/components/ui/Application/website/AnnouncementBar";
+import { getSettings } from "@/models/Setting.model";
 
 const jost = Jost({
   weight: ["400", "500", "600", "700", "800"],
@@ -37,6 +38,41 @@ const Layout = async ({ children }) => {
 
   // ✅ ডাটাবেসের জটিল অবজেক্টকে প্লেইন অবজেক্টে রূপান্তর (Error এড়াতে)
   const plainSettings = JSON.parse(JSON.stringify(settings));
+
+  // Maintenance mode closes the storefront only. Staff keep working:
+  // the admin panel and POS sit outside this layout.
+  const shopSettings = await getSettings();
+
+  if (shopSettings.maintenanceMode) {
+    return (
+      <div
+        className={`${jost.className} flex min-h-screen items-center justify-center bg-gray-50 p-6`}
+      >
+        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <h1 className="text-xl font-bold">
+            {shopSettings.companyName || "We will be right back"}
+          </h1>
+
+          <p className="mt-3 text-sm text-gray-600">
+            {shopSettings.maintenanceMessage ||
+              "The shop is being updated. Please come back shortly."}
+          </p>
+
+          {shopSettings.supportPhone && (
+            <p className="mt-4 text-sm">
+              Need something now? Call{" "}
+              <a
+                href={`tel:${shopSettings.supportPhone}`}
+                className="font-semibold underline"
+              >
+                {shopSettings.supportPhone}
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ✅ সার্ভার টার্মিনালে ডাটা চেক করার জন্য
   console.log("--- Meta Settings From DB ---");

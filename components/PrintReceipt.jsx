@@ -96,10 +96,31 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
 
-  const showroomName = "SB Telecom";
-  const showroomAddress = order.showroom?.address || "Dhaka, Bangladesh";
-  const showroomPhone = order.showroom?.phone || "01700000001";
-  const showroomEmail = order.showroom?.email || "support@sbtelecom.com.bd";
+  // App Settings first, then the showroom's own details, then the
+  // originals — so an unconfigured shop still prints a full header
+  const company = order.company || {};
+
+  const showroomName = company.name || order.showroom?.name || "SB Telecom";
+  const showroomAddress =
+    order.showroom?.address || company.address || "Dhaka, Bangladesh";
+  const showroomPhone =
+    order.showroom?.phone || company.phone || "01700000001";
+  const showroomEmail =
+    order.showroom?.email || company.email || "support@sbtelecom.com.bd";
+
+  // Mushak 6.3 is the VAT challan a registered retailer issues
+  const vatLine =
+    company.showMushakLine && company.bin
+      ? `BIN ${company.bin}${company.mushakFormNo ? ` · Mushak ${company.mushakFormNo}` : ""}`
+      : "";
+
+  const warrantyNotes =
+    company.warrantyTerms
+      ? company.warrantyTerms
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+      : WARRANTY_NOTES;
 
   const totalAmount = order.total || 0;
   // older orders have no paidAmount: they were paid in full
@@ -181,7 +202,14 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
     doc.text(`Mobile: ${showroomPhone}`, pageWidth / 2, y, { align: "center" });
     y += 3.5;
     doc.text(`Email: ${showroomEmail}`, pageWidth / 2, y, { align: "center" });
-    y += 5;
+    y += 3.5;
+
+    if (vatLine) {
+      doc.text(vatLine, pageWidth / 2, y, { align: "center" });
+      y += 3.5;
+    }
+
+    y += 1.5;
 
     // Divider Line
     doc.setLineDash([1, 1], 0);
@@ -321,7 +349,7 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
     // Footer Notes
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "italic");
-    WARRANTY_NOTES.forEach((note) => {
+    warrantyNotes.forEach((note) => {
       doc.text(note, pageWidth / 2, y, {
         align: "center",
         maxWidth: contentWidth,
@@ -503,6 +531,9 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
             Mobile: {showroomPhone}
           </p>
           <p className="text-[11px] text-gray-700">Email: {showroomEmail}</p>
+          {vatLine && (
+            <p className="text-[11px] text-gray-700">{vatLine}</p>
+          )}
         </div>
 
         {/* Core Metadata Specifications Grid Block */}
@@ -696,7 +727,7 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
           <p className="border-t border-dashed border-black/20 pt-2 font-bold not-italic text-gray-800">
             Warranty Terms
           </p>
-          {WARRANTY_NOTES.map((note) => (
+          {warrantyNotes.map((note) => (
             <p key={note}>{note}</p>
           ))}
           <p className="text-black font-semibold not-italic mt-2">

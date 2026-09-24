@@ -51,6 +51,11 @@ const productVariantSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // What this variant costs us. Purchases keep it as a moving average,
+    // so profit reports read a real cost per variant — a 12/256 handset
+    // never borrows the 8/128 price.
+    purchasePrice: { type: Number, min: 0, default: 0 },
+
     stock: { type: Number, required: true, min: 0, default: 0 },
     sold: { type: Number, default: 0, min: 0 },
 

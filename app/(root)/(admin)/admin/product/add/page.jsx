@@ -45,12 +45,12 @@ import { productFormSchema } from "@/lib/productFormSchema";
 import { tierPricesFromProduct } from "@/lib/priceTiers";
 import {
   PRODUCT_TYPES,
-  PRODUCT_UNITS,
   extraFieldsFromProduct,
 } from "@/lib/productExtraFields";
 import { posBrandsQueryOptions } from "@/lib/posProducts";
 import { showToast } from "@/lib/showToast";
 import useFetch from "@/hooks/useFetch";
+import { useProductLookups } from "@/hooks/useProductLookups";
 import { useRouter } from "next/navigation";
 
 const breadcrumbData = [
@@ -173,9 +173,13 @@ const AddProduct = () => {
     defaultValues,
   });
 
-  const { data: brands = [] } = useQuery({
+  const { data: existingBrands = [] } = useQuery({
     ...posBrandsQueryOptions(),
     refetchOnWindowFocus: false,
+  });
+
+  const { brands, units } = useProductLookups({
+    fallbackBrands: existingBrands,
   });
 
   const { data: getCategory } = useFetch("/api/category?deleteType=SD&size=10000");
@@ -538,7 +542,7 @@ const AddProduct = () => {
                         <FormLabel>Unit *</FormLabel>
                         <Input list="unit-options" placeholder="Pcs" className="h-10" {...field} />
                         <datalist id="unit-options">
-                          {PRODUCT_UNITS.map((u) => (
+                          {units.map((u) => (
                             <option key={u} value={u} />
                           ))}
                         </datalist>

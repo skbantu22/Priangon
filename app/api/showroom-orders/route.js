@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import Customer from "@/models/Customer.model";
 import { normalizeCustomerType } from "@/lib/priceTiers";
 import Product from "@/models/Product.model";
+import ProductVariant from "@/models/ProductVariant.model ";
 import { warrantyExpiryDate } from "@/lib/warranty";
 /* =========================
    GET ORDER
@@ -98,6 +99,19 @@ export async function POST(req) {
       .select("warranty trackSerial purchasePrice")
       .lean();
     const productMap = new Map(productDocs.map((p) => [String(p._id), p]));
+
+    // Purchases keep a moving average cost per variant, which is the real
+    // cost of this handset. The product's own price is only the fallback
+    // for a variant that has never been bought through a purchase.
+    const variantDocs = await ProductVariant.find({
+      _id: { $in: items.map((i) => i.variantId).filter(Boolean) },
+    })
+      .select("purchasePrice")
+      .lean();
+    const variantCost = new Map(
+      variantDocs.map((v) => [String(v._id), Number(v.purchasePrice) || 0]),
+    );
+
     const sellDate = saleDate ? new Date(saleDate) : new Date();
 
     const allImeis = [];
@@ -119,7 +133,10 @@ export async function POST(req) {
       item.warrantyMonths = months;
       item.warrantyExpiry = warrantyExpiryDate(sellDate, months);
       // cost at the time of sale, for profit reports
-      item.purchasePrice = Number(product?.purchasePrice) || 0;
+      item.purchasePrice =
+        variantCost.get(String(item.variantId)) ||
+        Number(product?.purchasePrice) ||
+        0;
       allImeis.push(...imeis);
     }
 
