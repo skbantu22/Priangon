@@ -80,3 +80,10 @@ export const ADMIN_SUPPORT_TICKETS = "/admin/support-tickets";
 
 // Attribute routes
 export const ADMIN_ATTRIBUTE_SHOW = "/admin/attributes";
+
+// Users & role routes
+export const ADMIN_USERS = "/admin/users";
+export const ADMIN_USER_CREATE = "/admin/users/create";
+export const ADMIN_ROLES = "/admin/users/roles";
+export const ADMIN_ROLE_MANAGE = (id) =>
+  id ? `/admin/users/roles/manage?id=${id}` : "/admin/users/roles/manage";

@@ -19,6 +19,24 @@ const userSchema = new mongoose.Schema(
       default: "customer",
     },
 
+    /**
+     * The role document deciding what this login may do. Left empty on
+     * older users, who fall back to the permissions their `role` key
+     * carries, so nobody is locked out by the upgrade.
+     */
+    roleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+      default: null,
+      index: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
     // partner logins: the Customer account their invoices and dues belong to
     customerId: {
       type: mongoose.Schema.Types.ObjectId,

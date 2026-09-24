@@ -2,6 +2,9 @@ import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
 import User from "@/models/User.model";
 import Showroom from "@/models/Showroom.model";
+import mongoose from "mongoose";
+import RoleModel, { ensureSystemRoles } from "@/models/Role.model";
+import { normalizeBdMobile, isValidBdMobile } from "@/lib/bdFormat";
 
 const STAFF_ROLES = ["admin", "manager", "cashier"];
 
@@ -20,14 +23,32 @@ export async function POST(req) {
 
     const body = await req.json();
 
+    await ensureSystemRoles();
+
+    // ================= ROLE =================
+    // A role is picked by its document now, so a shop's own roles can be
+    // assigned too. `role` is kept in step for the proxy and older checks.
+    let roleDoc = null;
+
+    if (mongoose.isValidObjectId(body.roleId)) {
+      roleDoc = await RoleModel.findOne({ _id: body.roleId, deletedAt: null });
+
+      if (!roleDoc) throw new Error("Role not found");
+
+      body.role = roleDoc.systemKey || "manager";
+    }
+
     // ================= VALIDATION =================
     // dealers / wholesalers are created from /api/partners (they need a customer account)
-    if (!STAFF_ROLES.includes(body.role)) {
-      throw new Error("Choose Admin, Manager or Cashier");
+    if (!roleDoc && !STAFF_ROLES.includes(body.role)) {
+      throw new Error("Choose a role");
     }
     if (!body.name?.trim() || !body.email?.trim()) throw new Error("Name and email are required");
     if (String(body.password || "").length < 6) {
       throw new Error("Password must be at least 6 characters");
+    }
+    if (body.phone && !isValidBdMobile(body.phone)) {
+      throw new Error("Enter a Bangladeshi mobile number (01XXXXXXXXX)");
     }
 
     // single store: a cashier sells from the one store
@@ -44,7 +65,10 @@ export async function POST(req) {
       email: body.email.trim().toLowerCase(),
       password: body.password,
       role: body.role,
+      roleId: roleDoc?._id || null,
+      phone: body.phone ? normalizeBdMobile(body.phone) : "",
       showroomId,
+      isActive: true,
 
       // ✅ IMPORTANT FIX
       isEmailVerified: true, // admin-created users
