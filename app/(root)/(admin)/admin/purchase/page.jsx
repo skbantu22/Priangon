@@ -7,6 +7,7 @@ import { FiCheckCircle, FiDollarSign, FiPlus, FiSearch, FiTrash2 } from "react-i
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { formatDateBD, formatTaka } from "@/lib/bdFormat";
 import {
   ADMIN_DASHBOARD,
   ADMIN_PURCHASE_ADD,
@@ -54,8 +55,6 @@ const paymentVariant = {
   partial: "secondary",
   paid: "default",
 };
-
-const taka = (value) => `৳ ${Number(value || 0).toLocaleString()}`;
 
 const PurchasePage = () => {
   const [purchases, setPurchases] = useState([]);
@@ -294,7 +293,7 @@ const PurchasePage = () => {
                           {purchase.purchaseNumber}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(purchase.purchaseDate).toLocaleDateString()}
+                          {formatDateBD(purchase.purchaseDate)}
                           {purchase.referenceNo
                             ? ` · ${purchase.referenceNo}`
                             : ""}
@@ -305,7 +304,7 @@ const PurchasePage = () => {
                       <TableCell>{purchase.supplierName}</TableCell>
 
                       <TableCell className="text-right tabular-nums">
-                        {taka(purchase.grandTotal)}
+                        {formatTaka(purchase.grandTotal)}
                       </TableCell>
 
                       <TableCell
@@ -315,7 +314,7 @@ const PurchasePage = () => {
                             : ""
                         }`}
                       >
-                        {taka(purchase.dueAmount)}
+                        {formatTaka(purchase.dueAmount)}
                       </TableCell>
 
                       <TableCell>
@@ -391,7 +390,7 @@ const PurchasePage = () => {
             <p className="text-sm text-muted-foreground">
               Due on this purchase:{" "}
               <span className="font-semibold text-foreground">
-                {taka(payTarget?.dueAmount)}
+                {formatTaka(payTarget?.dueAmount)}
               </span>
             </p>
 

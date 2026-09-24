@@ -70,3 +70,10 @@ export const ADMIN_EXPENSE_SHOW = "/admin/expenses";
 // Report routes
 export const ADMIN_REPORT_DUE = "/admin/reports/due";
 export const ADMIN_REPORT_PROFIT_LOSS = "/admin/reports/profit-loss";
+
+// Settings routes
+export const ADMIN_APP_SETTINGS = "/admin/settings";
+export const ADMIN_SYSTEM_SETTINGS = "/admin/settings/system";
+
+// Support routes
+export const ADMIN_SUPPORT_TICKETS = "/admin/support-tickets";

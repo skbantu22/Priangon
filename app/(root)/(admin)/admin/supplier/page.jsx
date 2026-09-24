@@ -6,6 +6,7 @@ import { FiEdit2, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { bdOperator, formatTaka, isValidBdMobile } from "@/lib/bdFormat";
 import { ADMIN_DASHBOARD, ADMIN_SUPPLIER_SHOW } from "@/Route/Adminpannelroute";
 
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +107,11 @@ const SupplierPage = () => {
   const saveSupplier = async () => {
     if (!form.name.trim() || !form.phone.trim()) {
       showToast("error", "Supplier name and phone are required");
+      return;
+    }
+
+    if (!isValidBdMobile(form.phone)) {
+      showToast("error", "Enter a Bangladeshi mobile number (01XXXXXXXXX)");
       return;
     }
 
@@ -236,7 +242,7 @@ const SupplierPage = () => {
 
                       <TableCell className="text-right tabular-nums">
                         {supplier.openingBalance > 0
-                          ? `৳ ${supplier.openingBalance.toLocaleString()}`
+                          ? formatTaka(supplier.openingBalance)
                           : "—"}
                       </TableCell>
 
@@ -304,6 +310,11 @@ const SupplierPage = () => {
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="01XXXXXXXXX"
                 />
+                {form.phone && bdOperator(form.phone) && (
+                  <p className="text-xs text-muted-foreground">
+                    {bdOperator(form.phone)}
+                  </p>
+                )}
               </div>
             </div>
 

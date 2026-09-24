@@ -14,6 +14,7 @@ import {
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { formatTaka, formatTakaCompact } from "@/lib/bdFormat";
 import {
   ADMIN_DASHBOARD,
   ADMIN_REPORT_PROFIT_LOSS,
@@ -41,18 +42,6 @@ const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
   { href: ADMIN_REPORT_PROFIT_LOSS, label: "Profit & Loss" },
 ];
-
-const taka = (value) =>
-  `৳ ${Math.round(Number(value) || 0).toLocaleString()}`;
-
-const compact = (value) => {
-  const n = Number(value) || 0;
-
-  if (Math.abs(n) >= 100000) return `${(n / 100000).toFixed(1)}L`;
-  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(0)}k`;
-
-  return String(Math.round(n));
-};
 
 const daysAgo = (days) => {
   const date = new Date();
@@ -194,26 +183,26 @@ const ProfitLossPage = () => {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             <StatTile
               label="Revenue"
-              value={taka(summary.revenue)}
+              value={formatTaka(summary.revenue)}
               hint={`${summary.orders} sale${summary.orders === 1 ? "" : "s"}`}
             />
 
             <StatTile
               label="Cost of goods"
-              value={taka(summary.cogs)}
+              value={formatTaka(summary.cogs)}
               hint={`${summary.unitsSold} unit sold`}
             />
 
             <StatTile
               label="Gross profit"
-              value={taka(summary.grossProfit)}
+              value={formatTaka(summary.grossProfit)}
               hint={`${summary.grossMargin.toFixed(1)}% margin`}
               tone={summary.grossProfit < 0 ? "bad" : ""}
             />
 
             <StatTile
               label="Expenses"
-              value={taka(summary.totalExpense)}
+              value={formatTaka(summary.totalExpense)}
               hint={`${expensesByCategory.length} categor${
                 expensesByCategory.length === 1 ? "y" : "ies"
               }`}
@@ -221,7 +210,7 @@ const ProfitLossPage = () => {
 
             <StatTile
               label="Net profit"
-              value={taka(summary.netProfit)}
+              value={formatTaka(summary.netProfit)}
               hint={`${summary.netMargin.toFixed(1)}% margin`}
               tone={summary.netProfit < 0 ? "bad" : ""}
             />
@@ -295,7 +284,7 @@ const ProfitLossPage = () => {
                       tickLine={false}
                       axisLine={false}
                       width={48}
-                      tickFormatter={compact}
+                      tickFormatter={formatTakaCompact}
                     />
 
                     <ReferenceLine y={0} stroke="var(--border)" />
@@ -303,7 +292,7 @@ const ProfitLossPage = () => {
                     <ChartTooltip
                       content={
                         <ChartTooltipContent
-                          formatter={(value) => taka(value)}
+                          formatter={(value) => formatTaka(value)}
                         />
                       }
                     />
@@ -336,20 +325,20 @@ const ProfitLossPage = () => {
                         <TableRow key={row.date}>
                           <TableCell>{row.date}</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {taka(row.revenue)}
+                            {formatTaka(row.revenue)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {taka(row.cogs)}
+                            {formatTaka(row.cogs)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {taka(row.expense)}
+                            {formatTaka(row.expense)}
                           </TableCell>
                           <TableCell
                             className={`text-right font-medium tabular-nums ${
                               row.netProfit < 0 ? "text-destructive" : ""
                             }`}
                           >
-                            {taka(row.netProfit)}
+                            {formatTaka(row.netProfit)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -377,7 +366,7 @@ const ProfitLossPage = () => {
                       <div className="flex items-baseline justify-between gap-3 text-sm">
                         <span className="font-medium">{row.category}</span>
                         <span className="tabular-nums">
-                          {taka(row.amount)}
+                          {formatTaka(row.amount)}
                           <span className="ml-2 text-xs text-muted-foreground">
                             {summary.totalExpense > 0
                               ? `${((row.amount / summary.totalExpense) * 100).toFixed(0)}%`

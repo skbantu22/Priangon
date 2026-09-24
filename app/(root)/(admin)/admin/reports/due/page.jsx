@@ -6,6 +6,7 @@ import { FiArrowDownLeft, FiArrowUpRight } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { formatTaka } from "@/lib/bdFormat";
 import { ADMIN_DASHBOARD, ADMIN_REPORT_DUE } from "@/Route/Adminpannelroute";
 
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +26,6 @@ const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
   { href: ADMIN_REPORT_DUE, label: "Due Report" },
 ];
-
-const taka = (value) => `৳ ${Number(value || 0).toLocaleString()}`;
 
 const daysSince = (date) => {
   if (!date) return null;
@@ -101,7 +100,7 @@ const DueReportPage = () => {
               We owe suppliers
             </div>
             <p className="mt-1 text-2xl font-bold tabular-nums">
-              {taka(totalPayable)}
+              {formatTaka(totalPayable)}
             </p>
           </CardContent>
         </Card>
@@ -113,7 +112,7 @@ const DueReportPage = () => {
               Customers owe us
             </div>
             <p className="mt-1 text-2xl font-bold tabular-nums">
-              {taka(totalReceivable)}
+              {formatTaka(totalReceivable)}
             </p>
           </CardContent>
         </Card>
@@ -126,7 +125,7 @@ const DueReportPage = () => {
                 net < 0 ? "text-destructive" : ""
               }`}
             >
-              {taka(net)}
+              {formatTaka(net)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {net < 0
@@ -202,16 +201,16 @@ const DueReportPage = () => {
 
                         <TableCell className="text-right tabular-nums">
                           {row.openingBalance > 0
-                            ? taka(row.openingBalance)
+                            ? formatTaka(row.openingBalance)
                             : "—"}
                         </TableCell>
 
                         <TableCell className="text-right tabular-nums">
-                          {row.purchaseDue > 0 ? taka(row.purchaseDue) : "—"}
+                          {row.purchaseDue > 0 ? formatTaka(row.purchaseDue) : "—"}
                         </TableCell>
 
                         <TableCell className="text-right font-semibold tabular-nums">
-                          {taka(row.totalDue)}
+                          {formatTaka(row.totalDue)}
                         </TableCell>
 
                         <TableCell>
@@ -254,7 +253,7 @@ const DueReportPage = () => {
                       </TableCell>
 
                       <TableCell className="text-right font-semibold tabular-nums">
-                        {taka(row.totalDue)}
+                        {formatTaka(row.totalDue)}
                       </TableCell>
 
                       <TableCell>

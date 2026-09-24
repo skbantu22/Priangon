@@ -6,6 +6,7 @@ import { FiEdit2, FiPlus, FiSearch, FiTag, FiTrash2 } from "react-icons/fi";
 
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { formatDateBD, formatTaka } from "@/lib/bdFormat";
 import { ADMIN_DASHBOARD, ADMIN_EXPENSE_SHOW } from "@/Route/Adminpannelroute";
 
 import { Button } from "@/components/ui/button";
@@ -37,8 +38,6 @@ const breadcrumbData = [
 
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
-const taka = (value) => `৳ ${Number(value || 0).toLocaleString()}`;
 
 const firstOfMonth = () => {
   const date = new Date();
@@ -239,7 +238,7 @@ const ExpensePage = () => {
           <div>
             <h4 className="text-xl font-semibold">Expenses</h4>
             <p className="text-sm text-muted-foreground">
-              {expenses.length} voucher · {taka(totalAmount)} in this range
+              {expenses.length} voucher · {formatTaka(totalAmount)} in this range
             </p>
           </div>
 
@@ -327,7 +326,7 @@ const ExpensePage = () => {
                           {expense.voucherNumber}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {new Date(expense.expenseDate).toLocaleDateString()}
+                          {formatDateBD(expense.expenseDate)}
                         </div>
                       </TableCell>
 
@@ -347,7 +346,7 @@ const ExpensePage = () => {
                       </TableCell>
 
                       <TableCell className="text-right font-medium tabular-nums">
-                        {taka(expense.amount)}
+                        {formatTaka(expense.amount)}
                       </TableCell>
 
                       <TableCell className="text-right">
