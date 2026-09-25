@@ -313,6 +313,36 @@
   .no-print {
     display: none !important;
   }
+
+  /* A4 PAPER (purchase invoice, purchase order, purchase return) —
+     a named page, so the 80mm receipt size above stays as it is */
+  #invoice-print,
+  #invoice-print * {
+    visibility: visible !important;
+  }
+
+  #invoice-print {
+    page: invoice;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    color: #212529;
+  }
+
+  #invoice-print .print-hide {
+    display: none !important;
+  }
+
+  #invoice-print .print-signatures {
+    display: flex !important;
+  }
+
+  @page invoice {
+    size: A4;
+    margin: 12mm;
+  }
 }
 
 #crisp-chatbox {

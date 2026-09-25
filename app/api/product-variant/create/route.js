@@ -76,7 +76,7 @@ export async function POST(request) {
         sku: generateSKU(productId),
         barcode,
 
-        mrp: product.mrp,
+        mrp: Number(item.mrp) || product.mrp,
         sellingPrice: Number(item.sellingPrice) || product.sellingPrice,
 
         purchasePrice: Number(item.purchasePrice) || 0,

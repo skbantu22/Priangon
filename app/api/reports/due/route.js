@@ -6,11 +6,13 @@ import PurchaseModel from "@/models/Purchase.model";
 import POSOrderModel from "@/models/posorder.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
+import { supplierBalances } from "@/lib/supplierService";
 
 /**
  * Who we owe and who owes us.
  *
- * Payable  = supplier opening balance + unpaid amount on live purchases
+ * Payable  = each supplier's balance (the same figure the supplier screens
+ *            show: purchases, payments, advances, dismisses and returns)
  * Receivable = due left on completed POS sales, grouped per customer
  */
 export async function GET(req) {
@@ -47,6 +49,8 @@ export async function GET(req) {
         },
       ]);
 
+      const balances = await supplierBalances(suppliers);
+
       const dueBySupplier = new Map(
         purchaseDue.map((row) => [String(row._id), row]),
       );
@@ -65,7 +69,7 @@ export async function GET(req) {
             phone: supplier.phone,
             openingBalance,
             purchaseDue: purchaseDueAmount,
-            totalDue: openingBalance + purchaseDueAmount,
+            totalDue: balances.get(String(supplier._id))?.due ?? openingBalance + purchaseDueAmount,
             purchases: row?.purchases || 0,
             oldestDueDate: row?.oldestDueDate || null,
           };

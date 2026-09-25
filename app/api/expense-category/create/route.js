@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import ExpenseCategoryModel from "@/models/ExpenseCategory.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { requirePermission } from "@/lib/apiAuth";
 import { exactRegex } from "@/lib/escapeRegex";
 
 export async function POST(req) {
   try {
-    const auth = await requireRoles(ADMIN_ONLY);
+    const auth = await requirePermission("expenses.categories");
     if (auth.response) return auth.response;
 
     await connectDB();

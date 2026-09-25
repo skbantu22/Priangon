@@ -1,93 +1,134 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/auth.server";
-import { connectDB } from "@/lib/databaseconnection";
-import { CUSTOMER_TYPES } from "@/lib/priceTiers";
-import Customer from "@/models/Customer.model";
-import POSOrder from "@/models/posorder.model";
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import Customer from "@/models/Customer.model";
+import UserModel from "@/models/User.model";
+import { connectDB } from "@/lib/databaseconnection";
+import { requirePermission } from "@/lib/apiAuth";
+import { escapeRegex } from "@/lib/escapeRegex";
+import { CUSTOMER_TYPES } from "@/lib/priceTiers";
+import { customerBalances } from "@/lib/customerService";
 
 const SORTS = {
-  recent: { updatedAt: -1 },
-  name: { name: 1 },
-  spent: { totalSpent: -1 },
-  orders: { totalOrders: -1 },
+  created_desc: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  created_asc: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  name_asc: (a, b) => a.name.localeCompare(b.name),
+  name_desc: (a, b) => b.name.localeCompare(a.name),
+  due_desc: (a, b) => b.balance.due - a.balance.due,
+  due_asc: (a, b) => a.balance.due - b.balance.due,
+  sale_desc: (a, b) => b.balance.saleTotal - a.balance.saleTotal,
+  recent: (a, b) => new Date(b.balance.lastSale || 0) - new Date(a.balance.lastSale || 0),
 };
 
-// Admin customer list (POS buyers, dealers, wholesalers...) with each one's due
-// GET ?q=&type=&sort=&page=&limit=
-export async function GET(request) {
+const TOTAL_KEYS = ["total", "paid", "tradeDue", "advance", "dismiss", "paidOut", "due"];
+
+/**
+ * Customer list with every customer's balance, the totals row and how many
+ * customers each type (retail, dealer, sub dealer, wholesaler) has.
+ */
+export async function GET(req) {
   try {
-    const auth = await isAuthenticated();
-    if (!auth.isAuth || !["admin", "manager"].includes(auth.role)) {
-      return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 403 });
-    }
+    const auth = await requirePermission("customers.due");
+    if (auth.response) return auth.response;
 
     await connectDB();
 
-    const sp = request.nextUrl.searchParams;
-    const page = Math.max(1, Number(sp.get("page")) || 1);
-    const limit = Math.min(100, Math.max(5, Number(sp.get("limit")) || 20));
-    const q = (sp.get("q") || "").trim();
-    const type = sp.get("type") || "";
-    const sort = SORTS[sp.get("sort")] || SORTS.recent;
+    const { searchParams } = new URL(req.url);
 
-    const query = {};
-    if (Object.hasOwn(CUSTOMER_TYPES, type)) {
-      // old customers saved before types existed count as retail
-      query.type = type === "retail" ? { $in: ["retail", null] } : type;
-    }
-    if (q) {
-      const rx = { $regex: escapeRegex(q), $options: "i" };
-      query.$or = [{ name: rx }, { phone: rx }, { address: rx }];
+    const search = (searchParams.get("search") || "").trim();
+    const type = searchParams.get("type") || "";
+    const status = searchParams.get("status") || "all"; // all | active | inactive
+    const dueOnly = searchParams.get("due") === "1";
+    const sort = SORTS[searchParams.get("sort")] ? searchParams.get("sort") : "created_desc";
+    const start = searchParams.get("start_date");
+    const end = searchParams.get("end_date");
+    const showAll = searchParams.get("limit") === "all";
+    const limit = Math.min(200, Math.max(10, Number(searchParams.get("limit")) || 20));
+    const page = Math.max(1, Number(searchParams.get("page")) || 1);
+
+    const filter = {};
+
+    // customers saved before isActive existed count as active
+    if (status === "active") filter.isActive = { $ne: false };
+    if (status === "inactive") filter.isActive = false;
+
+    if (search) {
+      const pattern = { $regex: escapeRegex(search), $options: "i" };
+
+      filter.$or = [
+        { name: pattern },
+        { businessName: pattern },
+        { phone: pattern },
+        { email: pattern },
+        { address: pattern },
+      ];
     }
 
-    const [customers, total, typeCounts] = await Promise.all([
-      Customer.find(query)
-        .select("name phone address type totalOrders totalSpent updatedAt")
-        .sort(sort)
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      Customer.countDocuments(query),
-      Customer.aggregate([{ $group: { _id: { $ifNull: ["$type", "retail"] }, n: { $sum: 1 } } }]),
+    if (start || end) {
+      filter.createdAt = {
+        ...(start && { $gte: new Date(`${start}T00:00:00`) }),
+        ...(end && { $lte: new Date(`${end}T23:59:59.999`) }),
+      };
+    }
+
+    // the type tabs count everything else the filters match
+    const typeCounts = await Customer.aggregate([
+      { $match: filter },
+      { $group: { _id: { $ifNull: ["$type", "retail"] }, n: { $sum: 1 } } },
     ]);
 
-    // due and last purchase of the customers on this page
-    const dues = customers.length
-      ? await POSOrder.aggregate([
-          { $match: { customerId: { $in: customers.map((c) => c._id) }, status: "completed" } },
-          {
-            $group: {
-              _id: "$customerId",
-              due: { $sum: { $ifNull: ["$dueAmount", 0] } },
-              lastPurchase: { $max: "$createdAt" },
-            },
-          },
-        ])
-      : [];
-    const dueMap = new Map(dues.map((d) => [String(d._id), d]));
+    if (Object.hasOwn(CUSTOMER_TYPES, type)) {
+      // old customers saved before types existed count as retail
+      filter.type = type === "retail" ? { $in: ["retail", null] } : type;
+    }
 
-    const items = customers.map((c) => {
-      const d = dueMap.get(String(c._id));
-      return {
-        _id: c._id,
-        name: c.name,
-        phone: c.phone || "",
-        address: c.address || "",
-        type: c.type || "retail",
-        totalOrders: c.totalOrders || 0,
-        totalSpent: c.totalSpent || 0,
-        due: Math.round((d?.due || 0) * 100) / 100,
-        lastPurchase: d?.lastPurchase || null,
-      };
+    const customers = await Customer.find(filter).lean();
+
+    const [balances, logins] = await Promise.all([
+      customerBalances(customers),
+      UserModel.find({ customerId: { $in: customers.map((c) => c._id) }, deletedAt: null })
+        .select("customerId")
+        .lean(),
+    ]);
+    const withLogin = new Set(logins.map((user) => String(user.customerId)));
+
+    const rows = customers
+      .map((customer) => ({
+        ...customer,
+        type: customer.type || "retail",
+        isActive: customer.isActive !== false,
+        // a dealer login's type follows its role, so the form locks it
+        hasLogin: withLogin.has(String(customer._id)),
+        balance: balances.get(String(customer._id)),
+      }))
+      .filter((row) => !dueOnly || row.balance.due > 0.009)
+      .sort(SORTS[sort]);
+
+    const totals = Object.fromEntries(
+      TOTAL_KEYS.map((key) => [
+        key,
+        Math.round(rows.reduce((sum, row) => sum + row.balance[key], 0) * 100) / 100,
+      ]),
+    );
+
+    const size = showAll ? rows.length || 1 : limit;
+    const from = showAll ? 0 : (page - 1) * size;
+
+    return NextResponse.json({
+      success: true,
+      data: rows.slice(from, from + size),
+      totals,
+      counts: Object.fromEntries(typeCounts.map((row) => [row._id, row.n])),
+      total: rows.length,
+      page: showAll ? 1 : page,
+      pages: Math.max(1, Math.ceil(rows.length / size)),
+      from: rows.length ? from + 1 : 0,
     });
-
-    const counts = Object.fromEntries(typeCounts.map((t) => [t._id, t.n]));
-
-    return NextResponse.json({ success: true, items, total, page, limit, counts });
   } catch (error) {
     console.error("CUSTOMER LIST ERROR:", error);
-    return NextResponse.json({ success: false, message: "Server error" }, { status: 500 });
+
+    return NextResponse.json(
+      { success: false, message: "Could not load customers" },
+      { status: 500 },
+    );
   }
 }

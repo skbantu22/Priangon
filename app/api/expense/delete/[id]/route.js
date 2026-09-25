@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import ExpenseModel from "@/models/Expense.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+import { requirePermission } from "@/lib/apiAuth";
 
 export async function DELETE(req, { params }) {
   try {
-    const auth = await requireRoles(ADMIN_ONLY);
+    const auth = await requirePermission("expenses.delete");
     if (auth.response) return auth.response;
 
     await connectDB();

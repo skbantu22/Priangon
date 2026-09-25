@@ -223,6 +223,13 @@ export default function Dashboard() {
             {isFetching && <Loader2 className="ml-2 inline size-3.5 animate-spin" />}
           </p>
         </div>
+        <Link
+          href="/admin/inventory"
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+        >
+          <Boxes className="size-4" />
+          Inventory
+        </Link>
       </motion.div>
 
       {/* ================= KPI TILES ================= */}
@@ -282,7 +289,7 @@ export default function Dashboard() {
           value={<CountUp value={k.stockValue} format={money} />}
           label="Stock Value (selling price)"
           sub={`${k.stockUnits.toLocaleString()} units · ${k.lowStockCount} low`}
-          href="/admin/Stock-Overview"
+          href="/admin/inventory"
         />
         <Kpi
           icon={ShieldCheck}

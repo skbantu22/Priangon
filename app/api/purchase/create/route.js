@@ -2,167 +2,197 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import PurchaseModel from "@/models/Purchase.model";
+import PurchaseOrder from "@/models/PurchaseOrder.model";
 import SupplierModel from "@/models/Supplier.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
-import { applyPurchaseToStock } from "@/lib/purchaseService";
+import { actorFullName, requirePermission } from "@/lib/apiAuth";
+import {
+  applyNewRates,
+  applyPurchaseToStock,
+  cleanRates,
+  nextPurchaseNumber,
+} from "@/lib/purchaseService";
+
+const METHODS = ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"];
+
+const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+const fail = (message, status = 400) =>
+  NextResponse.json({ success: false, message }, { status });
+
+const dateOrNull = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 export async function POST(req) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
+    const auth = await requirePermission("purchase.create");
     if (auth.response) return auth.response;
 
     await connectDB();
 
     const body = await req.json();
 
-    if (!mongoose.isValidObjectId(body.supplierId)) {
-      return NextResponse.json(
-        { success: false, message: "Select a supplier" },
-        { status: 400 },
-      );
+    if (!mongoose.isValidObjectId(body.supplierId)) return fail("Select a supplier");
+
+    const supplier = await SupplierModel.findOne({ _id: body.supplierId, deletedAt: null });
+
+    if (!supplier) return fail("Supplier not found", 404);
+
+    // Receiving a purchase order: it has to still be open, and it is the
+    // order — not the browser — that says which new sale rates to apply
+    let order = null;
+
+    if (body.purchaseOrderId) {
+      order = mongoose.isValidObjectId(body.purchaseOrderId)
+        ? await PurchaseOrder.findOne({ _id: body.purchaseOrderId, deletedAt: null })
+        : null;
+
+      if (!order) return fail("Purchase order not found", 404);
+      if (order.status !== "pending") return fail(`${order.orderNumber} is already ${order.status}`, 409);
+      if (String(order.supplierId) !== String(supplier._id)) {
+        return fail(`${order.orderNumber} was written to another supplier`);
+      }
     }
 
-    const supplier = await SupplierModel.findOne({
-      _id: body.supplierId,
-      deletedAt: null,
-    });
-
-    if (!supplier) {
-      return NextResponse.json(
-        { success: false, message: "Supplier not found" },
-        { status: 404 },
-      );
-    }
+    const ratesByVariant = new Map(
+      (order?.items || []).map((item) => [String(item.variantId), cleanRates(item)]),
+    );
 
     const rawItems = Array.isArray(body.items) ? body.items : [];
 
-    if (rawItems.length === 0) {
-      return NextResponse.json(
-        { success: false, message: "Add at least one item" },
-        { status: 400 },
-      );
-    }
+    if (rawItems.length === 0) return fail("Add at least one item");
 
-    // Rebuild every row from the database so prices and totals cannot
-    // be tampered with from the browser
+    // Rebuild every row from the database so names and totals cannot be
+    // tampered with from the browser
     const items = [];
 
     for (const raw of rawItems) {
-      if (!mongoose.isValidObjectId(raw.variantId)) {
-        return NextResponse.json(
-          { success: false, message: "An item has an invalid variant" },
-          { status: 400 },
-        );
-      }
+      if (!mongoose.isValidObjectId(raw.variantId)) return fail("An item has an invalid variant");
 
-      const variant = await ProductVariant.findOne({
-        _id: raw.variantId,
-        deletedAt: null,
-      }).populate("product", "name unit");
+      const variant = await ProductVariant.findOne({ _id: raw.variantId, deletedAt: null }).populate(
+        "product",
+        "name unit",
+      );
 
-      if (!variant) {
-        return NextResponse.json(
-          { success: false, message: "An item's variant no longer exists" },
-          { status: 404 },
-        );
-      }
+      if (!variant) return fail("An item's variant no longer exists", 404);
 
+      const name = variant.product?.name || "item";
       const quantity = Number(raw.quantity);
+      const extraQty = Number(raw.extraQty) || 0;
       const unitPrice = Number(raw.unitPrice);
+      const discount = round2(raw.discount);
 
-      if (!Number.isFinite(quantity) || quantity < 1) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Quantity for "${variant.product?.name || "item"}" must be at least 1`,
-          },
-          { status: 400 },
-        );
-      }
+      if (!Number.isFinite(quantity) || quantity < 1) return fail(`Quantity for "${name}" must be at least 1`);
+      if (!Number.isFinite(extraQty) || extraQty < 0) return fail(`Extra quantity for "${name}" is invalid`);
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) return fail(`Purchase price for "${name}" is invalid`);
+      if (discount < 0) return fail(`Discount for "${name}" is invalid`);
 
-      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Purchase price for "${variant.product?.name || "item"}" is invalid`,
-          },
-          { status: 400 },
-        );
-      }
+      const gross = round2(quantity * unitPrice);
+
+      if (discount > gross) return fail(`Discount for "${name}" is more than its subtotal`);
 
       const imeis = Array.isArray(raw.imeis)
-        ? raw.imeis.map((imei) => String(imei).trim()).filter(Boolean)
+        ? [...new Set(raw.imeis.map((imei) => String(imei).trim()).filter(Boolean))]
         : [];
 
-      if (imeis.length > quantity) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `"${variant.product?.name || "item"}" has ${imeis.length} IMEI(s) for only ${quantity} unit(s)`,
-          },
-          { status: 400 },
-        );
+      if (imeis.length > quantity + extraQty) {
+        return fail(`"${name}" has ${imeis.length} IMEI(s) for only ${quantity + extraQty} unit(s)`);
       }
 
       items.push({
         productId: variant.product?._id || variant.product,
         variantId: variant._id,
         productName: variant.product?.name || "",
-        variantLabel: [variant.color, variant.size].filter(Boolean).join(" / "),
+        variantLabel: [variant.color, variant.size]
+          .filter((x) => x && !/^(default|standard)$/i.test(x))
+          .join(" / "),
         sku: variant.sku || "",
         quantity,
+        extraQty,
         unitPrice,
-        total: quantity * unitPrice,
+        discount,
+        total: round2(gross - discount),
+        expireDate: dateOrNull(raw.expireDate),
         imeis,
+        newRates: ratesByVariant.get(String(variant._id)) || cleanRates(),
       });
     }
 
-    const seq = await getNextInvoiceNumber("purchase");
+    // The invoice number is ours to give; one typed by hand must be free
+    const typedNumber = String(body.purchaseNumber || "").trim().slice(0, 40);
+
+    if (typedNumber && (await PurchaseModel.exists({ purchaseNumber: typedNumber }))) {
+      return fail(`Invoice no ${typedNumber} is already used`, 409);
+    }
+
+    const subtotal = round2(items.reduce((sum, item) => sum + item.total, 0));
+    const discountType = body.discountType === "percent" ? "percent" : "amount";
+    const discountValue = Math.max(0, round2(body.discountValue ?? body.discount));
+
+    if (discountType === "percent" && discountValue > 100) return fail("Discount cannot be more than 100%");
+
+    const discount = Math.min(
+      subtotal,
+      discountType === "percent" ? round2((subtotal * discountValue) / 100) : discountValue,
+    );
+
+    const createdBy = await actorFullName(auth);
 
     const purchase = new PurchaseModel({
-      purchaseNumber: `PUR-${seq}`,
+      purchaseNumber: typedNumber || (await nextPurchaseNumber()),
       supplierId: supplier._id,
       supplierName: supplier.name,
-      referenceNo: body.referenceNo?.trim() || "",
-      purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : new Date(),
+      referenceNo: String(body.referenceNo || "").trim(),
+      purchaseDate: dateOrNull(body.purchaseDate) || new Date(),
+      dueDate: dateOrNull(body.dueDate),
+      purchaseOrderId: order?._id || null,
+      attachment: {
+        url: String(body.attachment?.url || "").trim(),
+        publicId: String(body.attachment?.publicId || "").trim(),
+      },
       items,
-      discount: Math.max(0, Number(body.discount) || 0),
-      shippingCost: Math.max(0, Number(body.shippingCost) || 0),
-      note: body.note?.trim() || "",
-      createdBy: body.createdBy?.trim() || "",
-      status: body.status === "received" ? "received" : "pending",
+      discount,
+      discountType,
+      discountValue,
+      shippingCost: Math.max(0, round2(body.shippingCost)),
+      note: String(body.note || "").trim(),
+      createdBy,
+      status: body.status === "pending" ? "pending" : "received",
     });
 
-    const paidNow = Math.max(0, Number(body.paidAmount) || 0);
+    // Several payments may be made at once (part cash, part bKash). An
+    // older form sends a single paidAmount instead.
+    const rawPayments = Array.isArray(body.payments)
+      ? body.payments
+      : [{ amount: body.paidAmount, method: body.paymentMethod, reference: body.paymentReference }];
 
-    if (paidNow > 0) {
+    for (const raw of rawPayments) {
+      const amount = round2(raw?.amount);
+
+      if (amount < 0) return fail("A payment amount is invalid");
+      if (!amount) continue;
+
       purchase.payments.push({
-        amount: paidNow,
-        method: body.paymentMethod || "cash",
-        reference: body.paymentReference?.trim() || "",
+        amount,
+        method: METHODS.includes(raw.method) ? raw.method : "cash",
+        reference: String(raw.reference || "").trim(),
         note: "Paid while creating the purchase",
-        createdBy: purchase.createdBy,
+        paidAt: purchase.purchaseDate,
+        createdBy,
       });
     }
 
     purchase.recalculateTotals();
 
-    if (purchase.paidAmount > purchase.grandTotal) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Paid amount cannot be more than the total (${purchase.grandTotal})`,
-        },
-        { status: 400 },
-      );
+    if (purchase.paidAmount - purchase.grandTotal > 0.009) {
+      return fail(`Paid amount cannot be more than the total (${purchase.grandTotal})`);
     }
 
-    if (purchase.status === "received") {
-      purchase.receivedAt = new Date();
-    }
+    if (purchase.status === "received") purchase.receivedAt = new Date();
 
     await purchase.save();
 
@@ -172,7 +202,7 @@ export async function POST(req) {
     // receive route does.
     if (purchase.status === "received") {
       try {
-        await applyPurchaseToStock(purchase, { createdBy: purchase.createdBy });
+        await applyPurchaseToStock(purchase, { createdBy });
       } catch (stockError) {
         purchase.status = "pending";
         purchase.receivedAt = null;
@@ -180,16 +210,22 @@ export async function POST(req) {
 
         throw stockError;
       }
+
+      await applyNewRates(purchase.items);
+    }
+
+    if (order) {
+      order.status = "received";
+      order.purchaseId = purchase._id;
+      order.purchaseNumber = purchase.purchaseNumber;
+      await order.save();
     }
 
     return NextResponse.json(
-      { success: true, data: purchase },
+      { success: true, message: "Purchase saved", data: purchase },
       { status: 201 },
     );
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

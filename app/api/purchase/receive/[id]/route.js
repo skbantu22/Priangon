@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
-import { applyPurchaseToStock } from "@/lib/purchaseService";
+import { actorFullName, requirePermission } from "@/lib/apiAuth";
+import { applyNewRates, applyPurchaseToStock } from "@/lib/purchaseService";
 
 export async function POST(req, { params }) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
+    const auth = await requirePermission("purchase.receive");
     if (auth.response) return auth.response;
 
     await connectDB();
 
     const { id } = await params; // ✅ Next.js 15/16
-
-    const body = await req.json().catch(() => ({}));
 
     const purchase = await PurchaseModel.findOne({ _id: id, deletedAt: null });
 
@@ -44,9 +42,7 @@ export async function POST(req, { params }) {
     await purchase.save();
 
     try {
-      await applyPurchaseToStock(purchase, {
-        createdBy: body.createdBy?.trim() || purchase.createdBy,
-      });
+      await applyPurchaseToStock(purchase, { createdBy: await actorFullName(auth) });
     } catch (stockError) {
       purchase.status = "pending";
       purchase.receivedAt = null;
@@ -54,6 +50,9 @@ export async function POST(req, { params }) {
 
       throw stockError;
     }
+
+    // rates a purchase order asked for reach the counter with the goods
+    await applyNewRates(purchase.items);
 
     return NextResponse.json({
       success: true,

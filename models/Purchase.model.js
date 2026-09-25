@@ -20,9 +20,26 @@ const purchaseItemSchema = new mongoose.Schema(
     variantLabel: { type: String, trim: true, default: "" },
     sku: { type: String, trim: true, default: "" },
 
+    // quantity is what is paid for; extraQty comes free with it. Both go
+    // into stock, so the real cost of a unit is total / (quantity + extraQty)
     quantity: { type: Number, required: true, min: 1 },
+    extraQty: { type: Number, default: 0, min: 0 },
     unitPrice: { type: Number, required: true, min: 0 },
+    discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },
+    expireDate: { type: Date, default: null },
+
+    // units already sent back to the supplier (purchase returns)
+    returnedQty: { type: Number, default: 0, min: 0 },
+
+    // Sale rates a purchase order asked for. They go onto the product when
+    // the goods are taken into stock, not before. 0 = leave that rate alone.
+    newRates: {
+      sellingPrice: { type: Number, default: 0, min: 0 },
+      dealerPrice: { type: Number, default: 0, min: 0 },
+      subDealerPrice: { type: Number, default: 0, min: 0 },
+      wholesalerPrice: { type: Number, default: 0, min: 0 },
+    },
 
     // Handset IMEIs scanned in with this row
     imeis: { type: [String], default: [] },
@@ -36,7 +53,7 @@ const purchasePaymentSchema = new mongoose.Schema(
 
     method: {
       type: String,
-      enum: ["cash", "bkash", "nagad", "bank", "cheque", "other"],
+      enum: ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"],
       default: "cash",
     },
 
@@ -44,6 +61,14 @@ const purchasePaymentSchema = new mongoose.Schema(
     note: { type: String, trim: true, default: "" },
     paidAt: { type: Date, default: Date.now },
     createdBy: { type: String, trim: true, default: "" },
+
+    // Set when the money came from a supplier payment spread over several
+    // purchases, so deleting that payment takes this row back out
+    supplierPaymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SupplierPayment",
+      default: null,
+    },
   },
   { _id: true },
 );
@@ -72,6 +97,17 @@ const purchaseSchema = new mongoose.Schema(
 
     purchaseDate: { type: Date, default: Date.now, index: true },
 
+    // when the supplier expects to be paid
+    dueDate: { type: Date, default: null },
+
+    // the purchase order this purchase received, if any
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "PurchaseOrder", default: null },
+
+    attachment: {
+      url: { type: String, default: "" },
+      publicId: { type: String, default: "" },
+    },
+
     items: {
       type: [purchaseItemSchema],
       validate: {
@@ -81,13 +117,20 @@ const purchaseSchema = new mongoose.Schema(
     },
 
     subtotal: { type: Number, default: 0, min: 0 },
+    // invoice discount in taka; discountType / discountValue is how it was typed
     discount: { type: Number, default: 0, min: 0 },
+    discountType: { type: String, enum: ["amount", "percent"], default: "amount" },
+    discountValue: { type: Number, default: 0, min: 0 },
     shippingCost: { type: Number, default: 0, min: 0 },
     grandTotal: { type: Number, default: 0, min: 0 },
 
     payments: { type: [purchasePaymentSchema], default: [] },
 
     paidAmount: { type: Number, default: 0, min: 0 },
+
+    // Due the supplier agreed to let go, through a due dismiss
+    dismissAmount: { type: Number, default: 0, min: 0 },
+
     dueAmount: { type: Number, default: 0 },
 
     paymentStatus: {
@@ -135,9 +178,12 @@ purchaseSchema.methods.recalculateTotals = function () {
     0,
   );
 
-  this.dueAmount = this.grandTotal - this.paidAmount;
+  this.dueAmount =
+    this.grandTotal - this.paidAmount - Number(this.dismissAmount || 0);
 
-  if (this.paidAmount <= 0) {
+  if (this.dueAmount <= 0) {
+    this.paymentStatus = "paid";
+  } else if (this.paidAmount <= 0 && !Number(this.dismissAmount)) {
     this.paymentStatus = "unpaid";
   } else if (this.dueAmount > 0) {
     this.paymentStatus = "partial";

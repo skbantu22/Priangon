@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import ExpenseCategoryModel from "@/models/ExpenseCategory.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
+import { requirePermission } from "@/lib/apiAuth";
 
 export async function GET(req) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
+    const auth = await requirePermission("expenses.view");
     if (auth.response) return auth.response;
 
     await connectDB();

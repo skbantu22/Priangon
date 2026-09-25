@@ -21,11 +21,8 @@ const expenseSchema = new mongoose.Schema(
     // after the category is renamed or deleted
     categoryName: { type: String, trim: true, default: "" },
 
-    title: {
-      type: String,
-      required: [true, "What the money was spent on is required"],
-      trim: true,
-    },
+    // what the money was spent on; the expense type is enough on its own
+    title: { type: String, trim: true, default: "" },
 
     amount: {
       type: Number,
@@ -37,7 +34,7 @@ const expenseSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cash", "bkash", "nagad", "bank", "cheque", "other"],
+      enum: ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"],
       default: "cash",
     },
 

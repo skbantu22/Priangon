@@ -40,6 +40,25 @@ const supplierSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Money already sitting with the supplier on the day they were added
+    initialAdvance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // The day the opening due and advance were counted
+    openingDate: {
+      type: Date,
+      default: null,
+    },
+
+    // The supplier's sales rep and delivery rep, who the shop actually calls
+    srName: { type: String, trim: true, default: "" },
+    srMobile: { type: String, trim: true, default: "" },
+    dsrName: { type: String, trim: true, default: "" },
+    dsrMobile: { type: String, trim: true, default: "" },
+
     note: {
       type: String,
       trim: true,

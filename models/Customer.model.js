@@ -7,11 +7,15 @@ const CustomerSchema = new mongoose.Schema(
       required: true,
     },
 
+    businessName: { type: String, trim: true, default: "" },
+
     phone: {
       type: String,
       unique: true,
       index: true,
     },
+
+    email: { type: String, trim: true, lowercase: true, default: "" },
 
     address: {
       type: String,
@@ -25,6 +29,15 @@ const CustomerSchema = new mongoose.Schema(
       default: "retail",
       index: true,
     },
+
+    // what they owed / had paid ahead before their first sale in this app
+    openingDue: { type: Number, default: 0, min: 0 },
+    initialAdvance: { type: Number, default: 0, min: 0 },
+    openingDate: { type: Date, default: null },
+
+    note: { type: String, trim: true, default: "" },
+
+    isActive: { type: Boolean, default: true, index: true },
 
     totalOrders: {
       type: Number,

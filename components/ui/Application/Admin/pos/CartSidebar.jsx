@@ -456,7 +456,7 @@ export default function CartSidebar({
     <aside
       className={`h-full min-h-0 flex-col overflow-y-auto bg-white dark:bg-card lg:static lg:z-auto lg:flex lg:border-l lg:border-gray-200 lg:dark:border-white/10 ${
         mobileOpen ? "fixed inset-0 z-50 flex" : "hidden"
-      } ${expanded ? "lg:flex-1" : "w-full shrink-0 lg:w-[410px] 2xl:w-[440px]"}`}
+      } ${expanded ? "lg:flex-1" : "w-full shrink-0 lg:w-[480px] xl:w-[560px] 2xl:w-[640px]"}`}
     >
       {/* ================= HEADER ================= */}
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
@@ -542,10 +542,10 @@ export default function CartSidebar({
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-[12px] font-medium leading-tight text-gray-900 dark:text-gray-100">
+                      <p className="break-words text-[13px] font-semibold leading-snug text-gray-900 dark:text-gray-100" title={item.name}>
                         {item.name}
                       </p>
-                      <p className="flex items-center gap-1 truncate text-[10px] text-gray-500">
+                      <p className="flex items-center gap-1 truncate text-[11px] text-gray-500">
                         {[item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" · ")}
                         {warrantyLabel(item) && (
                           <ShieldCheck

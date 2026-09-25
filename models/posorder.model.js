@@ -192,6 +192,13 @@ const POSOrderSchema = new mongoose.Schema(
       index: true,
     },
 
+    // part of the due the shop let go (a customer "Due Dismiss")
+    dismissAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     paymentDetails: {
       transactionId: String,
       cardDigits: String,

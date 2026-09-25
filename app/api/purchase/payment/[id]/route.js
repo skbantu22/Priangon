@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
+import { actorFullName, requirePermission } from "@/lib/apiAuth";
 
 export async function POST(req, { params }) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
+    const auth = await requirePermission("purchase.payment");
     if (auth.response) return auth.response;
 
     await connectDB();
@@ -51,11 +51,13 @@ export async function POST(req, { params }) {
 
     purchase.payments.push({
       amount,
-      method: body.method || "cash",
+      method: ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"].includes(body.method)
+        ? body.method
+        : "cash",
       reference: body.reference?.trim() || "",
       note: body.note?.trim() || "",
       paidAt: body.paidAt ? new Date(body.paidAt) : new Date(),
-      createdBy: body.createdBy?.trim() || "",
+      createdBy: await actorFullName(auth),
     });
 
     purchase.recalculateTotals();

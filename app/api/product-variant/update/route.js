@@ -3,6 +3,12 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
+const NUMBER_FIELDS = ["mrp", "sellingPrice", "purchasePrice", "discountPercentage"];
+const TEXT_FIELDS = ["sku", "barcode", "color", "size"];
+
+// Update variants. Only the fields sent are changed, so a form that edits
+// prices never wipes a variant's photos. Stock is not set here: it moves
+// through purchases, transfers and adjustments.
 export async function PUT(request) {
   try {
     const auth = await requireRoles(STAFF_ROLES);
@@ -19,82 +25,39 @@ export async function PUT(request) {
     const updatedVariants = [];
 
     for (const variant of variants) {
-      const {
-        _id,
-        id,
-        product,
-        sku,
-        color,
-        size,
-        mrp,
-        sellingPrice,
-        discountPercentage,
-        stock,
-        media,
-        isActive,
-        barcode,
-      } = variant;
-
-      const variantId = _id || id;
-
+      const variantId = variant._id || variant.id;
       if (!variantId) continue;
 
-      // Duplicate SKU check
-      if (sku) {
-        const existingSku = await ProductVariantModel.findOne({
-          sku,
-          _id: { $ne: variantId },
-        });
+      const current = await ProductVariantModel.findById(variantId).select("product color size");
+      if (!current) continue;
 
-        if (existingSku) {
-          return response(false, 400, `SKU already exists (${sku})`);
-        }
+      const update = {};
+      for (const f of TEXT_FIELDS) if (variant[f] !== undefined) update[f] = String(variant[f] || "").trim();
+      for (const f of NUMBER_FIELDS) if (variant[f] !== undefined) update[f] = Math.max(0, Number(variant[f]) || 0);
+      if (variant.media !== undefined) update.media = variant.media || [];
+      if (variant.isActive !== undefined) update.isActive = Boolean(variant.isActive);
+      if (update.barcode === "") delete update.barcode;
+
+      if (update.sku) {
+        const taken = await ProductVariantModel.exists({ sku: update.sku, _id: { $ne: variantId } });
+        if (taken) return response(false, 400, `SKU already exists (${update.sku})`);
       }
 
-      // Duplicate Color + Size check
-      const existingVariant = await ProductVariantModel.findOne({
-        product,
-        color,
-        size,
-        _id: { $ne: variantId },
-      });
-
-      if (existingVariant) {
-        return response(false, 400, `${color} + ${size} already exists`);
+      if (update.barcode) {
+        const taken = await ProductVariantModel.exists({ barcode: update.barcode, _id: { $ne: variantId } });
+        if (taken) return response(false, 400, `Barcode already used (${update.barcode})`);
       }
 
-      const updated = await ProductVariantModel.findByIdAndUpdate(
-        variantId,
-        {
-          product,
-          sku,
-          barcode,
-          color,
-          size,
-          mrp: Number(mrp) || 0,
-          sellingPrice: Number(sellingPrice) || 0,
-          discountPercentage: Number(discountPercentage) || 0,
-          stock: Number(stock) || 0,
-          media: media || [],
-          isActive: Boolean(isActive),
-        },
-        {
-          new: true,
-          runValidators: true,
-        },
-      );
+      const color = update.color ?? current.color;
+      const size = update.size ?? current.size;
+      const twin = await ProductVariantModel.exists({ product: current.product, color, size, _id: { $ne: variantId } });
+      if (twin) return response(false, 400, `${color} + ${size} already exists`);
 
-      if (updated) {
-        updatedVariants.push(updated);
-      }
+      const updated = await ProductVariantModel.findByIdAndUpdate(variantId, { $set: update }, { new: true, runValidators: true });
+      if (updated) updatedVariants.push(updated);
     }
 
-    return response(
-      true,
-      200,
-      "Variants updated successfully",
-      updatedVariants,
-    );
+    return response(true, 200, "Variants updated successfully", updatedVariants);
   } catch (error) {
     console.error(error);
     return catchError(error, "Update failed");

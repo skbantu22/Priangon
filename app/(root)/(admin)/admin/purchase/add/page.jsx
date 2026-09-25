@@ -1,673 +1,546 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
-import { FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
+import { ClipboardList, List, Plus, Trash2, X } from "lucide-react";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
+import { ADMIN_PURCHASE_SHOW, ADMIN_PURCHASE_VIEW } from "@/Route/Adminpannelroute";
+import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass, totalRowClass } from "@/components/ui/Application/Admin/listKit";
+import { PAYMENT_METHODS, money } from "@/components/ui/Application/Admin/supplier/supplierKit";
 import {
-  ADMIN_DASHBOARD,
-  ADMIN_PURCHASE_ADD,
-  ADMIN_PURCHASE_SHOW,
-} from "@/Route/Adminpannelroute";
-
+  AttachmentInput,
+  Field,
+  ProductSearch,
+  RATES,
+  SupplierPicker,
+  cell,
+  num,
+  today,
+  useSuppliers,
+} from "@/components/ui/Application/Admin/purchase/purchaseKit";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-const breadcrumbData = [
-  { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_PURCHASE_SHOW, label: "Purchase" },
-  { href: ADMIN_PURCHASE_ADD, label: "New Purchase" },
-];
+const round2 = (value) => Math.round(num(value) * 100) / 100;
 
-const selectClass =
-  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+// what a row costs after its discount, and per unit once free units share it
+const lineTotal = (line) => Math.max(0, num(line.quantity) * num(line.unitPrice) - num(line.discount));
+const unitCost = (line) => {
+  const units = num(line.quantity) + num(line.extraQty);
+  return units ? lineTotal(line) / units : 0;
+};
 
-// toISOString() reads the UTC date, which in Bangladesh (UTC+6) is still
-// yesterday until 6am — a date picker that defaults to yesterday hides the
-// rows just entered. These read the date as the browser sees it.
-const isoDay = (date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+const newPayment = () => ({ method: "cash", amount: "", reference: "" });
 
-const today = () => isoDay(new Date());
+export default function AddPurchasePage() {
+  return (
+    <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[8px] bg-white dark:bg-card" />}>
+      <AddPurchase />
+    </Suspense>
+  );
+}
 
-const AddPurchasePage = () => {
+/**
+ * "Purchase Product", laid out like the 360 purchase screen: supplier and
+ * header fields, product lines with extra (free) quantity, line discount
+ * and expire date, then totals and split payments.
+ *
+ * Every line also shows what each buyer type (buyer, dealer, sub dealer,
+ * wholesaler) pays for it and the margin left at this cost, so a price rise
+ * that eats the dealer margin is seen before the goods are taken in.
+ *
+ * Opened with ?po=<id> it receives that purchase order: supplier and lines
+ * are copied in, and the order's new sale rates go onto the products when
+ * the goods are taken into stock.
+ */
+function AddPurchase() {
   const router = useRouter();
+  const params = useSearchParams();
+  const [suppliers, reloadSuppliers] = useSuppliers();
 
-  const [suppliers, setSuppliers] = useState([]);
-  const [supplierId, setSupplierId] = useState("");
-  const [referenceNo, setReferenceNo] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState(today);
-
+  const [head, setHead] = useState({
+    supplierId: "",
+    purchaseNumber: "",
+    referenceNo: "",
+    purchaseDate: today(),
+    dueDate: "",
+    status: "received",
+    note: "",
+  });
+  const [numberEdited, setNumberEdited] = useState(false);
+  const [attachment, setAttachment] = useState(null);
+  const [order, setOrder] = useState(null);
   const [items, setItems] = useState([]);
-
-  const [discount, setDiscount] = useState(0);
-  const [shippingCost, setShippingCost] = useState(0);
-  const [paidAmount, setPaidAmount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [note, setNote] = useState("");
-
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
+  const [discount, setDiscount] = useState({ type: "amount", value: "" });
+  const [shippingCost, setShippingCost] = useState("");
+  const [payments, setPayments] = useState([newPayment()]);
 
   const [imeiRow, setImeiRow] = useState(null);
   const [imeiText, setImeiText] = useState("");
-
   const [saving, setSaving] = useState(false);
 
-  const searchTimer = useRef(null);
-
   useEffect(() => {
-    const loadSuppliers = async () => {
-      try {
-        const { data } = await axios.get("/api/supplier?active=true");
-
-        if (data.success) setSuppliers(data.data);
-      } catch {
-        showToast("error", "Could not load suppliers");
-      }
-    };
-
-    loadSuppliers();
+    axios
+      .get("/api/purchase/next-number?kind=purchase")
+      .then(({ data }) => data.success && setHead((h) => ({ ...h, purchaseNumber: h.purchaseNumber || data.number })))
+      .catch(() => {});
   }, []);
 
-  // Debounced so a scanner firing character by character hits the API once
+  // "Receive" on a purchase order opens this screen with ?po=<id>
   useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const poId = params.get("po");
+    if (!poId) return;
 
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    axios
+      .get(`/api/purchase-orders/${poId}`)
+      .then(({ data }) => {
+        if (!data.success) return showToast("error", data.message || "Purchase order not found");
+        const po = data.data;
+        if (po.status !== "pending") return showToast("error", `${po.orderNumber} is already ${po.status}`);
 
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true);
-
-      try {
-        const { data } = await axios.get(
-          `/api/purchase/variant-search?q=${encodeURIComponent(query.trim())}`,
+        setOrder(po);
+        setHead((h) => ({ ...h, supplierId: String(po.supplierId?._id || po.supplierId), referenceNo: po.orderNumber }));
+        setItems(
+          po.items.map((item) => ({
+            variantId: String(item.variantId),
+            productName: item.productName,
+            variantLabel: item.variantLabel,
+            barcode: item.barcode,
+            stock: item.stockAtOrder,
+            lastCost: item.prevPurchasePrice,
+            // the rates the order will set, where it sets one
+            rates: Object.fromEntries(
+              RATES.map(([f]) => [f, num(item[f]) || num(item[`prev${f[0].toUpperCase()}${f.slice(1)}`])]),
+            ),
+            newRate: Object.fromEntries(RATES.map(([f]) => [f, num(item[f]) > 0])),
+            quantity: String(item.quantity),
+            extraQty: item.extraQty ? String(item.extraQty) : "",
+            unitPrice: String(item.purchasePrice),
+            discount: item.discount ? String(item.discount) : "",
+            expireDate: "",
+            imeis: [],
+          })),
         );
+      })
+      .catch((error) => showToast("error", error.response?.data?.message || "Could not load the purchase order"));
+  }, [params]);
 
-        if (data.success) setResults(data.data);
-      } catch {
-        showToast("error", "Product search failed");
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(searchTimer.current);
-  }, [query]);
-
-  const addItem = useCallback((result) => {
+  const addItem = (hit) =>
     setItems((current) => {
-      const existingIndex = current.findIndex(
-        (item) => item.variantId === result.variantId,
-      );
-
-      if (existingIndex >= 0) {
-        const next = [...current];
-        next[existingIndex] = {
-          ...next[existingIndex],
-          quantity: Number(next[existingIndex].quantity) + 1,
-        };
-        return next;
-      }
-
+      const at = current.findIndex((item) => item.variantId === hit.variantId);
+      if (at >= 0) return current.map((item, i) => (i === at ? { ...item, quantity: String(num(item.quantity) + 1) } : item));
       return [
         ...current,
         {
-          variantId: result.variantId,
-          productId: result.productId,
-          productName: result.productName,
-          variantLabel: result.variantLabel,
-          sku: result.sku,
-          currentStock: result.stock,
-          quantity: 1,
-          unitPrice: 0,
+          ...hit,
+          quantity: "1",
+          extraQty: "",
+          unitPrice: hit.lastCost ? String(hit.lastCost) : "",
+          discount: "",
+          expireDate: "",
           imeis: [],
         },
       ];
     });
 
-    setQuery("");
-    setResults([]);
-  }, []);
+  const updateItem = (index, patch) => setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  const removeItem = (index) => setItems((current) => current.filter((_, i) => i !== index));
 
-  const updateItem = (index, patch) => {
-    setItems((current) =>
-      current.map((item, i) => (i === index ? { ...item, ...patch } : item)),
-    );
-  };
-
-  const removeItem = (index) => {
-    setItems((current) => current.filter((_, i) => i !== index));
-  };
-
-  const openImeiDialog = (index) => {
+  const openImei = (index) => {
     setImeiRow(index);
     setImeiText(items[index].imeis.join("\n"));
   };
 
   const saveImeis = () => {
-    const imeis = imeiText
-      .split(/[\n,]/)
-      .map((imei) => imei.trim())
-      .filter(Boolean);
-
+    const imeis = [...new Set(imeiText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean))];
     const row = items[imeiRow];
-
-    if (imeis.length > Number(row.quantity)) {
-      showToast(
-        "error",
-        `${imeis.length} IMEI for only ${row.quantity} unit. Raise the quantity first.`,
-      );
-      return;
-    }
-
+    const units = num(row.quantity) + num(row.extraQty);
+    if (imeis.length > units) return showToast("error", `${imeis.length} IMEI for only ${units} unit(s). Raise the quantity first.`);
     updateItem(imeiRow, { imeis });
     setImeiRow(null);
   };
 
-  const subtotal = useMemo(
-    () =>
-      items.reduce(
-        (sum, item) =>
-          sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-        0,
-      ),
-    [items],
-  );
+  const totals = useMemo(() => {
+    const subtotal = round2(items.reduce((sum, item) => sum + lineTotal(item), 0));
+    const itemCount = items.reduce((sum, item) => sum + num(item.quantity) + num(item.extraQty), 0);
+    const discountAmount = Math.min(
+      subtotal,
+      round2(discount.type === "percent" ? (subtotal * num(discount.value)) / 100 : num(discount.value)),
+    );
+    const grand = round2(subtotal - discountAmount + num(shippingCost));
+    const paid = round2(payments.reduce((sum, p) => sum + num(p.amount), 0));
+    return { subtotal, itemCount, discountAmount, grand, paid, due: round2(grand - paid) };
+  }, [items, discount, shippingCost, payments]);
 
-  const grandTotal =
-    subtotal - (Number(discount) || 0) + (Number(shippingCost) || 0);
+  const lossLines = items.filter((item) => {
+    const cost = unitCost(item);
+    return cost > 0 && RATES.some(([f]) => item.rates?.[f] > 0 && item.rates[f] <= cost);
+  });
 
-  const due = grandTotal - (Number(paidAmount) || 0);
+  const setPayment = (index, patch) => setPayments((list) => list.map((p, i) => (i === index ? { ...p, ...patch } : p)));
+  const payFull = () => setPayments((list) => [{ ...list[0], amount: String(totals.grand) }, ...list.slice(1).map((p) => ({ ...p, amount: "" }))]);
 
-  const savePurchase = async (status) => {
-    if (!supplierId) {
-      showToast("error", "Select a supplier");
-      return;
-    }
+  const save = async (event) => {
+    event.preventDefault();
 
-    if (items.length === 0) {
-      showToast("error", "Add at least one item");
-      return;
-    }
-
-    const zeroPriced = items.find((item) => Number(item.unitPrice) <= 0);
-
-    if (zeroPriced) {
-      showToast(
-        "error",
-        `Enter a purchase price for "${zeroPriced.productName}"`,
-      );
-      return;
-    }
-
-    if (due < 0) {
-      showToast("error", "Paid amount is more than the total");
-      return;
-    }
+    if (!head.supplierId) return showToast("error", "Select a supplier");
+    if (!items.length) return showToast("error", "Add at least one product");
+    const bad = items.find((item) => !(num(item.unitPrice) > 0) || !(num(item.quantity) >= 1));
+    if (bad) return showToast("error", `Enter quantity and purchase price for "${bad.productName}"`);
+    const overDiscount = items.find((item) => num(item.discount) > num(item.quantity) * num(item.unitPrice));
+    if (overDiscount) return showToast("error", `Discount on "${overDiscount.productName}" is more than its subtotal`);
+    if (head.dueDate && head.dueDate < head.purchaseDate) return showToast("error", "Due date cannot be before the purchase date");
+    if (totals.due < 0) return showToast("error", "Paid amount is more than the grand total");
+    if (lossLines.length && !confirm(`${lossLines.length} product(s) will sell at or below this cost to some buyer types. Save anyway?`)) return;
 
     setSaving(true);
-
     try {
       const { data } = await axios.post("/api/purchase/create", {
-        supplierId,
-        referenceNo,
-        purchaseDate,
+        ...head,
+        purchaseNumber: numberEdited ? head.purchaseNumber : "",
+        purchaseOrderId: order?._id || null,
+        attachment,
         items: items.map((item) => ({
           variantId: item.variantId,
-          quantity: Number(item.quantity),
-          unitPrice: Number(item.unitPrice),
+          quantity: num(item.quantity),
+          extraQty: num(item.extraQty),
+          unitPrice: num(item.unitPrice),
+          discount: num(item.discount),
+          expireDate: item.expireDate || null,
           imeis: item.imeis,
         })),
-        discount: Number(discount) || 0,
-        shippingCost: Number(shippingCost) || 0,
-        paidAmount: Number(paidAmount) || 0,
-        paymentMethod,
-        paymentReference,
-        note,
-        status,
+        discountType: discount.type,
+        discountValue: num(discount.value),
+        shippingCost: num(shippingCost),
+        payments: payments.filter((p) => num(p.amount) > 0).map((p) => ({ ...p, amount: num(p.amount) })),
       });
 
-      if (!data.success) {
-        showToast("error", data.message || "Could not save purchase");
-        return;
-      }
+      if (!data.success) return showToast("error", data.message || "Could not save purchase");
 
       showToast(
         "success",
-        status === "received"
-          ? `${data.data.purchaseNumber} saved and stock updated`
-          : `${data.data.purchaseNumber} saved as pending`,
+        head.status === "received" ? `${data.data.purchaseNumber} saved and stock updated` : `${data.data.purchaseNumber} saved as pending`,
       );
-
-      router.push(ADMIN_PURCHASE_SHOW);
+      router.push(ADMIN_PURCHASE_VIEW(data.data._id));
     } catch (error) {
-      showToast(
-        "error",
-        error.response?.data?.message || "Could not save purchase",
-      );
+      showToast("error", error.response?.data?.message || "Could not save purchase");
     } finally {
       setSaving(false);
     }
   };
 
+  const setH = (key) => (e) => setHead({ ...head, [key]: e.target.value });
+
   return (
-    <div className="space-y-4">
-      <BreadCrumb breadcrumbData={breadcrumbData} />
-
-      <Card className="py-0 rounded shadow-sm">
-        <CardHeader className="pt-3 px-3 border-b">
-          <h4 className="text-xl font-semibold">New Purchase</h4>
-        </CardHeader>
-
-        <CardContent className="px-3 py-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="purchase-supplier">Supplier</Label>
-            <select
-              id="purchase-supplier"
-              className={selectClass}
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-            >
-              <option value="">Select a supplier</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier._id} value={supplier._id}>
-                  {supplier.name}
-                  {supplier.companyName ? ` — ${supplier.companyName}` : ""}
-                </option>
-              ))}
+    <form onSubmit={save} noValidate className="space-y-4">
+      <ListCard
+        title="Purchase Product"
+        actions={
+          <Link href={ADMIN_PURCHASE_SHOW} className={btn.primary}>
+            <List size={14} /> Purchase List
+          </Link>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Supplier Name" required htmlFor="pur-supplier" className="md:col-span-2">
+            <SupplierPicker
+              id="pur-supplier"
+              value={head.supplierId}
+              onChange={(supplierId) => setHead((h) => ({ ...h, supplierId }))}
+              suppliers={suppliers}
+              reload={reloadSuppliers}
+            />
+          </Field>
+          <Field label="Invoice No" htmlFor="pur-number">
+            <input
+              id="pur-number"
+              value={head.purchaseNumber}
+              maxLength={40}
+              onChange={(e) => {
+                setNumberEdited(true);
+                setHead({ ...head, purchaseNumber: e.target.value });
+              }}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Purchase Date" required htmlFor="pur-date">
+            <input id="pur-date" type="date" value={head.purchaseDate} onChange={setH("purchaseDate")} className={inputClass} />
+          </Field>
+          <Field label="Due Date" htmlFor="pur-due">
+            <input id="pur-due" type="date" value={head.dueDate} min={head.purchaseDate} onChange={setH("dueDate")} className={inputClass} />
+          </Field>
+          <Field label="Reference" htmlFor="pur-ref">
+            <input id="pur-ref" value={head.referenceNo} onChange={setH("referenceNo")} placeholder="Supplier's invoice / challan no" maxLength={255} className={inputClass} />
+          </Field>
+          <Field label="Stock" htmlFor="pur-status">
+            <select id="pur-status" value={head.status} onChange={setH("status")} className={inputClass}>
+              <option value="received">Received now (stock in)</option>
+              <option value="pending">Pending (goods not in yet)</option>
             </select>
-          </div>
+          </Field>
+          <Field label="Attachment" htmlFor="pur-attach">
+            <AttachmentInput id="pur-attach" value={attachment} onChange={setAttachment} />
+          </Field>
+          <Field label="Note" htmlFor="pur-note" className="md:col-span-2 xl:col-span-4">
+            <input id="pur-note" value={head.note} onChange={setH("note")} placeholder="Note" maxLength={5000} className={inputClass} />
+          </Field>
+        </div>
+      </ListCard>
 
-          <div className="space-y-2">
-            <Label htmlFor="purchase-ref">Supplier Challan / Invoice No</Label>
-            <Input
-              id="purchase-ref"
-              value={referenceNo}
-              onChange={(e) => setReferenceNo(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
+      <ListCard title="Products">
+        {order && (
+          <p className="m-0 mb-3 flex items-center gap-2 rounded-[6px] bg-[#eaf4fd] px-3 py-[9px] text-[13px] text-[#1766a8]">
+            <ClipboardList size={16} /> Receiving purchase order <b>{order.orderNumber}</b>. Adjust quantities if the delivery differs. Its new sale
+            rates (marked ●) go onto the products when the goods are taken into stock.
+          </p>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="purchase-date">Purchase Date</Label>
-            <Input
-              id="purchase-date"
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <ProductSearch onPick={addItem} />
 
-      <Card className="py-0 rounded shadow-sm">
-        <CardHeader className="pt-3 px-3 border-b">
-          <h4 className="text-lg font-semibold">Items</h4>
-        </CardHeader>
-
-        <CardContent className="px-3 py-4 space-y-4">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Scan barcode or type a product name"
-              className="pl-9"
-            />
-
-            {(results.length > 0 || searching) && (
-              <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border bg-popover shadow-md">
-                {searching && results.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">
-                    Searching...
-                  </p>
-                ) : (
-                  results.map((result) => (
-                    <button
-                      key={result.variantId}
-                      type="button"
-                      onClick={() => addItem(result)}
-                      className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-accent"
-                    >
-                      <span>
-                        <span className="font-medium">
-                          {result.productName}
-                        </span>
-                        {result.variantLabel && (
-                          <span className="text-muted-foreground">
-                            {" "}
-                            — {result.variantLabel}
-                          </span>
-                        )}
-                        <span className="block text-xs text-muted-foreground">
-                          SKU {result.sku || "—"}
-                        </span>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[1560px] border-collapse text-left text-sm">
+            <thead>
+              <tr className={theadClass}>
+                {["SL No", "Product Name", "Received Qty", "Extra Qty", "Qty", "Actual Purchase Price", "Purchase Price", "Discount", "Subtotal", "Expire Date"].map((h) => (
+                  <th key={h} rowSpan={2} className={thClass}>
+                    {h}
+                  </th>
+                ))}
+                <th colSpan={4} className={`${thClass} text-center`}>
+                  Sale rate · margin at this cost
+                </th>
+                <th rowSpan={2} className={thClass}>
+                  IMEI
+                </th>
+                <th rowSpan={2} className={thClass} aria-label="Remove" />
+              </tr>
+              <tr className={theadClass}>
+                {RATES.map(([f, label]) => (
+                  <th key={f} className={thClass}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {!items.length && (
+                <tr>
+                  <td colSpan={16} className={`${tdClass} py-10 text-center text-muted-foreground`}>
+                    Search above to add products to this purchase.
+                  </td>
+                </tr>
+              )}
+              {items.map((item, index) => {
+                const cost = unitCost(item);
+                const change = item.lastCost && cost ? round2(cost - item.lastCost) : 0;
+                const units = num(item.quantity) + num(item.extraQty);
+                return (
+                  <tr key={item.variantId}>
+                    <td className={tdClass}>{index + 1}</td>
+                    <td className={`${tdClass} min-w-[220px]`}>
+                      <b className="block font-medium">{item.productName}</b>
+                      <span className="text-[12px] text-muted-foreground">
+                        {[item.variantLabel, item.barcode].filter(Boolean).join(" · ")} · Stock {item.stock}
                       </span>
+                    </td>
+                    <td className={tdClass}>
+                      <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} className={`${cell} w-[80px]`} aria-label={`Received quantity for ${item.productName}`} />
+                    </td>
+                    <td className={tdClass}>
+                      <input type="number" min="0" value={item.extraQty} placeholder="0" onChange={(e) => updateItem(index, { extraQty: e.target.value })} className={`${cell} w-[80px]`} aria-label={`Extra quantity for ${item.productName}`} />
+                    </td>
+                    <td className={`${tdClass} font-semibold`}>{units}</td>
+                    <td className={tdClass}>
+                      <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, { unitPrice: e.target.value })} className={`${cell} w-[110px]`} aria-label={`Price for ${item.productName}`} />
+                    </td>
+                    <td className={`${tdClass} whitespace-nowrap`}>
+                      {money(round2(cost))}
+                      {change !== 0 && (
+                        <span className={`block text-[11px] ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          {change > 0 ? "▲" : "▼"} {money(Math.abs(change))} vs last
+                        </span>
+                      )}
+                    </td>
+                    <td className={tdClass}>
+                      <input type="number" min="0" step="0.01" value={item.discount} placeholder="0" onChange={(e) => updateItem(index, { discount: e.target.value })} className={`${cell} w-[90px]`} aria-label={`Discount for ${item.productName}`} />
+                    </td>
+                    <td className={`${tdClass} font-semibold`}>{money(round2(lineTotal(item)))}</td>
+                    <td className={tdClass}>
+                      <input type="date" value={item.expireDate} onChange={(e) => updateItem(index, { expireDate: e.target.value })} className={`${cell} w-[140px]`} aria-label={`Expire date for ${item.productName}`} />
+                    </td>
+                    {RATES.map(([f]) => {
+                      const rate = item.rates?.[f];
+                      if (!rate) return <td key={f} className={`${tdClass} text-[12px] text-amber-600`}>Not set</td>;
+                      const pct = cost ? Math.round(((rate - cost) / cost) * 100) : null;
+                      const loss = pct !== null && pct <= 0;
+                      return (
+                        <td key={f} className={`${tdClass} whitespace-nowrap ${loss ? "font-semibold text-red-600" : ""}`}>
+                          {item.newRate?.[f] && <span className="mr-0.5 text-[#188ae2]" title="New rate from the purchase order">●</span>}
+                          {money(rate)}
+                          {pct !== null && <span className={`ml-1 text-[11px] ${loss ? "" : "text-emerald-600"}`}>{pct > 0 ? "+" : ""}{pct}%</span>}
+                        </td>
+                      );
+                    })}
+                    <td className={tdClass}>
+                      <button
+                        type="button"
+                        onClick={() => openImei(index)}
+                        className={`whitespace-nowrap rounded-[4px] px-2 py-1 text-[12px] font-medium ${
+                          item.imeis.length && item.imeis.length === units
+                            ? "bg-emerald-100 text-emerald-700"
+                            : item.trackSerial
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-600 dark:bg-muted dark:text-muted-foreground"
+                        }`}
+                      >
+                        {item.trackSerial || item.imeis.length ? `${item.imeis.length}/${units}` : "+ IMEI"}
+                      </button>
+                    </td>
+                    <td className={tdClass}>
+                      <button type="button" onClick={() => removeItem(index)} className="rounded-[4px] bg-[#ff5b5b] p-1.5 text-white hover:bg-[#f24242]" aria-label={`Remove ${item.productName}`}>
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {items.length > 0 && (
+              <tfoot>
+                <tr className={totalRowClass}>
+                  <td colSpan={4} className={tdClass}>
+                    Total ({items.length} products)
+                  </td>
+                  <td className={tdClass}>{totals.itemCount}</td>
+                  <td colSpan={3} className={tdClass} />
+                  <td className={tdClass}>{money(totals.subtotal)}</td>
+                  <td colSpan={7} className={tdClass} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
 
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        Stock {result.stock}
-                      </span>
-                    </button>
-                  ))
+        {lossLines.length > 0 && (
+          <p className="m-0 mt-2 rounded-[4px] bg-red-50 px-3 py-2 text-[13px] text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            At this cost {lossLines.map((l) => l.productName).join(", ")} sells at a loss to some buyer types. Raise its rates on the product after
+            this purchase.
+          </p>
+        )}
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_420px]">
+          <div className="space-y-[10px]">
+            <p className="m-0 text-[14px] font-medium">Payment</p>
+            {payments.map((payment, index) => (
+              <div key={index} className="flex flex-wrap items-center gap-2">
+                <select value={payment.method} onChange={(e) => setPayment(index, { method: e.target.value })} className={`${inputClass} !w-[160px]`} aria-label="Payment type">
+                  {PAYMENT_METHODS.map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <input type="number" min="0" step="0.01" placeholder="Amount" value={payment.amount} onChange={(e) => setPayment(index, { amount: e.target.value })} className={`${inputClass} !w-[150px]`} aria-label="Paying amount" />
+                {payment.method !== "cash" && (
+                  <input
+                    placeholder={payment.method === "cheque" ? "Cheque No." : "Trx / reference"}
+                    value={payment.reference}
+                    onChange={(e) => setPayment(index, { reference: e.target.value })}
+                    className={`${inputClass} !w-[170px]`}
+                    aria-label="Payment reference"
+                  />
+                )}
+                {payments.length > 1 && (
+                  <button type="button" onClick={() => setPayments(payments.filter((_, i) => i !== index))} className="rounded p-1.5 text-[#ff5b5b] hover:bg-[#fff1f1]" aria-label="Remove payment">
+                    <X size={16} />
+                  </button>
                 )}
               </div>
-            )}
+            ))}
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={btn.info} onClick={() => setPayments([...payments, newPayment()])}>
+                <Plus size={14} /> Add payment
+              </button>
+              {totals.grand > 0 && (
+                <button type="button" className={btn.warning} onClick={payFull}>
+                  Pay full
+                </button>
+              )}
+            </div>
           </div>
 
-          {items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No item added yet. Search above to add one.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="w-28">Qty</TableHead>
-                    <TableHead className="w-36">Purchase Price</TableHead>
-                    <TableHead className="w-28 text-right">Total</TableHead>
-                    <TableHead className="w-28">IMEI</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-
-                <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={item.variantId}>
-                      <TableCell>
-                        <div className="font-medium">{item.productName}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.variantLabel || "—"} · in stock{" "}
-                          {item.currentStock}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(index, { quantity: e.target.value })
-                          }
-                        />
-                      </TableCell>
-
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            updateItem(index, { unitPrice: e.target.value })
-                          }
-                        />
-                      </TableCell>
-
-                      <TableCell className="text-right tabular-nums">
-                        {(
-                          (Number(item.quantity) || 0) *
-                          (Number(item.unitPrice) || 0)
-                        ).toLocaleString()}
-                      </TableCell>
-
-                      <TableCell>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openImeiDialog(index)}
-                        >
-                          {item.imeis.length > 0
-                            ? `${item.imeis.length} added`
-                            : "Add"}
-                        </Button>
-                      </TableCell>
-
-                      <TableCell>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeItem(index)}
-                        >
-                          <FiTrash2 className="text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="py-0 rounded shadow-sm">
-          <CardHeader className="pt-3 px-3 border-b">
-            <h4 className="text-lg font-semibold">Payment</h4>
-          </CardHeader>
-
-          <CardContent className="px-3 py-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="purchase-discount">Discount</Label>
-                <Input
-                  id="purchase-discount"
-                  type="number"
-                  min={0}
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="purchase-shipping">Shipping Cost</Label>
-                <Input
-                  id="purchase-shipping"
-                  type="number"
-                  min={0}
-                  value={shippingCost}
-                  onChange={(e) => setShippingCost(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="purchase-paid">Paid Now</Label>
-                <Input
-                  id="purchase-paid"
-                  type="number"
-                  min={0}
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="purchase-method">Method</Label>
-                <select
-                  id="purchase-method"
-                  className={selectClass}
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="bkash">bKash</option>
-                  <option value="nagad">Nagad</option>
-                  <option value="bank">Bank</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="other">Other</option>
+          <dl className="m-0 space-y-2 rounded-[6px] border border-[#ebeff2] bg-[#fafbfc] p-4 text-[14px] dark:border-border dark:bg-muted">
+            <Row label="Item Count" value={totals.itemCount} />
+            <Row label="Subtotal" value={`৳ ${money(totals.subtotal)}`} />
+            <Row label="Discount">
+              <span className="flex gap-1">
+                <select value={discount.type} onChange={(e) => setDiscount({ ...discount, type: e.target.value })} className={`${cell} !w-[110px]`} aria-label="Discount type">
+                  <option value="amount">Amount</option>
+                  <option value="percent">Percentage</option>
                 </select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="purchase-payref">Payment Reference</Label>
-              <Input
-                id="purchase-payref"
-                value={paymentReference}
-                onChange={(e) => setPaymentReference(e.target.value)}
-                placeholder="Trx ID / cheque no"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="purchase-note">Note</Label>
-              <Textarea
-                id="purchase-note"
-                rows={2}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="py-0 rounded shadow-sm">
-          <CardHeader className="pt-3 px-3 border-b">
-            <h4 className="text-lg font-semibold">Summary</h4>
-          </CardHeader>
-
-          <CardContent className="px-3 py-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="tabular-nums">
-                ৳ {subtotal.toLocaleString()}
+                <input type="number" min="0" step="0.01" placeholder="Enter discount" value={discount.value} onChange={(e) => setDiscount({ ...discount, value: e.target.value })} className={`${cell} !w-[110px]`} aria-label="Discount value" />
               </span>
-            </div>
+            </Row>
+            <Row label="Total Discount" value={`৳ ${money(totals.discountAmount)}`} />
+            <Row label="Shipping / Labour (+)">
+              <input type="number" min="0" step="0.01" placeholder="0" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} className={`${cell} !w-[120px]`} aria-label="Shipping or labour cost" />
+            </Row>
+            <Row label="Grand Total" value={`৳ ${money(totals.grand)}`} strong divider />
+            <Row label="Paid" value={`৳ ${money(totals.paid)}`} tone="text-[#0b8a45]" />
+            <Row label="Due" value={`৳ ${money(totals.due)}`} strong tone={totals.due > 0 ? "text-[#ff5b5b]" : ""} />
+          </dl>
+        </div>
 
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Discount</span>
-              <span className="tabular-nums">
-                − ৳ {(Number(discount) || 0).toLocaleString()}
-              </span>
-            </div>
+        <div className="mt-[18px] flex justify-end gap-2">
+          <button type="button" className={btn.secondary} onClick={() => router.push(ADMIN_PURCHASE_SHOW)}>
+            Cancel
+          </button>
+          <button type="submit" disabled={saving || !items.length} className={`${btn.success} min-w-[120px] !text-[15px]`}>
+            {saving ? "Saving..." : head.status === "received" ? "Buy" : "Save as Pending"}
+          </button>
+        </div>
+      </ListCard>
 
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Shipping</span>
-              <span className="tabular-nums">
-                + ৳ {(Number(shippingCost) || 0).toLocaleString()}
-              </span>
-            </div>
-
-            <div className="flex justify-between border-t pt-2 text-base font-semibold">
-              <span>Grand Total</span>
-              <span className="tabular-nums">
-                ৳ {grandTotal.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Paid</span>
-              <span className="tabular-nums">
-                ৳ {(Number(paidAmount) || 0).toLocaleString()}
-              </span>
-            </div>
-
-            <div
-              className={`flex justify-between font-semibold ${
-                due > 0 ? "text-destructive" : ""
-              }`}
-            >
-              <span>Due</span>
-              <span className="tabular-nums">৳ {due.toLocaleString()}</span>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-4 sm:flex-row">
-              <Button
-                variant="outline"
-                className="flex-1"
-                disabled={saving}
-                onClick={() => savePurchase("pending")}
-              >
-                Save as Pending
-              </Button>
-
-              <Button
-                className="flex-1"
-                disabled={saving}
-                onClick={() => savePurchase("received")}
-              >
-                <FiPlus className="mr-2" />
-                {saving ? "Saving..." : "Save & Receive Stock"}
-              </Button>
-            </div>
-
-            <p className="pt-1 text-xs text-muted-foreground">
-              Stock only increases when a purchase is received. Save as pending
-              if the goods have not arrived yet.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Dialog open={imeiRow !== null} onOpenChange={() => setImeiRow(null)}>
+      <Dialog open={imeiRow !== null} onOpenChange={(open) => !open && setImeiRow(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              IMEI — {imeiRow !== null ? items[imeiRow]?.productName : ""}
-            </DialogTitle>
+            <DialogTitle>IMEI — {imeiRow !== null ? `${items[imeiRow]?.productName} ${items[imeiRow]?.variantLabel || ""}` : ""}</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-2">
-            <Label htmlFor="imei-list">One IMEI per line</Label>
-            <Textarea
-              id="imei-list"
-              rows={8}
-              value={imeiText}
-              onChange={(e) => setImeiText(e.target.value)}
-              placeholder={"356938035643809\n356938035643810"}
-            />
-            <p className="text-xs text-muted-foreground">
-              Scan them one after another. Leave empty for accessories that
-              carry no IMEI.
-            </p>
-          </div>
-
+          <textarea
+            rows={8}
+            value={imeiText}
+            onChange={(e) => setImeiText(e.target.value)}
+            placeholder={"356938035643809\n356938035643810"}
+            className={`${inputClass} !h-auto py-2 font-mono`}
+            autoFocus
+          />
+          <p className="m-0 text-[12px] text-muted-foreground">
+            One per line; scan them one after another.{" "}
+            {imeiRow !== null &&
+              `${imeiText.split(/[\n,]/).filter((s) => s.trim()).length} of ${num(items[imeiRow]?.quantity) + num(items[imeiRow]?.extraQty)} entered.`}
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setImeiRow(null)}>
+            <Button type="button" variant="outline" onClick={() => setImeiRow(null)}>
               Cancel
             </Button>
-
-            <Button onClick={saveImeis}>Save IMEI</Button>
+            <Button type="button" onClick={saveImeis}>
+              Save IMEI
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </form>
+  );
+}
+
+function Row({ label, value, strong, divider, tone = "", children }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 ${divider ? "border-t border-[#e3e8ee] pt-2 dark:border-border" : ""}`}>
+      <dt className={strong ? "font-semibold" : ""}>{label}</dt>
+      <dd className={`m-0 tabular-nums ${strong ? "text-[16px] font-bold" : ""} ${tone}`}>{children ?? value}</dd>
     </div>
   );
-};
-
-export default AddPurchasePage;
+}

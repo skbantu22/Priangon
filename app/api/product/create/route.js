@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
@@ -30,6 +31,9 @@ export async function POST(request) {
       media: true,
       offers: true,
       freeDelivery: true,
+    }).extend({
+      description: z.string().optional().default(""),
+      media: z.array(z.string()).optional().default([]),
     });
 
     const validate = schema.safeParse(payload);
@@ -79,6 +83,8 @@ export async function POST(request) {
       ...cleanMobileFields(payload),
       ...cleanTierPrices(payload),
       ...cleanExtraFields(payload),
+      // no photo: POS only until one is added
+      ...(!productData.media.length && { showInWebsite: false }),
 
       freeDelivery: productData.freeDelivery || false,
     });

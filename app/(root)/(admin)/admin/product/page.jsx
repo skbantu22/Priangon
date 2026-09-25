@@ -1,215 +1,174 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileSpreadsheet,
-  Loader2,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Printer,
-  RotateCcw,
-  Search,
-  Trash2,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  ADMIN_DASHBOARD,
-  ADMIN_PRODUCT_ADD,
-  ADMIN_PRODUCT_EDIT,
-  ADMIN_PRODUCT_SHOW,
-} from "@/Route/Adminpannelroute";
+import { ADMIN_PRODUCT_ADD, ADMIN_PRODUCT_EDIT } from "@/Route/Adminpannelroute";
 import { posCategoriesQueryOptions, posShowroomsQueryOptions } from "@/lib/posProducts";
 import { skipOptimize } from "@/lib/imageSrc";
 import { showToast } from "@/lib/showToast";
+import {
+  ActionMenu,
+  EmptyRow,
+  ExportButtons,
+  ListCard,
+  Pagination,
+  btn,
+  exportExcel,
+  exportPdf,
+  inputClass,
+  money,
+  printTable,
+  tdClass,
+  thClass,
+  theadRow,
+  totalRow,
+} from "@/components/ui/Application/Admin/supplier/supplierKit";
 
-const breadcrumbData = [
-  { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_PRODUCT_SHOW, label: "Products" },
+const EMPTY_FILTERS = { brand: "", category: "", location: "all", sort: "newest", status: "active", q: "" };
+
+const SORTS = [
+  ["newest", "Newest"],
+  ["oldest", "Oldest"],
+  ["name", "Name A-Z"],
+  ["stock-desc", "Stock High-Low"],
+  ["stock-asc", "Stock Low-High"],
+  ["value-desc", "Stock Value"],
+  ["price-asc", "Price Low-High"],
+  ["price-desc", "Price High-Low"],
 ];
 
-const INITIAL_FILTERS = {
-  limit: 10,
-  brand: "",
-  location: "all",
-  sort: "newest",
-  status: "active",
-  category: "",
-  subcategory: "",
-  web: "",
-  q: "",
-};
+const TABS = [
+  ["", "All", "all"],
+  ["in", "In Stock", "in"],
+  ["low", "Low Stock", "low"],
+  ["out", "Out of Stock", "out"],
+  ["issue", "Price Issue", "issue"],
+];
 
-const money = (n) => Number(n || 0).toLocaleString("en-BD");
+// the four sale rates, in the order the POS price list uses them
+const RATES = [
+  ["sellingPrice", "Buyer"],
+  ["dealerPrice", "Dealer"],
+  ["subDealerPrice", "Sub Dealer"],
+  ["wholesalerPrice", "Wholesaler"],
+];
 
-const selectClass =
-  "h-9 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none focus:border-primary dark:border-white/10 dark:bg-card";
+const COLUMNS = [
+  "SL",
+  "Product",
+  "Code",
+  "Variant",
+  "Barcode",
+  "Brand",
+  "Category",
+  "Stock",
+  "Cost",
+  ...RATES.map(([, label]) => label),
+  "Stock Value",
+];
 
-const toParams = (filters, page) =>
-  new URLSearchParams(
-    Object.entries({ ...filters, page }).filter(([, v]) => v !== "" && v != null),
-  ).toString();
-
-const fetchList = async (filters, page) => {
-  const { data } = await axios.get(`/api/product/list?${toParams(filters, page)}`);
+const fetchList = async (params) => {
+  const { data } = await axios.get("/api/product/list", { params });
   if (!data.success) throw new Error(data.message || "Could not load products");
   return data;
 };
 
-// ---------- export / print ----------
-const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+const marginPct = (rate, cost) => (cost > 0 && rate > 0 ? Math.round(((rate - cost) / cost) * 100) : null);
 
-const exportRows = (items) =>
-  items.flatMap((p) =>
-    (p.variants.length ? p.variants : [{}]).map((v) => ({
-      Product: p.name,
-      Code: p.code,
-      Variant: v.label || "",
-      Barcode: v.barcode || "",
-      SKU: v.sku || "",
-      Stock: v.stock ?? 0,
-      MRP: v.mrp ?? "",
-      "Sale Price": v.sellingPrice ?? "",
-      "Purchase Price": p.purchasePrice || "",
-      "Dealer Price": p.dealerPrice || "",
-      "Min Price": p.minSalePrice || "",
-      Brand: p.brand,
-      Category: p.category,
-      "Sub Category": p.subcategory,
-      Website: p.showInWebsite ? "Yes" : "No",
-    })),
+/** One sale rate with its margin over cost; flags a rate that is not set or loses money */
+function RateCell({ line, field }) {
+  const rate = line[field];
+
+  if (!rate) {
+    return (
+      <span className="text-[12px] font-medium text-amber-600" title="Not set: the POS charges this buyer the Buyer price">
+        Not set
+      </span>
+    );
+  }
+
+  const pct = marginPct(rate, line.cost);
+  const loss = pct !== null && pct <= 0;
+
+  return (
+    <span className={`whitespace-nowrap ${loss ? "font-semibold text-red-600" : ""}`} title={loss ? "At or below cost" : undefined}>
+      {money(rate)}
+      {pct !== null && (
+        <span className={`ml-1 text-[11px] ${loss ? "" : "text-emerald-600"}`}>
+          {pct > 0 ? "+" : ""}
+          {pct}%
+        </span>
+      )}
+    </span>
   );
+}
 
-const downloadCsv = (items) => {
-  const rows = exportRows(items);
-  if (!rows.length) return;
-  const head = Object.keys(rows[0]);
-  const csv = [head.map(csvCell).join(","), ...rows.map((r) => head.map((h) => csvCell(r[h])).join(","))].join("\r\n");
-  // BOM so Excel opens Bangla / ৳ correctly
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-
-const escapeHtml = (s) =>
-  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-
-const printList = (items) => {
-  const rows = exportRows(items);
-  const win = window.open("", "_blank");
-  if (!win) return showToast("error", "Allow pop-ups to print");
-  const head = ["Product", "Variant", "Barcode", "Stock", "MRP", "Sale Price", "Dealer Price", "Brand", "Category"];
-  win.document.write(`<!doctype html><html><head><title>Product List</title><style>
-    body{font-family:Arial,sans-serif;font-size:11px;margin:16px}h2{margin:0 0 8px}
-    table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:4px 6px;text-align:left}
-    th{background:#eee}td.n{text-align:right}</style></head><body>
-    <h2>Product List</h2><p>${new Date().toLocaleString()} · ${items.length} products</p>
-    <table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
-    ${rows
-      .map(
-        (r) =>
-          `<tr>${head
-            .map((h) => `<td class="${["Stock", "MRP", "Sale Price", "Dealer Price"].includes(h) ? "n" : ""}">${escapeHtml(r[h])}</td>`)
-            .join("")}</tr>`,
-      )
-      .join("")}
-    </tbody></table><script>window.onload=()=>window.print()</script></body></html>`);
-  win.document.close();
-};
-
-// ---------------------------------------------------------------------------
-
-export default function ShowProduct() {
+/** Product list, laid out like the 360 product screen, with the dealer price list beside every variant */
+export default function ProductsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
-  // "draft" is what the filter bar shows; "filters" is what was searched
-  const [draft, setDraft] = useState(INITIAL_FILTERS);
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [draft, setDraft] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [stock, setStock] = useState("");
+  const [limit, setLimit] = useState("20");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["product-list", filters, page],
-    queryFn: () => fetchList(filters, page),
+  const params = (extra) => ({
+    ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== "")),
+    ...(stock && { stock }),
+    ...extra,
+  });
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["product-list", filters, stock, limit, page],
+    queryFn: () => fetchList(params({ page, limit })),
     placeholderData: keepPreviousData,
   });
 
   const { data: categories = [] } = useQuery({ ...posCategoriesQueryOptions(), refetchOnWindowFocus: false });
   const { data: showrooms = [] } = useQuery({ ...posShowroomsQueryOptions(), refetchOnWindowFocus: false });
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories", draft.category],
-    queryFn: async () => {
-      const { data } = await axios.get(`/api/subcategory?category=${draft.category}&deleteType=SD`);
-      return data?.data || [];
-    },
-    enabled: !!draft.category,
-    staleTime: 1000 * 60 * 5,
-  });
+  const rows = data?.items ?? [];
+  const totals = data?.totals;
+  const counts = data?.counts || {};
+  const isTrash = filters.status === "trash";
 
-  const items = useMemo(() => data?.items ?? [], [data]);
-  const total = data?.total || 0;
-  const limit = filters.limit;
-  const pages = Math.max(1, Math.ceil(total / limit));
-  const from = total ? (page - 1) * limit + 1 : 0;
-  const to = Math.min(page * limit, total);
-
-  // changing a dropdown applies at once; the text box waits for Search / Enter
-  const setFilter = (key, value) => {
-    const next = { ...draft, [key]: value, ...(key === "category" ? { subcategory: "" } : {}) };
-    setDraft(next);
-    if (key !== "q") {
-      setFilters({ ...next, q: filters.q });
-      setPage(1);
-      setSelected([]);
-    }
-  };
-
-  const search = (e) => {
-    e?.preventDefault();
-    setFilters(draft);
+  const reset = () => {
     setPage(1);
     setSelected([]);
+  };
+
+  const search = (event) => {
+    event?.preventDefault();
+    setFilters({ ...draft, q: draft.q.trim() });
+    reset();
   };
 
   const clear = () => {
-    setDraft(INITIAL_FILTERS);
-    setFilters(INITIAL_FILTERS);
-    setPage(1);
-    setSelected([]);
+    setDraft(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
+    setStock("");
+    reset();
   };
 
-  const allOnPage = items.length > 0 && items.every((p) => selected.includes(p._id));
-  const toggleAll = () =>
-    setSelected(allOnPage ? selected.filter((id) => !items.some((p) => p._id === id)) : [...new Set([...selected, ...items.map((p) => p._id)])]);
-  const toggleOne = (id) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const pickTab = (value) => {
+    setStock(value);
+    reset();
+  };
 
   const runAction = async (ids, action) => {
     if (!ids.length) return showToast("error", "Select products first");
-    if (action === "trash" && !window.confirm(`Move ${ids.length} product(s) to trash?`)) return;
+    if (action === "trash" && !confirm(`Move ${ids.length} product(s) to trash?`)) return;
+
     setBusy(true);
     try {
       const { data: res } = await axios.put("/api/product/bulk", { ids, action });
@@ -217,60 +176,133 @@ export default function ShowProduct() {
       setSelected([]);
       queryClient.invalidateQueries({ queryKey: ["product-list"] });
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });
-    } catch (err) {
-      showToast("error", err?.response?.data?.message || "Action failed");
+    } catch (error) {
+      showToast("error", error.response?.data?.message || "Action failed");
     } finally {
       setBusy(false);
     }
   };
 
-  // export / print use every product matching the filters, not only this page
-  const withAllRows = async (fn) => {
+  // export / print take every product matching the filters, one line per variant
+  const withAllRows = async (handle) => {
     setBusy(true);
     try {
-      const all = [];
-      for (let p = 1; p <= 100; p++) {
-        const res = await fetchList({ ...filters, limit: 100 }, p);
-        all.push(...res.items);
-        if (all.length >= res.total || !res.items.length) break;
-      }
-      fn(all);
-    } catch {
-      showToast("error", "Could not export");
+      const all = await fetchList(params({ limit: "all" }));
+      const body = [];
+      all.items.forEach((p, index) =>
+        (p.variants.length ? p.variants : [{}]).forEach((v, k) =>
+          body.push([
+            k ? "" : index + 1,
+            k ? "" : p.name,
+            k ? "" : p.code,
+            v.label || "",
+            v.barcode || "",
+            k ? "" : p.brand,
+            k ? "" : p.category,
+            v.stock ?? 0,
+            v.cost ?? 0,
+            ...RATES.map(([field]) => v[field] || "Not set"),
+            (v.stock || 0) * (v.cost || 0),
+          ]),
+        ),
+      );
+      const t = all.totals;
+      const foot = ["", "Total", "", "", "", "", "", t.stock, "", "", "", "", "", t.cost];
+      await handle(body, foot);
+    } catch (error) {
+      showToast("error", error.message || "Could not export");
     } finally {
       setBusy(false);
     }
   };
 
-  const isTrash = filters.status === "trash";
-  const th = "whitespace-nowrap px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide";
-  const td = "px-2 py-1.5 align-middle";
+  const rowActions = (p) => [
+    ["Edit / Variants", () => router.push(ADMIN_PRODUCT_EDIT(p._id))],
+    p.deleted ? ["Restore", () => runAction([p._id], "restore")] : ["Move to trash", () => runAction([p._id], "trash"), "danger"],
+  ];
+
+  const allChecked = rows.length > 0 && rows.every((p) => selected.includes(p._id));
+  const check = (id, on) => setSelected(on ? [...selected, id] : selected.filter((x) => x !== id));
+  const filtered = filters.q || filters.brand || filters.category || filters.location !== "all" || stock;
+
+  // profit if every unit in view went to one kind of buyer
+  const profits = totals
+    ? [
+        ["Buyer", totals.retail],
+        ["Dealer", totals.dealer],
+        ["Sub Dealer", totals.subDealer],
+        ["Wholesaler", totals.wholesaler],
+      ].map(([label, value]) => [label, value - totals.cost])
+    : [];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <BreadCrumb breadcrumbData={breadcrumbData} />
-          <h1 className="text-2xl font-bold">Products</h1>
-        </div>
-        <Button asChild>
-          <Link href={ADMIN_PRODUCT_ADD}>
-            <Plus className="size-4" /> Add Product
+      <ListCard
+        title="Product List"
+        actions={
+          <Link href={ADMIN_PRODUCT_ADD} className={btn.primary}>
+            <Plus size={14} /> Add New Product
           </Link>
-        </Button>
-      </div>
+        }
+      >
+        {/* stock worth, and the profit per price list */}
+        {totals && (
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              ["Stock Qty", totals.stock.toLocaleString("en-BD"), ""],
+              ["Stock Value (Cost)", `৳${money(totals.cost)}`, ""],
+              ...profits.map(([label, value]) => [
+                `Profit · ${label}`,
+                `৳${money(value)}`,
+                value < 0 ? "text-red-600" : "text-emerald-600",
+              ]),
+            ].map(([label, value, tone]) => (
+              <div key={label} className="rounded-[6px] border border-[#ebeff2] bg-[#f7f9fb] px-3 py-2 dark:border-border dark:bg-muted">
+                <p className="m-0 text-[11px] text-muted-foreground">{label}</p>
+                <p className={`m-0 text-[16px] font-semibold tabular-nums ${tone}`}>{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* ================= FILTERS ================= */}
-      <form onSubmit={search} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-          <select className={selectClass} value={draft.limit} onChange={(e) => setFilter("limit", Number(e.target.value))} title="Rows per page">
-            {[10, 25, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                {n} rows
+        <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {TABS.map(([key, label, countKey]) => (
+            <button
+              key={key || "all"}
+              type="button"
+              onClick={() => pickTab(key)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
+                stock === key
+                  ? "bg-[#188ae2] text-white shadow"
+                  : "bg-[#f1f5f9] text-[#495057] hover:bg-[#e2e8f0] dark:bg-muted dark:text-muted-foreground"
+              }`}
+            >
+              {label}
+              <span className={`rounded-full px-1.5 text-[11px] ${stock === key ? "bg-white/25" : "bg-white dark:bg-background"}`}>
+                {counts[countKey] ?? 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={search} className="flex flex-wrap items-center gap-2">
+          <select
+            value={limit}
+            onChange={(event) => {
+              setLimit(event.target.value);
+              reset();
+            }}
+            className={`${inputClass} !w-20`}
+            aria-label="Rows per page"
+          >
+            {["10", "20", "50", "100"].map((size) => (
+              <option key={size} value={size}>
+                {size}
               </option>
             ))}
           </select>
-          <select className={selectClass} value={draft.brand} onChange={(e) => setFilter("brand", e.target.value)}>
+
+          <select value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={`${inputClass} !w-36`} aria-label="Brand">
             <option value="">All Brands</option>
             {(data?.brands || []).map((b) => (
               <option key={b} value={b}>
@@ -278,7 +310,17 @@ export default function ShowProduct() {
               </option>
             ))}
           </select>
-          <select className={selectClass} value={draft.location} onChange={(e) => setFilter("location", e.target.value)} title="Whose stock is shown">
+
+          <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={`${inputClass} !w-40`} aria-label="Category">
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <select value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={`${inputClass} !w-40`} aria-label="Stock location">
             <option value="all">All Stock</option>
             <option value="warehouse">Warehouse / Godown</option>
             {showrooms.map((s) => (
@@ -287,336 +329,277 @@ export default function ShowProduct() {
               </option>
             ))}
           </select>
-          <select className={selectClass} value={draft.sort} onChange={(e) => setFilter("sort", e.target.value)}>
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="name">Name A–Z</option>
-            <option value="price-asc">Price Low–High</option>
-            <option value="price-desc">Price High–Low</option>
+
+          <select value={draft.sort} onChange={(e) => setDraft({ ...draft, sort: e.target.value })} className={`${inputClass} !w-36`} aria-label="Sort">
+            {SORTS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
-          <select className={selectClass} value={draft.status} onChange={(e) => setFilter("status", e.target.value)}>
+
+          <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })} className={`${inputClass} !w-28`} aria-label="Status">
             <option value="active">Active</option>
             <option value="trash">Trash</option>
           </select>
-          <select className={selectClass} value={draft.category} onChange={(e) => setFilter("category", e.target.value)}>
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select className={selectClass} value={draft.subcategory} onChange={(e) => setFilter("subcategory", e.target.value)} disabled={!draft.category}>
-            <option value="">All Sub Categories</option>
-            {subcategories.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select className={selectClass} value={draft.web} onChange={(e) => setFilter("web", e.target.value)}>
-            <option value="">Website: All</option>
-            <option value="yes">On website</option>
-            <option value="no">POS only</option>
-          </select>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary sm:max-w-sm dark:border-white/10 dark:bg-card">
-            <Search className="size-4 shrink-0 text-gray-400" />
-            <input
-              value={draft.q}
-              onChange={(e) => setFilter("q", e.target.value)}
-              placeholder="Product name, code, SKU, barcode..."
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-            />
-          </label>
-          <Button type="submit" className="h-9 bg-emerald-600 hover:bg-emerald-700">
+          <input
+            value={draft.q}
+            onChange={(e) => setDraft({ ...draft, q: e.target.value })}
+            placeholder="Search Name, Code, Barcode, SKU..."
+            className={`${inputClass} min-w-[220px] flex-1`}
+          />
+
+          <button type="submit" className={btn.info}>
             Search
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="secondary" className="h-9" disabled={busy}>
-                Action {selected.length > 0 && `(${selected.length})`} <ChevronDown className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => runAction(selected, "web-on")}>
-                <Eye className="size-4" /> Show on website
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => runAction(selected, "web-off")}>
-                <EyeOff className="size-4" /> Hide from website
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {isTrash ? (
-                <DropdownMenuItem onClick={() => runAction(selected, "restore")}>
-                  <RotateCcw className="size-4" /> Restore
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem className="text-red-600" onClick={() => runAction(selected, "trash")}>
-                  <Trash2 className="size-4" /> Move to trash
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button type="button" variant="outline" className="h-9 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={clear}>
+          </button>
+          <button type="button" onClick={clear} className={btn.warning}>
             Clear
-          </Button>
+          </button>
+        </form>
 
-          <div className="ml-auto flex gap-2">
-            <Button type="button" variant="outline" className="h-9" disabled={busy} onClick={() => withAllRows(downloadCsv)}>
-              <FileSpreadsheet className="size-4" /> Excel
-            </Button>
-            <Button type="button" variant="outline" className="h-9" disabled={busy} onClick={() => withAllRows(printList)}>
-              <Printer className="size-4" /> Print / PDF
-            </Button>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <ExportButtons
+            disabled={busy}
+            onPdf={() => withAllRows((body, foot) => exportPdf("Product List", COLUMNS, body, foot))}
+            onExcel={() => withAllRows((body, foot) => exportExcel("Products.xlsx", COLUMNS, body, foot))}
+            onPrint={() =>
+              withAllRows((body, foot) => {
+                if (!printTable("Product List", COLUMNS, body, foot)) showToast("error", "Allow pop-ups to print");
+              })
+            }
+          />
+          <ActionMenu
+            label={selected.length ? `Actions (${selected.length})` : "Actions"}
+            items={[
+              isTrash ? ["Restore", () => runAction(selected, "restore")] : ["Move to trash", () => runAction(selected, "trash"), "danger"],
+            ]}
+          />
+          <span className="ml-auto text-[12px] text-muted-foreground">
+            % = margin over cost · <span className="text-amber-600">Not set</span> = POS charges the Buyer price
+          </span>
         </div>
-      </form>
 
-      {/* ================= TABLE ================= */}
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div>
-          <table className="w-full table-fixed text-xs">
-            <colgroup>
-              <col className="w-8" />
-              <col className="w-8" />
-              <col />
-              <col className="w-[26%]" />
-              <col className="w-14" />
-              <col className="w-20" />
-              <col className="hidden w-24 md:table-column" />
-              <col className="hidden w-20 sm:table-column" />
-              <col className="w-10" />
-            </colgroup>
-            <thead className="bg-emerald-600 text-white">
-              <tr>
-                <th className={th}>
-                  <input type="checkbox" className="size-3.5 accent-white" checked={allOnPage} onChange={toggleAll} aria-label="Select all" />
+        {/* Phones: one card per product */}
+        <div className="mt-3 space-y-2.5 md:hidden">
+          {isLoading && [1, 2, 3].map((n) => <div key={n} className="h-[140px] animate-pulse rounded-[6px] bg-slate-100 dark:bg-muted" />)}
+
+          {!isLoading && rows.length === 0 && (
+            <div className="rounded-[6px] border border-dashed border-[#d4dae0] px-4 py-8 text-center text-[15px] font-medium text-[#495057]">
+              {isError ? "Could not load products" : filtered ? "No products match these filters" : "No products yet"}
+            </div>
+          )}
+
+          {!isLoading &&
+            rows.map((p) => (
+              <article key={p._id} className="rounded-[6px] border border-[#ebeff2] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-border dark:bg-card">
+                <div className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-[5px]" checked={selected.includes(p._id)} onChange={(e) => check(p._id, e.target.checked)} aria-label={`Select ${p.name}`} />
+                  <Thumb src={p.image} />
+                  <div className="min-w-0 flex-1">
+                    <Link href={ADMIN_PRODUCT_EDIT(p._id)} className="line-clamp-2 text-[15px] font-semibold">
+                      {p.name}
+                    </Link>
+                    <p className="m-0 truncate text-[12px] text-muted-foreground">{[p.brand, p.category, p.code].filter(Boolean).join(" · ")}</p>
+                    <Flags p={p} />
+                  </div>
+                  <ActionMenu items={rowActions(p)} />
+                </div>
+
+                {p.variants.map((v) => (
+                  <div key={v._id} className="mt-2 rounded-[4px] bg-[#f7f9fb] px-2 py-1.5 text-[13px] dark:bg-muted">
+                    <div className="flex justify-between gap-2">
+                      <span className="truncate font-medium">{v.label || v.barcode}</span>
+                      <span className={`tabular-nums ${v.stock <= 0 ? "text-red-600" : ""}`}>
+                        Stock {v.stock} · Cost {money(v.cost)}
+                      </span>
+                    </div>
+                    <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+                      {RATES.map(([field, label]) => (
+                        <div key={field} className="flex justify-between gap-1">
+                          <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                          <dd className="m-0 tabular-nums">
+                            <RateCell line={v} field={field} />
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </article>
+            ))}
+        </div>
+
+        <div className="mt-4 hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[1150px] border-collapse text-sm">
+            <thead>
+              <tr className={theadRow}>
+                <th rowSpan={2} className={thClass}>
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={(e) => setSelected(e.target.checked ? rows.map((p) => p._id) : [])}
+                    aria-label="Select all"
+                  />
                 </th>
-                <th className={th}>#</th>
-                <th className={th}>Product</th>
-                <th className={th}>Barcode · Variant</th>
-                <th className={`${th} text-right`}>Stock</th>
-                <th className={`${th} text-right`}>Price</th>
-                <th className={`${th} hidden text-right md:table-cell`}>Rates</th>
-                <th className={`${th} hidden sm:table-cell`}>Status</th>
-                <th className={th} />
+                <th rowSpan={2} className={thClass}>SL</th>
+                <th rowSpan={2} className={thClass}>Product</th>
+                <th rowSpan={2} className={thClass}>Variant · Barcode</th>
+                <th rowSpan={2} className={thClass}>Stock</th>
+                <th rowSpan={2} className={thClass}>Cost</th>
+                <th colSpan={4} className={`${thClass} text-center`}>Sale Rate (margin)</th>
+                <th rowSpan={2} className={thClass}>Stock Value</th>
+                <th rowSpan={2} className={thClass}>Action</th>
+              </tr>
+              <tr className={theadRow}>
+                {RATES.map(([field, label]) => (
+                  <th key={field} className={thClass}>
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="py-14 text-center text-muted-foreground">
-                    <Loader2 className="mx-auto mb-2 size-5 animate-spin" /> Loading products...
-                  </td>
-                </tr>
-              ) : isError ? (
-                <tr>
-                  <td colSpan={9} className="py-14 text-center">
-                    <p className="text-red-600">Could not load products.</p>
-                    <Button variant="link" onClick={() => refetch()}>
-                      Retry
-                    </Button>
-                  </td>
-                </tr>
-              ) : !items.length ? (
-                <tr>
-                  <td colSpan={9} className="py-14 text-center text-muted-foreground">
-                    No products found
-                  </td>
-                </tr>
-              ) : (
-                items.map((p, i) => {
-                  const lines = p.variants.length ? p.variants : [null];
-                  return (
-                    <tr
-                      key={p._id}
-                      className={`${selected.includes(p._id) ? "bg-primary/5" : p.lowStock ? "bg-red-50/60 dark:bg-red-500/5" : ""} hover:bg-muted/40`}
-                    >
-                      <td className={td}>
-                        <input type="checkbox" className="size-3.5 accent-primary" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} />
-                      </td>
-                      <td className={`${td} text-muted-foreground`}>{(page - 1) * limit + i + 1}</td>
 
-                      {/* picture + name + brand / category */}
-                      <td className={td}>
-                        <div className="flex min-w-0 items-center gap-2">
-                          <div className="relative size-10 shrink-0 overflow-hidden rounded-md border bg-white">
-                            <Image
-                              src={p.image || "/placeholder.png"}
-                              alt=""
-                              fill
-                              sizes="40px"
-                              className="object-contain"
-                              unoptimized={skipOptimize(p.image)}
-                            />
-                          </div>
+            <tbody>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={index}>
+                    <td colSpan={12} className={tdClass}>
+                      <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-muted" />
+                    </td>
+                  </tr>
+                ))}
+
+              {!isLoading && isError && (
+                <tr>
+                  <td colSpan={12} className={`${tdClass} py-10 text-center`}>
+                    <span className="text-red-600">Could not load products.</span>{" "}
+                    <button type="button" className="text-[#188ae2] underline" onClick={() => refetch()}>
+                      Retry
+                    </button>
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && !isError && rows.length === 0 && (
+                <EmptyRow
+                  colSpan={12}
+                  title={filtered ? "No products match these filters" : "No products yet"}
+                  hint="Add a product, then its variants and stock through a purchase."
+                />
+              )}
+
+              {!isLoading &&
+                rows.map((p, index) => {
+                  const lines = p.variants.length ? p.variants : [null];
+                  const perLine = (render) =>
+                    lines.map((v, k) => (
+                      <div key={k} className="leading-6">
+                        {v ? render(v) : "—"}
+                      </div>
+                    ));
+
+                  return (
+                    <tr key={p._id} className={p.deleted ? "bg-[#fff7f7] text-[#98a6ad] dark:bg-red-950/30" : "hover:bg-[#f5f7f9] dark:hover:bg-muted/50"}>
+                      <td className={tdClass}>
+                        <input type="checkbox" checked={selected.includes(p._id)} onChange={(e) => check(p._id, e.target.checked)} aria-label={`Select ${p.name}`} />
+                      </td>
+                      <td className={tdClass}>{data.from + index}</td>
+                      <td className={tdClass}>
+                        <div className="flex min-w-[220px] items-center gap-2">
+                          <Thumb src={p.image} />
                           <div className="min-w-0">
-                            <Link
-                              href={ADMIN_PRODUCT_EDIT(p._id)}
-                              className="line-clamp-2 font-medium leading-snug hover:text-primary hover:underline"
-                              title={p.name}
-                            >
+                            <Link href={ADMIN_PRODUCT_EDIT(p._id)} className="line-clamp-2 font-medium hover:text-blue-600" title={p.name}>
                               {p.name}
                             </Link>
-                            <p className="truncate text-[11px] text-muted-foreground">
-                              {[p.brand, p.category, p.subcategory].filter(Boolean).join(" · ") || "—"}
-                            </p>
-                            <p className="truncate text-[10px] text-muted-foreground">
-                              {[p.code, p.unit].filter(Boolean).join(" · ")}
-                              {p.lowStock && (
-                                <span className="ml-1 rounded bg-red-100 px-1 font-semibold text-red-700">Low stock</span>
-                              )}
-                            </p>
+                            <span className="block text-xs text-muted-foreground">
+                              {[p.brand, p.category, p.code].filter(Boolean).join(" · ")}
+                            </span>
+                            <Flags p={p} />
                           </div>
                         </div>
                       </td>
-
-                      <td className={`${td} font-mono text-[11px]`}>
-                        {lines.map((v, k) =>
-                          v ? (
-                            <div key={v._id} className="truncate leading-5" title={`${v.barcode || v.sku} ${v.label}`}>
-                              {v.barcode || v.sku}
-                              {v.label && <span className="font-sans text-muted-foreground"> · {v.label}</span>}
-                            </div>
-                          ) : (
-                            <Link key={k} href={ADMIN_PRODUCT_EDIT(p._id)} className="font-sans text-amber-600 hover:underline">
-                              No variants — add
-                            </Link>
-                          ),
+                      <td className={`${tdClass} text-[13px]`}>
+                        {p.variants.length ? (
+                          perLine((v) => (
+                            <span className="whitespace-nowrap">
+                              {v.label && <span className="font-medium">{v.label} · </span>}
+                              <span className="font-mono text-[12px] text-muted-foreground">{v.barcode}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <Link href={ADMIN_PRODUCT_EDIT(p._id)} className="text-amber-600 hover:underline">
+                            No variants — add
+                          </Link>
                         )}
                       </td>
-
-                      <td className={`${td} text-right tabular-nums`}>
-                        {lines.map((v, k) => (
-                          <div key={k} className={`leading-5 ${v && v.stock <= 0 ? "text-red-600" : ""}`}>
-                            {v ? v.stock : "—"}
-                          </div>
-                        ))}
-                        {p.variants.length > 1 && (
-                          <div className="border-t font-semibold leading-5">{p.totalStock}</div>
-                        )}
+                      <td className={tdClass}>
+                        {perLine((v) => <span className={v.stock <= 0 ? "text-red-600" : ""}>{v.stock}</span>)}
+                        {p.variants.length > 1 && <div className="border-t font-semibold leading-6">{p.totalStock}</div>}
                       </td>
-
-                      {/* sale price, MRP struck through when higher */}
-                      <td className={`${td} text-right tabular-nums`}>
-                        {lines.map((v, k) => (
-                          <div key={k} className="whitespace-nowrap leading-5">
-                            {v ? (
-                              <>
-                                {v.mrp > v.sellingPrice && (
-                                  <span className="mr-1 text-[10px] text-muted-foreground line-through">{money(v.mrp)}</span>
-                                )}
-                                <span className="font-semibold">{money(v.sellingPrice)}</span>
-                              </>
-                            ) : (
-                              "—"
-                            )}
-                          </div>
-                        ))}
-                      </td>
-
-                      <td className={`${td} hidden text-right text-[11px] tabular-nums md:table-cell`}>
-                        <div title="Purchase price">
-                          <span className="text-muted-foreground">P </span>
-                          {p.purchasePrice ? money(p.purchasePrice) : "—"}
-                        </div>
-                        <div title="Dealer price" className="text-emerald-700">
-                          <span className="text-muted-foreground">D </span>
-                          {p.dealerPrice ? money(p.dealerPrice) : "—"}
-                        </div>
-                        {p.minSalePrice > 0 && (
-                          <div title="Minimum sale price">
-                            <span className="text-muted-foreground">Min </span>
-                            {money(p.minSalePrice)}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className={`${td} hidden sm:table-cell`}>
-                        <div className="flex flex-col items-start gap-1">
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                              p.deleted ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
-                            }`}
-                          >
-                            {p.deleted ? "Trash" : "Active"}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={busy || isTrash}
-                            onClick={() => runAction([p._id], p.showInWebsite ? "web-off" : "web-on")}
-                            title="Click to change"
-                            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                              p.showInWebsite ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-500"
-                            }`}
-                          >
-                            {p.showInWebsite ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
-                            Web
-                          </button>
-                        </div>
-                      </td>
-
-                      <td className={td}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="size-7" aria-label="Actions">
-                              <MoreVertical className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={ADMIN_PRODUCT_EDIT(p._id)}>
-                                <Pencil className="size-4" /> Edit / Variants
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => runAction([p._id], p.showInWebsite ? "web-off" : "web-on")}>
-                              {p.showInWebsite ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                              {p.showInWebsite ? "Hide from website" : "Show on website"}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {p.deleted ? (
-                              <DropdownMenuItem onClick={() => runAction([p._id], "restore")}>
-                                <RotateCcw className="size-4" /> Restore
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem className="text-red-600" onClick={() => runAction([p._id], "trash")}>
-                                <Trash2 className="size-4" /> Move to trash
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <td className={tdClass}>{perLine((v) => (v.cost ? money(v.cost) : <span className="text-amber-600">—</span>))}</td>
+                      {RATES.map(([field]) => (
+                        <td key={field} className={tdClass}>
+                          {perLine((v) => <RateCell line={v} field={field} />)}
+                        </td>
+                      ))}
+                      <td className={`${tdClass} font-semibold`}>{money(p.stockValue)}</td>
+                      <td className={tdClass}>
+                        <ActionMenu items={rowActions(p)} />
                       </td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
+
+            {!isLoading && totals && rows.length > 0 && (
+              <tfoot>
+                <tr className={totalRow}>
+                  <td colSpan={4} className={tdClass}>
+                    Total ({data.total} products)
+                  </td>
+                  <td className={tdClass}>{totals.stock}</td>
+                  <td colSpan={5} className={tdClass} />
+                  <td className={tdClass}>{money(totals.cost)}</td>
+                  <td className={tdClass} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 
-        {/* ================= PAGINATION ================= */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-          <span className="text-muted-foreground">
-            {isFetching && !isLoading && <Loader2 className="mr-1 inline size-3.5 animate-spin" />}
-            Showing {from}–{to} of {total} products
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-              <ChevronLeft className="size-4" /> Prev
-            </Button>
-            <span className="tabular-nums">
-              {page} / {pages}
-            </span>
-            <Button variant="outline" size="sm" disabled={page >= pages} onClick={() => setPage((n) => n + 1)}>
-              Next <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
+        <Pagination page={page} pages={data?.pages || 1} from={data?.from || 0} count={rows.length} total={data?.total || 0} onPage={setPage} />
+      </ListCard>
     </div>
+  );
+}
+
+function Thumb({ src }) {
+  return (
+    <div className="relative size-10 shrink-0 overflow-hidden rounded-[4px] border bg-white">
+      <Image src={src || "/placeholder.png"} alt="" fill sizes="40px" className="object-contain" unoptimized={skipOptimize(src)} />
+    </div>
+  );
+}
+
+function Flags({ p }) {
+  const flags = [
+    p.deleted && ["Trash", "bg-red-100 text-red-700"],
+    p.variants.length > 0 && p.totalStock <= 0 && ["Out of stock", "bg-red-100 text-red-700"],
+    p.lowStock && p.totalStock > 0 && ["Low stock", "bg-orange-100 text-orange-700"],
+    p.missingTier && ["Dealer rate not set", "bg-amber-100 text-amber-800"],
+    p.lossTier && ["Below cost", "bg-red-100 text-red-700"],
+  ].filter(Boolean);
+
+  if (!flags.length) return null;
+
+  return (
+    <span className="mt-0.5 flex flex-wrap gap-1">
+      {flags.map(([text, tone]) => (
+        <span key={text} className={`rounded px-1.5 text-[10px] font-semibold ${tone}`}>
+          {text}
+        </span>
+      ))}
+    </span>
   );
 }

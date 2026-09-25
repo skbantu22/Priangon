@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
+import { requirePermission } from "@/lib/apiAuth";
 
 export async function GET(req) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
+    const auth = await requirePermission("purchase.view");
     if (auth.response) return auth.response;
 
     await connectDB();
@@ -23,7 +24,10 @@ export async function GET(req) {
     }
 
     const supplierId = searchParams.get("supplierId");
-    if (supplierId) filter.supplierId = supplierId;
+    if (supplierId && mongoose.isValidObjectId(supplierId)) {
+      // cast: the totals aggregate does not cast strings the way find() does
+      filter.supplierId = new mongoose.Types.ObjectId(supplierId);
+    }
 
     const from = searchParams.get("from");
     const to = searchParams.get("to");
@@ -51,12 +55,26 @@ export async function GET(req) {
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Number(searchParams.get("limit")) || 20);
 
-    const [purchases, total] = await Promise.all([
+    // totals of every purchase in the filter; a cancelled one owes nothing
+    const [purchases, total, sums] = await Promise.all([
       PurchaseModel.find(filter)
         .sort({ purchaseDate: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit),
       PurchaseModel.countDocuments(filter),
+      PurchaseModel.aggregate([
+        { $match: { ...filter, status: filter.status || { $ne: "cancelled" } } },
+        {
+          $group: {
+            _id: null,
+            grandTotal: { $sum: "$grandTotal" },
+            paidAmount: { $sum: "$paidAmount" },
+            dismissAmount: { $sum: "$dismissAmount" },
+            dueAmount: { $sum: "$dueAmount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     return NextResponse.json({
@@ -65,6 +83,9 @@ export async function GET(req) {
       page,
       limit,
       total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      from: total ? (page - 1) * limit + 1 : 0,
+      totals: sums[0] || { grandTotal: 0, paidAmount: 0, dismissAmount: 0, dueAmount: 0, count: 0 },
       hasMore: page * limit < total,
     });
   } catch (error) {

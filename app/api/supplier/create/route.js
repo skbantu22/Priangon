@@ -47,6 +47,12 @@ export async function POST(req) {
       email: body.email?.trim() || "",
       address: body.address?.trim() || "",
       openingBalance: Number(body.openingBalance) || 0,
+      initialAdvance: Math.max(0, Number(body.initialAdvance) || 0),
+      openingDate: body.openingDate ? new Date(body.openingDate) : null,
+      srName: body.srName?.trim() || "",
+      srMobile: body.srMobile?.trim() || "",
+      dsrName: body.dsrName?.trim() || "",
+      dsrMobile: body.dsrMobile?.trim() || "",
       note: body.note?.trim() || "",
       isActive: body.isActive !== false,
     });

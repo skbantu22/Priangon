@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { connectDB } from "@/lib/databaseconnection";
 import { response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
@@ -28,6 +29,9 @@ export async function PUT(request) {
       discountPercentage: true,
       description: true,
       media: true,
+    }).extend({
+      description: z.string().optional().default(""),
+      media: z.array(z.string()).optional().default([]),
     });
 
     const validate = schema.safeParse(payload);
@@ -75,6 +79,8 @@ export async function PUT(request) {
     product.trackSerial = mobile.trackSerial;
 
     Object.assign(product, cleanTierPrices(payload), cleanExtraFields(payload));
+    // no photo: POS only until one is added
+    if (!product.media.length) product.showInWebsite = false;
     if (payload.freeDelivery !== undefined) product.freeDelivery = !!payload.freeDelivery;
 
     await product.save();
