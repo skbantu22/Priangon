@@ -65,7 +65,7 @@ const settingSchema = new mongoose.Schema(
     // or in English alone
     language: {
       type: String,
-      enum: ["bn-en", "en"],
+      enum: ["bn-en", "en", "bn"],
       default: "bn-en",
     },
 

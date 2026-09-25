@@ -5,12 +5,15 @@ import Link from "next/link";
 import { RiMenu4Fill } from "react-icons/ri";
 import { IoSearch, IoCartOutline } from "react-icons/io5";
 import Themeswitch from "./Themeswitch";
-import UserDropDown from "./UserDropDown";
+import ProfilePanel from "./ProfilePanel";
+import { IoPersonCircleOutline } from "react-icons/io5";
 import SearchModel from "./SearchModel";
 import AdminMobileSearch from "./AdminMobileSearch";
 import { useSidebar } from "@/components/ui/sidebar";
 
 const Topbar = () => {
+  const [profileOpen, setProfileOpen] = useState(false);
+
   const { toggleSidebar, open, isMobile } = useSidebar();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -68,8 +71,17 @@ const Topbar = () => {
           <Themeswitch />
         </div>
 
-        <UserDropDown showDetails />
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          aria-label="Account"
+          className="flex size-9 items-center justify-center rounded-full text-white hover:bg-white/10"
+        >
+          <IoPersonCircleOutline className="size-7" />
+        </button>
       </div>
+
+      <ProfilePanel open={profileOpen} onOpenChange={setProfileOpen} />
     </div>
   );
 };

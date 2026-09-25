@@ -7,6 +7,7 @@ import { FiSave } from "react-icons/fi";
 import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
 import { ADMIN_DASHBOARD, ADMIN_SYSTEM_SETTINGS } from "@/Route/Adminpannelroute";
+import { LANGUAGES } from "@/lib/labels";
 import {
   fiscalYearRange,
   formatNumberBD,
@@ -156,6 +157,23 @@ const SystemSettingsPage = () => {
         </CardHeader>
 
         <CardContent className="px-3 py-4 space-y-4">
+          <Field
+            label="App Language (shop default)"
+            hint="What a device shows before anyone picks their own in the account panel"
+          >
+            <select
+              className={selectClass}
+              value={form.language || "bn-en"}
+              onChange={(e) => set({ language: e.target.value })}
+            >
+              {Object.entries(LANGUAGES).map(([key, item]) => (
+                <option key={key} value={key}>
+                  {item.label} — {item.sample}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field
               label="Number Digits"
