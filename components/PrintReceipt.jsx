@@ -734,6 +734,10 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
             This is a computer generated copy. No signature is required from the
             company.
           </p>
+          {/* software credit, last line of every receipt */}
+          <p className="mt-2 border-t border-dashed border-black/20 pt-1.5 text-[9px] font-semibold not-italic text-gray-700">
+            Made by Ecommerce Solution · 01619421979
+          </p>
         </div>
       </div>
     </div>

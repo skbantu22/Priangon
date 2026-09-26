@@ -9,6 +9,7 @@ import ProfilePanel from "./ProfilePanel";
 import { IoPersonCircleOutline } from "react-icons/io5";
 import SearchModel from "./SearchModel";
 import AdminMobileSearch from "./AdminMobileSearch";
+import NotificationBell from "./NotificationBell";
 import { useSidebar } from "@/components/ui/sidebar";
 
 const Topbar = () => {
@@ -66,6 +67,8 @@ const Topbar = () => {
         <div className="md:hidden [&_button]:text-white">
           <AdminMobileSearch />
         </div>
+
+        <NotificationBell />
 
         <div className="[&_button]:text-white [&_button:hover]:bg-white/10 [&_button:hover]:text-white">
           <Themeswitch />
