@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Plus, Trash2, Wand2 } from "lucide-react";
 
 import { btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
-import VariantImage from "@/components/ui/Application/Admin/products/VariantImage";
 import { ratesFor } from "@/lib/priceTiers";
 import { showToast } from "@/lib/showToast";
 
@@ -107,7 +106,6 @@ function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHre
 let seq = 0;
 export const emptyVariant = (color = "", size = "") => ({
   key: `v${++seq}`,
-  image: null,
   color,
   size,
   barcode: "",
@@ -127,7 +125,6 @@ export const variantPayload = (rows) =>
     mrp: Number(r.mrp) || 0,
     sellingPrice: Number(r.sellingPrice) || 0,
     stock: Number(r.stock) || 0,
-    media: r.image?._id ? [r.image._id] : [],
   }));
 
 /** What is wrong with the rows, or "" when they can be saved */
@@ -196,7 +193,7 @@ export default function VariantDraft({ rows, setRows, product }) {
     }
     if (!added.length) return showToast("error", "Those variants are already listed");
     // an untouched blank row gives way to the generated ones
-    const kept = rows.filter((r) => r.color || r.size || r.barcode || r.stock || r.image);
+    const kept = rows.filter((r) => r.color || r.size || r.barcode || r.stock);
     setRows([...kept, ...added]);
     setGen({ colors: "", sizes: "" });
   };
@@ -285,7 +282,6 @@ export default function VariantDraft({ rows, setRows, product }) {
               <tr className={theadClass}>
                 {[
                   "SL",
-                  "Photo",
                   "Size - Color *",
                   "Barcode",
                   "Purchase Price",
@@ -306,7 +302,7 @@ export default function VariantDraft({ rows, setRows, product }) {
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={12} className={`${tdClass} py-6 text-center text-muted-foreground`}>
+                  <td colSpan={11} className={`${tdClass} py-6 text-center text-muted-foreground`}>
                     Type storage and colors above and press Generate Variant, or Add Row.
                   </td>
                 </tr>
@@ -323,9 +319,6 @@ export default function VariantDraft({ rows, setRows, product }) {
                 return (
                   <tr key={r.key}>
                     <td className={tdClass}>{i + 1}</td>
-                    <td className={tdClass}>
-                      <VariantImage value={r.image} onChange={(image) => edit(r.key, { image })} />
-                    </td>
                     <td className={tdClass}>
                       <div className="flex gap-1">
                         <input
@@ -394,7 +387,7 @@ export default function VariantDraft({ rows, setRows, product }) {
           </table>
         </div>
         <p className="m-0 mt-1.5 text-[12px] text-muted-foreground">
-          A blank price uses the product&apos;s price; a blank barcode is made for you; the photo is optional. Dealer, Sub
+          A blank price uses the product&apos;s price; a blank barcode is made for you. Dealer, Sub
           Dealer and Wholesaler follow the Price List above and scale with a dearer variant.{" "}
           <span className="text-amber-600">= Buyer</span> means that rate is not set. Red = at or below cost.
         </p>

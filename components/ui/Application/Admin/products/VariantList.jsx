@@ -5,7 +5,6 @@ import axios from "axios";
 import { Plus, Trash2 } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
-import VariantImage from "@/components/ui/Application/Admin/products/VariantImage";
 import { ratesFor } from "@/lib/priceTiers";
 import { showToast } from "@/lib/showToast";
 
@@ -38,7 +37,6 @@ export default function VariantList({ product }) {
         setRows(
           data.data.map((v) => ({
             _id: v._id,
-            image: v.media?.[0]?._id ? { _id: v.media[0]._id, url: v.media[0].secure_url } : null,
             color: v.color || "",
             size: v.size || "",
             barcode: v.barcode || "",
@@ -64,7 +62,6 @@ export default function VariantList({ product }) {
   const newRow = (color = "", size = "") => ({
     _id: `new-${++tempId}`,
     isNew: true,
-    image: null,
     color,
     size,
     barcode: "",
@@ -118,10 +115,7 @@ export default function VariantList({ product }) {
       return showToast("error", "Every variant needs a color and a storage / size");
     }
 
-    const pick = (r) => ({
-      ...Object.fromEntries(EDITABLE.map((k) => [k, r[k]])),
-      media: r.image?._id ? [r.image._id] : [],
-    });
+    const pick = (r) => Object.fromEntries(EDITABLE.map((k) => [k, r[k]]));
     setSaving(true);
     try {
       if (fresh.length) {
@@ -177,10 +171,10 @@ export default function VariantList({ product }) {
       </p>
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[1210px] border-collapse text-sm">
+        <table className="w-full min-w-[1150px] border-collapse text-sm">
           <thead>
             <tr className={theadClass}>
-              {["SL", "Photo", "Color", "Storage / Size", "Barcode", "Cost", "MRP", "Buyer", "Dealer", "Sub Dealer", "Wholesaler", "Stock", ""].map((h) => (
+              {["SL", "Color", "Storage / Size", "Barcode", "Cost", "MRP", "Buyer", "Dealer", "Sub Dealer", "Wholesaler", "Stock", ""].map((h) => (
                 <th key={h} className={thClass}>
                   {h}
                 </th>
@@ -190,7 +184,7 @@ export default function VariantList({ product }) {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={13} className={tdClass}>
+                <td colSpan={12} className={tdClass}>
                   <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-muted" />
                 </td>
               </tr>
@@ -198,7 +192,7 @@ export default function VariantList({ product }) {
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={13} className={`${tdClass} py-8 text-center text-muted-foreground`}>
+                <td colSpan={12} className={`${tdClass} py-8 text-center text-muted-foreground`}>
                   No variants yet. Type colors and storage above and press Generate, or Add Row.
                 </td>
               </tr>
@@ -218,9 +212,6 @@ export default function VariantList({ product }) {
                 return (
                   <tr key={r._id} className={r.dirty ? "bg-amber-50/60 dark:bg-amber-500/5" : ""}>
                     <td className={tdClass}>{i + 1}</td>
-                    <td className={tdClass}>
-                      <VariantImage value={r.image} onChange={(image) => edit(r._id, "image", image)} />
-                    </td>
                     <td className={tdClass}>
                       <input value={r.color} onChange={(e) => edit(r._id, "color", e.target.value)} className={`${cell} min-w-[90px]`} />
                     </td>
