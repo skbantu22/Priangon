@@ -16,6 +16,11 @@ import FBTrackingSetting from "@/models/FbTrackingSetting.model";
 import AnnouncementBar from "@/components/ui/Application/website/AnnouncementBar";
 import { getSettings } from "@/models/Setting.model";
 
+// The layout reads settings from MongoDB, so its pages render per request.
+// Prerendering them made `next build` query the database from every worker
+// and hang on "Collecting page data".
+export const dynamic = "force-dynamic";
+
 const jost = Jost({
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
