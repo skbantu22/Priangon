@@ -13,7 +13,7 @@ import { List, Plus } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
-import VariantDraft, { emptyVariant, variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
+import VariantDraft, { variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSchema";
@@ -81,7 +81,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   );
   const [simpleItem, setSimpleItem] = useState({ barcode: "", stock: "" });
   // a variant product being added: its lines are typed in on this screen
-  const [variantRows, setVariantRows] = useState(() => [emptyVariant()]);
+  const [variantRows, setVariantRows] = useState([]);
   const [editorKey, setEditorKey] = useState(0);
   const warrantyTouched = useRef(editing);
 
@@ -161,7 +161,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     reset(productFormValues(null));
     setMedia([]);
     setSimpleItem({ barcode: "", stock: "" });
-    setVariantRows([emptyVariant()]);
+    setVariantRows([]);
     setEditorKey((k) => k + 1);
     warrantyTouched.current = false;
   };

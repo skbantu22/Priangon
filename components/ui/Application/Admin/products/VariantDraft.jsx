@@ -103,9 +103,13 @@ function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHre
   );
 }
 
-let seq = 0;
+// A key no other line can share, even across a hot reload or a second
+// render of the form (a module counter handed out "v1" twice).
+const newKey = () =>
+  globalThis.crypto?.randomUUID?.() ?? `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+
 export const emptyVariant = (color = "", size = "") => ({
-  key: `v${++seq}`,
+  key: newKey(),
   color,
   size,
   barcode: "",
@@ -192,7 +196,7 @@ export default function VariantDraft({ rows, setRows, product }) {
       }
     }
     if (!added.length) return showToast("error", "Those variants are already listed");
-    // an untouched blank row gives way to the generated ones
+    // a blank row added by hand gives way to the generated ones
     const kept = rows.filter((r) => r.color || r.size || r.barcode || r.stock);
     setRows([...kept, ...added]);
     setGen({ colors: "", sizes: "" });

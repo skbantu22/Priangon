@@ -1,7 +1,7 @@
 import { z } from "zod";
 import slugify from "slugify";
 import { connectDB } from "@/lib/databaseconnection";
-import { response } from "@/lib/helperfunction";
+import { response, zodMessage } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
@@ -44,7 +44,7 @@ export async function PUT(request) {
     const validate = schema.safeParse(payload);
 
     if (!validate.success) {
-      return response(false, 400, "Validation Error", validate.error.format());
+      return response(false, 400, zodMessage(validate.error), validate.error.format());
     }
 
     const data = validate.data;

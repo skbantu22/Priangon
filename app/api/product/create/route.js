@@ -1,7 +1,7 @@
 import { z } from "zod";
 import slugify from "slugify";
 import { connectDB } from "@/lib/databaseconnection";
-import { catchError, response } from "@/lib/helperfunction";
+import { catchError, response, zodMessage } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
 import ProductModel from "@/models/Product.model";
 import { encode } from "entities";
@@ -46,7 +46,7 @@ export async function POST(request) {
     const validate = schema.safeParse(payload);
 
     if (!validate.success) {
-      return response(false, 400, "Invalid or missing fields.", validate.error);
+      return response(false, 400, zodMessage(validate.error), validate.error);
     }
 
     let productData = validate.data;
