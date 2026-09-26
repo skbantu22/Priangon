@@ -16,7 +16,7 @@ const firstOfMonth = () => {
   return toInputDate(new Date(d.getFullYear(), d.getMonth(), 1));
 };
 
-const BLANK = { customerType: "", paymentStatus: "", orderStatus: "", soldBy: "", showroomId: "", supplierId: "", expenseTypeId: "", categoryId: "", brand: "", search: "", from: "", to: "", month: "", year: "" };
+const BLANK = { paidBy: "", customerId: "", location: "", customerType: "", paymentStatus: "", orderStatus: "", soldBy: "", showroomId: "", supplierId: "", expenseTypeId: "", categoryId: "", brand: "", search: "", from: "", to: "", month: "", year: "" };
 
 /** First query per report, like 360: daily = today, monthly = this month, yearly = this year */
 const defaultQuery = (key) => {
@@ -86,6 +86,17 @@ function Filter({ k, q, set, options }) {
         ["received", "Received"],
         ["cancelled", "Cancelled"],
       ]);
+    case "paid_by":
+      return select(q.paidBy, (v) => set("paidBy", v), "Paid By", [
+        ["Cash", "Cash"],
+        ["Mobile Banking", "Mobile Banking"],
+        ["Card", "Card"],
+        ["Bank", "Bank"],
+      ]);
+    case "customer":
+      return select(q.customerId, (v) => set("customerId", v), "Select Customer", pairs(options.customers));
+    case "location":
+      return select(q.location, (v) => set("location", v), "All Location", pairs(options.locations));
     case "user":
       return select(q.soldBy, (v) => set("soldBy", v), "All User", pairs(options.users));
     case "branch":

@@ -25,6 +25,15 @@ async function optionsFor(filters) {
   const options = {};
 
   if (filters.includes("branch")) options.branches = await list("showrooms", {});
+  if (filters.includes("location")) {
+    options.locations = [{ _id: "warehouse", name: "Warehouse" }, ...(await list("showrooms", {}))];
+  }
+  if (filters.includes("customer")) {
+    options.customers = (await db.collection("customers").find({}).project({ name: 1, phone: 1 }).sort({ name: 1 }).toArray()).map((c) => ({
+      _id: c._id,
+      name: c.phone ? c.name + " (" + c.phone + ")" : c.name,
+    }));
+  }
   if (filters.includes("supplier")) options.suppliers = await list("suppliers", { deletedAt: null });
   if (filters.includes("expense_type")) options.expenseTypes = await list("expensecategories", { deletedAt: null });
   if (filters.includes("category")) options.categories = await list("categories", {});
@@ -77,6 +86,9 @@ export async function GET(req, { params }) {
       paymentStatus: oneOf(q.get("paymentStatus"), ["paid", "partial", "due"]),
       orderStatus: oneOf(q.get("orderStatus"), ["pending", "confirmed", "invoiced", "received", "cancelled"]),
       soldBy: String(q.get("soldBy") || "").slice(0, 100),
+      paidBy: oneOf(q.get("paidBy"), ["Cash", "Mobile Banking", "Card", "Bank"]),
+      customerId: id(q.get("customerId")),
+      location: q.get("location") === "warehouse" ? "warehouse" : id(q.get("location")),
       supplierId: id(q.get("supplierId")),
       expenseTypeId: id(q.get("expenseTypeId")),
       categoryId: id(q.get("categoryId")),
