@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const productSchema = new mongoose.Schema(
   {
@@ -142,6 +143,8 @@ const productSchema = new mongoose.Schema(
 // Indexes
 productSchema.index({ category: 1, subcategory: 1 });
 productSchema.index({ offers: 1 });
+
+productSchema.plugin(activityLog, { module: "Product", label: "name" });
 
 const ProductModel =
   mongoose.models.Product ||

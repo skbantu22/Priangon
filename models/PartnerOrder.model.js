@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 // An order placed by a dealer / sub dealer / wholesaler from the partner portal.
 // Staff turn it into a real invoice (POSOrder) at the POS, where IMEIs are
@@ -61,6 +62,8 @@ const partnerOrderSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+partnerOrderSchema.plugin(activityLog, { module: "Partner Order", label: "orderNumber" });
 
 const PartnerOrder =
   mongoose.models.PartnerOrder ||

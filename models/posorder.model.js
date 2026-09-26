@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const POSOrderSchema = new mongoose.Schema(
   {
@@ -345,6 +346,8 @@ const POSOrderSchema = new mongoose.Schema(
 
 // warranty look-up by IMEI / serial
 POSOrderSchema.index({ "items.imeis": 1 });
+
+POSOrderSchema.plugin(activityLog, { module: "Sale", label: "orderNumber" });
 
 export default mongoose.models.POSOrder ||
   mongoose.model("POSOrder", POSOrderSchema);

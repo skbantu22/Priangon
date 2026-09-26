@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 /**
  * A request sent to a supplier. Nothing moves in stock or in the supplier's
@@ -61,6 +62,8 @@ const purchaseOrderSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+purchaseOrderSchema.plugin(activityLog, { module: "Purchase Order", label: "orderNumber" });
 
 export default mongoose.models.PurchaseOrder ||
   mongoose.model("PurchaseOrder", purchaseOrderSchema, "purchase_orders");

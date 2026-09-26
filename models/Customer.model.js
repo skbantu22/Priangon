@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const CustomerSchema = new mongoose.Schema(
   {
@@ -53,6 +54,8 @@ const CustomerSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+CustomerSchema.plugin(activityLog, { module: "Customer", label: "name" });
 
 export default mongoose.models.Customer ||
   mongoose.model("Customer", CustomerSchema);

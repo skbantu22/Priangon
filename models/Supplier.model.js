@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const supplierSchema = new mongoose.Schema(
   {
@@ -82,6 +83,8 @@ const supplierSchema = new mongoose.Schema(
 );
 
 supplierSchema.index({ name: 1, phone: 1 }, { unique: true });
+
+supplierSchema.plugin(activityLog, { module: "Supplier", label: "name" });
 
 const SupplierModel =
   mongoose.models.Supplier ||

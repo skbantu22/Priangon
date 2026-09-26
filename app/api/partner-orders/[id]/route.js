@@ -1,23 +1,18 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/auth.server";
+import { requirePermission } from "@/lib/apiAuth";
 import { connectDB } from "@/lib/databaseconnection";
 import PartnerOrder from "@/models/PartnerOrder.model";
 import POSOrder from "@/models/posorder.model";
 import Product from "@/models/Product.model";
 
-const STAFF = ["admin", "manager", "cashier"];
-
-const staff = async () => {
-  const auth = await isAuthenticated();
-  return auth.isAuth && STAFF.includes(auth.role);
-};
 const fail = (message, status = 400) =>
   NextResponse.json({ success: false, message }, { status });
 
 // GET: one order (used by the POS to load it into the cart)
 export async function GET(req, { params }) {
-  if (!(await staff())) return fail("Unauthorized", 403);
+  const auth = await requirePermission("partnerOrders.view");
+  if (auth.response) return auth.response;
   const { id } = await params;
   if (!mongoose.isValidObjectId(id)) return fail("Invalid id");
 
@@ -45,7 +40,8 @@ export async function GET(req, { params }) {
 
 // PATCH { status: "confirmed" | "cancelled" | "invoiced", posOrderId?, staffNote? }
 export async function PATCH(req, { params }) {
-  if (!(await staff())) return fail("Unauthorized", 403);
+  const auth = await requirePermission("partnerOrders.invoice");
+  if (auth.response) return auth.response;
   const { id } = await params;
   if (!mongoose.isValidObjectId(id)) return fail("Invalid id");
 

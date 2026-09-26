@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
@@ -141,6 +142,8 @@ userSchema.pre("save", async function () {
 userSchema.methods.comparePassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
+
+userSchema.plugin(activityLog, { module: "User", label: "name" });
 
 const UserModel =
   mongoose.models.User || mongoose.model("User", userSchema, "users");

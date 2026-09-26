@@ -7,13 +7,11 @@ import sbtMark from "@/public/assets/sbt-mark.png";
 import { usePathname } from "next/navigation";
 import { LuChevronRight } from "react-icons/lu";
 import { IoMdClose } from "react-icons/io";
-import { IoCartOutline } from "react-icons/io5";
 import { useSelector, useDispatch } from "react-redux";
 
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
@@ -69,13 +67,6 @@ export default function Appsidebar() {
 
     if (isMobile) toggleSidebar();
   };
-
-  const initials = (user?.name || "?")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <Sidebar className="z-50 border-r-0">
@@ -203,31 +194,6 @@ export default function Appsidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-3">
-        <div className="rounded-xl bg-gradient-to-br from-[#5b2ee0] to-[#3b1c9e] p-3 text-white shadow-lg shadow-black/30">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold">
-              {initials}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {user?.name || "Guest"}
-              </p>
-              <p className="text-[11px] capitalize text-white/70">{role}</p>
-            </div>
-          </div>
-
-          <Link
-            href="/admin/pos"
-            onClick={() => handleNav("POS")}
-            className="mt-3 flex h-9 items-center justify-center gap-2 rounded-lg bg-white text-sm font-semibold text-[#3b1c9e] transition hover:bg-white/90"
-          >
-            <IoCartOutline className="size-4" />
-            Open POS
-          </Link>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   );
 }

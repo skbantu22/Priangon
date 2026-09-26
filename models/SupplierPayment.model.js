@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 /**
  * Money moving between the shop and a supplier outside a purchase screen.
@@ -71,6 +72,8 @@ const supplierPaymentSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+supplierPaymentSchema.plugin(activityLog, { module: "Supplier Payment", label: "invoiceNo" });
 
 export default mongoose.models.SupplierPayment ||
   mongoose.model("SupplierPayment", supplierPaymentSchema);

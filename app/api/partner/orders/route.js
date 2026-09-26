@@ -102,7 +102,8 @@ export async function POST(req) {
 
     const seq = await getNextInvoiceNumber("partner_order");
     const order = await PartnerOrder.create({
-      orderNumber: `PO-${String(seq).padStart(5, "0")}`,
+      // DO- (dealer order), so it never reads like a purchase order (PO-)
+      orderNumber: `DO-${String(seq).padStart(5, "0")}`,
       userId: partner.user._id,
       customerId: partner.customer._id,
       customerType: partner.type,

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 /**
  * A correction to a stock figure that no sale, purchase or transfer
@@ -95,6 +96,8 @@ const stockAdjustmentSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+stockAdjustmentSchema.plugin(activityLog, { module: "Stock Adjustment", label: "adjustmentNumber" });
 
 export default mongoose.models.StockAdjustment ||
   mongoose.model("StockAdjustment", stockAdjustmentSchema);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 /**
  * Goods sent back to a supplier. The units leave warehouse stock, and the
@@ -47,6 +48,8 @@ const purchaseReturnSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+purchaseReturnSchema.plugin(activityLog, { module: "Purchase Return", label: "returnNumber" });
 
 export default mongoose.models.PurchaseReturn ||
   mongoose.model("PurchaseReturn", purchaseReturnSchema, "purchase_returns");

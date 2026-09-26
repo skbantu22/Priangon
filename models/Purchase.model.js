@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const purchaseItemSchema = new mongoose.Schema(
   {
@@ -191,6 +192,8 @@ purchaseSchema.methods.recalculateTotals = function () {
     this.paymentStatus = "paid";
   }
 };
+
+purchaseSchema.plugin(activityLog, { module: "Purchase", label: "purchaseNumber" });
 
 const PurchaseModel =
   mongoose.models.Purchase ||

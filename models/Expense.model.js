@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 const expenseSchema = new mongoose.Schema(
   {
@@ -60,6 +61,8 @@ const expenseSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+expenseSchema.plugin(activityLog, { module: "Expense", label: "voucherNumber" });
 
 const ExpenseModel =
   mongoose.models.Expense ||

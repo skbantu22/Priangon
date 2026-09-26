@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { activityLog } from "@/lib/activityLog";
 
 import { ALL_PERMISSIONS, SYSTEM_ROLES } from "@/lib/permissions";
 
@@ -36,6 +37,8 @@ const roleSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+roleSchema.plugin(activityLog, { module: "User Role", label: "name" });
 
 const RoleModel =
   mongoose.models.Role || mongoose.model("Role", roleSchema, "roles");
