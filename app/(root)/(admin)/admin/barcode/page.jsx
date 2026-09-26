@@ -1,15 +1,35 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import axios from "axios";
-import Barcode from "react-barcode";
-import { Trash2 } from "lucide-react";
+import { Settings2, Trash2 } from "lucide-react";
+
+import { printLabels } from "@/lib/barcodeLabel";
+import { showToast } from "@/lib/showToast";
 
 const BarcodePrintPage = () => {
   const [variants, setVariants] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
-  const [labels, setLabels] = useState([]);
+  // Settings → Barcode Print Settings, and the shop name / address it falls back to
+  const [labelSettings, setLabelSettings] = useState({ label: {}, shop: {} });
+
+  useEffect(() => {
+    axios
+      .get("/api/settings")
+      .then(({ data }) => {
+        if (!data?.success) return;
+        setLabelSettings({
+          label: data.data.barcodeLabel || {},
+          shop: {
+            name: data.data.companyName || "",
+            address: data.data.address || "",
+          },
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   // FETCH
   useEffect(() => {
@@ -27,7 +47,7 @@ const BarcodePrintPage = () => {
   // FILTER
   const filteredVariants = useMemo(() => {
     return variants.filter((v) =>
-      `${v.sku} ${v.color} ${v.size} ${v.product?.name || ""}`
+      `${v.sku} ${v.barcode || ""} ${v.color} ${v.size} ${v.product?.name || ""}`
         .toLowerCase()
         .includes(search.toLowerCase()),
     );
@@ -52,17 +72,23 @@ const BarcodePrintPage = () => {
     setSelectedItems((prev) => prev.filter((i) => i.variant._id !== id));
   };
 
+  // prints at the sticker size set in Barcode Print Settings, with the
+  // variant's own barcode (what the POS scans)
   const generateLabels = () => {
-    let all = [];
-
-    selectedItems.forEach((item) => {
-      const copies = Array.from({ length: item.qty }, () => item.variant);
-      all.push(...copies);
-    });
-
-    setLabels(all);
-
-    setTimeout(() => window.print(), 300);
+    if (!selectedItems.length)
+      return showToast("error", "Add products to print first");
+    const items = selectedItems.map(({ variant, qty }) => ({
+      productName: variant.product?.name || "",
+      variant: [variant.color, variant.size]
+        .filter((v) => v && v !== "Default" && v !== "Standard")
+        .join(" · "),
+      barcode: variant.barcode || variant.sku,
+      price: variant.sellingPrice,
+      mrp: variant.mrp,
+      copies: qty,
+    }));
+    if (!printLabels(items, labelSettings.label, labelSettings.shop))
+      showToast("error", "Allow pop-ups to print");
   };
 
   return (
@@ -71,12 +97,20 @@ const BarcodePrintPage = () => {
       <div className="no-print flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold">Barcode Print System</h1>
 
-        <button
-          onClick={generateLabels}
-          className="bg-black text-white px-5 py-2 rounded hover:bg-gray-800"
-        >
-          Print Labels
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/settings/barcode"
+            className="flex items-center gap-1.5 rounded border bg-white px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            <Settings2 size={16} /> Label settings
+          </Link>
+          <button
+            onClick={generateLabels}
+            className="bg-black text-white px-5 py-2 rounded hover:bg-gray-800"
+          >
+            Print Labels
+          </button>
+        </div>
       </div>
 
       {/* SEARCH */}
@@ -193,46 +227,6 @@ const BarcodePrintPage = () => {
           </table>
         </div>
       )}
-
-      {/* PRINT AREA (2 COLUMN + CLEAN BARCODE UI) */}
-      <div id="receipt" className="print-grid">
-        {labels.map((item, i) => (
-          <div key={i} className="label-cell">
-            <div className="barcode-card">
-              {/* TOP INFO */}
-              <div className="barcode-top">
-                <div>
-                  <div className="font-bold text-sm text-center">
-                    {item.product?.name}
-                  </div>
-                  <div className="text-xs text-gray-500 text-center">
-                    {item.color} • {item.size}
-                  </div>
-                </div>
-              </div>
-
-              {/* BARCODE */}
-              <div className="barcode-box w-[320px] flex justify-center">
-                <Barcode
-                  value={item.sku}
-                  width={1.2}
-                  height={50}
-                  displayValue={true}
-                  fontSize={12}
-                  margin={0}
-                  background="#ffffff"
-                  lineColor="#000000"
-                />
-              </div>
-
-              {/* PRICE */}
-              <div className="barcode-price text-center">
-                ৳ {item.sellingPrice}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };

@@ -51,6 +51,10 @@ const settingSchema = new mongoose.Schema(
     showAmountInWords: { type: Boolean, default: true },
     warrantyTerms: { type: String, trim: true, default: "" },
 
+    // Settings → Barcode Print Settings: sticker size, what it shows, and
+    // the shop name / address printed on it (lib/barcodeLabel)
+    barcodeLabel: { type: mongoose.Schema.Types.Mixed, default: {} },
+
     // =========================
     // REGIONAL
     // =========================

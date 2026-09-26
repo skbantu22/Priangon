@@ -156,6 +156,7 @@ export async function GET(request) {
                 },
 
                 sku: 1,
+                barcode: 1,
                 color: 1,
                 size: 1,
                 mrp: 1,

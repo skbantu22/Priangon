@@ -43,6 +43,7 @@ const EDITABLE = [
   "invoiceFooter",
   "showAmountInWords",
   "warrantyTerms",
+  "barcodeLabel",
   "numberDigits",
   "language",
   "fiscalYearStartMonth",
