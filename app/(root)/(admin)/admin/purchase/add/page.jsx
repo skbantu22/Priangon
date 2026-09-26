@@ -68,6 +68,7 @@ function AddPurchase() {
     purchaseDate: today(),
     dueDate: "",
     status: "received",
+    stockLocation: "",
     note: "",
   });
   const [numberEdited, setNumberEdited] = useState(false);
@@ -81,6 +82,22 @@ function AddPurchase() {
   const [imeiRow, setImeiRow] = useState(null);
   const [imeiText, setImeiText] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Stock In To: like 360, the goods go to the main branch unless told otherwise
+  const [locations, setLocations] = useState([]);
+  const [mainLocation, setMainLocation] = useState("");
+
+  useEffect(() => {
+    axios
+      .get("/api/purchase/locations")
+      .then(({ data }) => {
+        if (!data.success) return;
+        setLocations(data.data);
+        setMainLocation(data.main);
+        setHead((h) => ({ ...h, stockLocation: h.stockLocation || data.main }));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     axios
@@ -279,6 +296,17 @@ function AddPurchase() {
             <select id="pur-status" value={head.status} onChange={setH("status")} className={inputClass}>
               <option value="received">Received now (stock in)</option>
               <option value="pending">Pending (goods not in yet)</option>
+            </select>
+          </Field>
+          <Field label="Stock In To" htmlFor="pur-location">
+            <select id="pur-location" value={head.stockLocation} onChange={setH("stockLocation")} className={inputClass}>
+              {!locations.length && <option value="">Main branch</option>}
+              {locations.map((l) => (
+                <option key={l.key} value={l.key}>
+                  {l.name}
+                  {l.key === mainLocation ? " (main)" : ""}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Attachment" htmlFor="pur-attach">

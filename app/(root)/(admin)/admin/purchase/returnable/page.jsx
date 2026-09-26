@@ -198,7 +198,10 @@ export default function ReturnablePage() {
                       {r.purchaseNumber}
                     </Link>
                   </td>
-                  <td className={tdClass}>{r.supplierName}</td>
+                  <td className={tdClass}>
+                    {r.supplierName}
+                    <span className="block text-[12px] text-[#98a6ad]">Stock at {r.location}</span>
+                  </td>
                   <td className={tdClass}>
                     {r.productName}
                     {r.variantLabel && <span className="text-[#6c757d]"> ({r.variantLabel})</span>}

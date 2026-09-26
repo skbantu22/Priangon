@@ -11,8 +11,10 @@ import {
   applyNewRates,
   applyPurchaseToStock,
   cleanRates,
+  mainStockLocation,
   nextPurchaseNumber,
 } from "@/lib/purchaseService";
+import { SHOWROOM, assertLocationExists, locationName, parseLocation } from "@/lib/stockService";
 
 const METHODS = ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"];
 
@@ -140,6 +142,11 @@ export async function POST(req) {
       discountType === "percent" ? round2((subtotal * discountValue) / 100) : discountValue,
     );
 
+    // Stock In To: a branch, the warehouse, or (not chosen) the main branch
+    const location = body.stockLocation ? parseLocation(body.stockLocation) : await mainStockLocation();
+
+    if (!location || !(await assertLocationExists(location))) return fail("Choose where the goods go into stock");
+
     const createdBy = await actorFullName(auth);
 
     const purchase = new PurchaseModel({
@@ -150,6 +157,8 @@ export async function POST(req) {
       purchaseDate: dateOrNull(body.purchaseDate) || new Date(),
       dueDate: dateOrNull(body.dueDate),
       purchaseOrderId: order?._id || null,
+      showroomId: location.locationType === SHOWROOM ? location.locationId : null,
+      locationName: await locationName(location),
       attachment: {
         url: String(body.attachment?.url || "").trim(),
         publicId: String(body.attachment?.publicId || "").trim(),

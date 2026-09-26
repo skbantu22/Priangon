@@ -101,6 +101,12 @@ const purchaseSchema = new mongoose.Schema(
     // when the supplier expects to be paid
     dueDate: { type: Date, default: null },
 
+    // Where the goods go into stock: a branch (showroom) or, when empty,
+    // the warehouse. Like 360, it defaults to the main branch, so bought
+    // goods can be sold straight away without a transfer.
+    showroomId: { type: mongoose.Schema.Types.ObjectId, ref: "Showroom", default: null },
+    locationName: { type: String, trim: true, default: "Warehouse" },
+
     // the purchase order this purchase received, if any
     purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "PurchaseOrder", default: null },
 

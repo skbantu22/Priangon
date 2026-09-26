@@ -246,7 +246,9 @@ function PurchaseReturnCreate() {
                         <Link href={ADMIN_PURCHASE_VIEW(item.purchaseId)} className="text-[#188ae2] hover:underline">
                           {item.purchaseNumber}
                         </Link>
-                        <span className="block text-[12px] text-[#98a6ad]">{fmtDate(item.purchaseDate)}</span>
+                        <span className="block text-[12px] text-[#98a6ad]">
+                          {fmtDate(item.purchaseDate)} · {item.location}
+                        </span>
                       </td>
                       <td className={tdClass}>
                         {item.productName}

@@ -139,6 +139,7 @@ function PurchaseView() {
             <div className="sm:text-right">
               <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#98a6ad]">Received by</p>
               <p className="m-0 mt-1">{p.createdBy || "—"}</p>
+              <p className="m-0 text-[#6c757d]">Stock in: {p.locationName || "Warehouse"}</p>
               <span className="mt-2 inline-flex gap-1">
                 <span className={`rounded-[4px] px-[10px] py-[3px] text-[12px] font-semibold uppercase ${STATUS_STYLE[p.status] || ""}`}>{p.status}</span>
                 <span
