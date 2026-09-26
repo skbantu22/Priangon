@@ -152,7 +152,9 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
   const [searching, setSearching] = useState(false);
   const [active, setActive] = useState(0);
   const [lastAdded, setLastAdded] = useState("");
+  const [searched, setSearched] = useState("");
   const box = useRef(null);
+  const pickRef = useRef(null);
 
   const search = async (q) => {
     const { data } = await axios.get(`/api/purchase/variant-search?q=${encodeURIComponent(q)}`);
@@ -168,14 +170,20 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        setResults(await search(query.trim()));
+        const term = query.trim();
+        const found = await search(term);
+        // like 360: an exact barcode goes straight in, no Enter needed
+        const exact = found.find((r) => r.barcode && r.barcode === term);
+        if (exact) return pickRef.current(exact);
+        setResults(found);
+        setSearched(term);
         setActive(0);
       } catch {
         showToast("error", "Product search failed");
       } finally {
         setSearching(false);
       }
-    }, 250);
+    }, 180);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -184,9 +192,11 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
     setLastAdded(`${hit.productName}${hit.variantLabel ? ` · ${hit.variantLabel}` : ""}`);
     setQuery("");
     setResults([]);
+    setSearched("");
     setActive(0);
     box.current?.focus();
   };
+  pickRef.current = pick;
 
   const exactIn = (list, q) => list.find((r) => r.barcode?.toLowerCase() === q || r.sku?.toLowerCase() === q);
 
@@ -251,10 +261,12 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
           "Scan a barcode, or type and use ↑ ↓ and Enter."
         )}
       </p>
-      {(results.length > 0 || searching) && (
+      {(results.length > 0 || searching || (searched && searched === query.trim())) && (
         <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-[6px] border border-[#e3e3e3] bg-white shadow-lg dark:bg-popover">
           {searching && !results.length ? (
             <p className="m-0 p-3 text-[13px] text-muted-foreground">Searching...</p>
+          ) : !results.length ? (
+            <p className="m-0 p-3 text-[13px] text-muted-foreground">No product found for &quot;{searched}&quot;</p>
           ) : (
             results.map((r, i) => (
               <button
