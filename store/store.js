@@ -28,9 +28,18 @@ const createNoopStorage = () => ({
 const storage =
   typeof window !== "undefined" ? createWebStorage("local") : createNoopStorage();
 
+// Browsers can still hold slices that were removed (orderStore went with the
+// online shop); drop them on load so the reducer does not warn about them.
+const KNOWN_KEYS = ["authStore", "cartStore", "wishlistStore", "posCart", "notification", "_persist"];
+const dropRemovedSlices = (state) =>
+  Promise.resolve(
+    state && Object.fromEntries(Object.entries(state).filter(([key]) => KNOWN_KEYS.includes(key))),
+  );
+
 const persistConfig = {
   key: "root",
   storage,
+  migrate: dropRemovedSlices,
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
