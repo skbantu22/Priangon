@@ -11,7 +11,7 @@ import { decode } from "entities";
 import { z } from "zod";
 import { List, Plus } from "lucide-react";
 
-import { ListCard, btn, filterInput as inputClass } from "@/components/ui/Application/Admin/listKit";
+import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
 import VariantDraft, { variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
@@ -304,31 +304,82 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
             <input {...register("rackNo")} placeholder="Ex: A-12" className={inputClass} />
           </Field>
 
-          {!editing && productType === "simple" && (
-            <>
-              <Field label="Barcode" className="sm:col-span-3" hint="Leave empty to auto-generate">
-                <input
-                  value={simpleItem.barcode}
-                  onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
-                  placeholder="Scan barcode"
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="Opening Stock (warehouse)" className="sm:col-span-3">
-                <input
-                  type="number"
-                  min="0"
-                  value={simpleItem.stock}
-                  onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
-                  placeholder="0"
-                  className={inputClass}
-                />
-              </Field>
-            </>
-          )}
         </div>
 
-        {/* ---------- price list ---------- */}
+        {/* ---------- a new simple product: one line with its prices and stock ---------- */}
+        {!editing && productType === "simple" ? (
+          <Section title="Price and Stock" note="A simple product sells as one item. The POS charges each customer the rate of their type; an empty rate charges the Buyer price.">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1040px] border-collapse text-sm">
+                <thead>
+                  <tr className={theadClass}>
+                    {["Size - Color", "Barcode", ...PRICES.map(([, label]) => label), "Opening Stock"].map((h) => (
+                      <th key={h} className={thClass}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className={`${tdClass} text-muted-foreground`}>Default</td>
+                    <td className={tdClass}>
+                      <div className="flex">
+                        <input
+                          value={simpleItem.barcode}
+                          onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
+                          placeholder="Scan or auto"
+                          aria-label="Barcode"
+                          className={`${inputClass} !h-[34px] !w-[120px] shrink-0 !px-2 font-mono !text-[13px]`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSimpleItem({ ...simpleItem, barcode: String(Math.floor(10000000 + Math.random() * 90000000)) })}
+                          title="Make a barcode"
+                          aria-label="Make a barcode"
+                          className="flex h-[34px] w-[30px] shrink-0 items-center justify-center bg-[#10c469] text-white hover:bg-[#0eab5c]"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </td>
+                    {PRICES.map(([field, label]) => (
+                      <td key={field} className={`${tdClass} align-top`}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          {...register(field)}
+                          aria-label={label}
+                          placeholder={["dealerPrice", "subDealerPrice", "wholesalerPrice"].includes(field) && retail ? String(retail) : "0"}
+                          className={`${inputClass} !h-[34px] w-[96px] !px-2 text-right !text-[13px] ${field === "sellingPrice" ? "font-semibold" : ""}`}
+                        />
+                        <span className="mt-0.5 block min-h-[14px] text-[11px] tabular-nums">{rateNote(field)}</span>
+                      </td>
+                    ))}
+                    <td className={`${tdClass} align-top`}>
+                      <input
+                        type="number"
+                        min="0"
+                        value={simpleItem.stock}
+                        onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
+                        placeholder="0"
+                        aria-label="Opening stock"
+                        className={`${inputClass} !h-[34px] w-[80px] !px-2 text-right !text-[13px]`}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            {tierOrderWarning && (
+              <p className="m-0 mt-2 rounded-[4px] bg-amber-50 px-3 py-1.5 text-[12px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                Check the rates: {tierOrderWarning}. Usually Dealer &lt; Sub Dealer &lt; Wholesaler &lt; Buyer.
+              </p>
+            )}
+          </Section>
+        ) : (
         <Section title="Price List (রেট)" note="The POS charges each customer the rate of their type. An empty rate charges the Buyer price.">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {PRICES.map(([field, label, bn]) => (
@@ -354,6 +405,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
             </p>
           )}
         </Section>
+        )}
 
         {/* ---------- stock & warranty ---------- */}
         <Section title="Stock & Warranty">
