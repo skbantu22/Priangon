@@ -593,13 +593,36 @@ export default function CartSidebar({
                       </button>
                     </div>
 
-                    <span className="text-right text-[12px] text-gray-700 dark:text-gray-300">
-                      {money(item.price)}
-                    </span>
+                    {/* A dealer / sub dealer / wholesaler rate shows under the
+                        normal (Buyer) price, struck through, so the counter
+                        can see the discount the customer type gets */}
+                    {(() => {
+                      const normal = Number(item.rates?.sellingPrice) || 0;
+                      const price = Number(item.price) || 0;
+                      const qty = Number(item.qty) || 0;
+                      const tiered = normal > price;
+                      return (
+                        <>
+                          <span className="text-right text-[12px] leading-tight text-gray-700 dark:text-gray-300">
+                            {tiered && (
+                              <span className="block text-[10.5px] text-gray-400 line-through" title="Normal price">
+                                {money(normal)}
+                              </span>
+                            )}
+                            <span className={tiered ? "font-semibold text-emerald-700 dark:text-emerald-400" : ""}>{money(price)}</span>
+                          </span>
 
-                    <span className="text-right text-[12px] font-bold text-gray-900 dark:text-white">
-                      {money((Number(item.price) || 0) * (Number(item.qty) || 0))}
-                    </span>
+                          <span className="text-right text-[12px] font-bold leading-tight text-gray-900 dark:text-white">
+                            {tiered && (
+                              <span className="block text-[10.5px] font-normal text-gray-400 line-through">
+                                {money(normal * qty)}
+                              </span>
+                            )}
+                            {money(price * qty)}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <button
