@@ -413,11 +413,18 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         </Section>
 
         {!editing && productType === "variant" && (
-          <Section title="Variants (color / storage)" note="Each line sells with its own barcode, price and stock.">
+          <Section title="Generate Variants (storage / color)" note="Each line sells with its own barcode, price and stock.">
             <VariantDraft
               rows={variantRows}
               setRows={setVariantRows}
-              defaults={{ purchasePrice: purchase, mrp: Number(watch("mrp")) || 0, sellingPrice: retail }}
+              product={{
+                purchasePrice: purchase,
+                mrp: Number(watch("mrp")) || 0,
+                sellingPrice: retail,
+                dealerPrice: Number(watch("dealerPrice")) || 0,
+                subDealerPrice: Number(watch("subDealerPrice")) || 0,
+                wholesalerPrice: Number(watch("wholesalerPrice")) || 0,
+              }}
             />
           </Section>
         )}
