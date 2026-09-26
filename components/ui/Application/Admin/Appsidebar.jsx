@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/collapsible";
 
 import { sidebarMenu } from "@/lib/adminappsidebarmenu";
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
 import { resetOrderNotification } from "@/store/reducer/notificationSlice";
 
 const menuButtonClass =
@@ -41,6 +43,8 @@ const isPathActive = (pathname, url) =>
   !!url && url !== "#" && (pathname === url || pathname.startsWith(url + "/"));
 
 export default function Appsidebar() {
+  const { language } = useLanguage();
+
   const { toggleSidebar, isMobile } = useSidebar();
   const dispatch = useDispatch();
   const pathname = usePathname();
@@ -142,7 +146,7 @@ export default function Appsidebar() {
                             className={menuButtonClass}
                           >
                             <menu.icon />
-                            <span>{menu.title}</span>
+                            <span>{oneLine(menu.title, menu.bn, language)}</span>
                             {orderBadge}
                             <LuChevronRight className="ml-auto !size-4 opacity-70 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                           </SidebarMenuButton>
@@ -161,7 +165,7 @@ export default function Appsidebar() {
                                     href={sub.url}
                                     onClick={() => handleNav(menu.title)}
                                   >
-                                    {sub.title}
+                                    {oneLine(sub.title, sub.bn, language)}
                                     {sub.soon && (
                                       <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-sidebar-foreground/70">
                                         Soon
@@ -182,7 +186,7 @@ export default function Appsidebar() {
                       >
                         <Link href={href} onClick={() => handleNav(menu.title)}>
                           <menu.icon />
-                          <span>{menu.title}</span>
+                          <span>{oneLine(menu.title, menu.bn, language)}</span>
                           {orderBadge}
                           {menu.soon && (
                             <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-sidebar-foreground/70">
