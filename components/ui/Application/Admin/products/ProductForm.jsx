@@ -492,10 +492,11 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         {/* ---------- photos and description, optional ---------- */}
         <details className="mt-5 rounded-[6px] border border-[#ebeff2] dark:border-border" open={editing && media.length > 0}>
           <summary className="cursor-pointer select-none px-4 py-2.5 text-[14px] font-semibold">
-            Photos &amp; description (optional)
+            Photo &amp; description (optional)
           </summary>
           <div className="space-y-4 border-t border-[#ebeff2] p-4 dark:border-border">
-            <UploadMedia isMultiple selectedMedia={media} setSelectedMedia={setMedia} />
+            {/* the POS shows one photo per product */}
+            <UploadMedia isMultiple={false} selectedMedia={media} setSelectedMedia={setMedia} />
             <RichText
               key={editorKey}
               value={watch("description")}

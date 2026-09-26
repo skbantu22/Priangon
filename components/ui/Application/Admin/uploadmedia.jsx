@@ -110,9 +110,10 @@ const UploadMedia = ({
   );
 
   // A form that keeps the picked photos (the product form) gets a gallery:
-  // every photo with Remove and Make main, and a tile to add more. The
-  // media library page, which only uploads, keeps the single tile below.
-  if (setSelectedMedia && isMultiple) {
+  // every photo with Remove (and Make main when several are allowed), and
+  // a tile to add more, or to change the one photo. The media library page,
+  // which only uploads, keeps the single tile below.
+  if (setSelectedMedia && selectedMedia) {
     const remove = (index) => setSelectedMedia((prev) => prev.filter((_, i) => i !== index));
     const makeMain = (index) =>
       setSelectedMedia((prev) => [prev[index], ...prev.filter((_, i) => i !== index)]);
@@ -133,7 +134,7 @@ const UploadMedia = ({
               </span>
             )}
             <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5">
-              {index > 0 && (
+              {isMultiple && index > 0 && (
                 <button
                   type="button"
                   onClick={() => makeMain(index)}
@@ -170,7 +171,7 @@ const UploadMedia = ({
           ) : (
             <>
               {selectedMedia.length ? <Plus size={24} /> : <Upload size={24} />}
-              {selectedMedia.length ? "Add more" : "Upload Image"}
+              {!selectedMedia.length ? "Upload Image" : isMultiple ? "Add more" : "Change"}
             </>
           )}
         </button>
