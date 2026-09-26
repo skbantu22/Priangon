@@ -1,31 +1,16 @@
-import { Geist_Mono, Hind_Siliguri, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+
 import { Toaster } from "sonner";
 
 import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
 import PosPrefetch from "@/components/ui/Application/PosPrefetch";
 import SupportChannels from "@/components/ui/Application/website/SupportChannels";
 
-// English / numbers
-const fontEn = Plus_Jakarta_Sans({
-  variable: "--font-en",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
-// Bangla text and the ৳ sign (the browser takes these glyphs from here)
-const fontBn = Hind_Siliguri({
-  variable: "--font-bn",
-  subsets: ["bengali"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Fonts come from Google in the browser, not at build time: next/font/google
+// fetched them during `next build`, and on the VPS Google answered with font
+// links Turbopack could not read, which failed the build.
+const FONTS_URL =
+  "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Geist+Mono&family=Assistant:wght@400;500;600;700;800&display=swap";
 
 export const metadata = {
   title: {
@@ -38,9 +23,12 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body
-        className={`${fontEn.variable} ${fontBn.variable} ${geistMono.variable} antialiased`}
-      >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={FONTS_URL} />
+      </head>
+      <body className="antialiased">
         <GlobalStoreProvider>
           <PosPrefetch />
           {children}

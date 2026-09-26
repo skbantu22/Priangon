@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+:root {
+  --font-en: "Plus Jakarta Sans";
+  --font-bn: "Hind Siliguri";
+  --font-geist-mono: "Geist Mono", ui-monospace, monospace;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
