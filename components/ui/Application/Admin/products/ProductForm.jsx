@@ -14,7 +14,7 @@ import { List, Plus } from "lucide-react";
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
 import VariantDraft, { makeBarcode, variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
-import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
+import ProductPhoto from "@/components/ui/Application/Admin/products/ProductPhoto";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSchema";
 import { tierPricesFromProduct } from "@/lib/priceTiers";
@@ -76,9 +76,12 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   });
   const { register, watch, setValue, getValues, reset, formState } = form;
 
-  const [media, setMedia] = useState(() =>
-    (product?.media || []).filter((m) => m?._id).map((m) => ({ _id: m._id, url: m.secure_url || m.url, secure_url: m.secure_url })),
+  // the one photo: saved ({ _id, url }) or picked and not uploaded yet ({ file, url })
+  const savedMedia = (product?.media || []).filter((m) => m?._id);
+  const [photo, setPhoto] = useState(() =>
+    savedMedia[0] ? { _id: String(savedMedia[0]._id), url: savedMedia[0].secure_url || savedMedia[0].url } : null,
   );
+  const media = photo ? [photo] : [];
   const [simpleItem, setSimpleItem] = useState({ barcode: "", stock: "" });
   // a new product starts with an 8 digit barcode; made after mount so the
   // server and browser render the same empty box first
@@ -158,10 +161,6 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     }
   };
 
-  useEffect(() => {
-    setValue("media", media.map((m) => m._id));
-    if (!media.length) setValue("showInWebsite", false);
-  }, [media, setValue]);
 
   const productType = watch("productType");
   const warrantyType = watch("warrantyType");
@@ -171,7 +170,8 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
 
   const clear = () => {
     reset(productFormValues(null));
-    setMedia([]);
+    if (photo?.file) URL.revokeObjectURL(photo.url);
+    setPhoto(null);
     setSimpleItem({ barcode: makeBarcode(), stock: "" });
     setVariantRows([]);
     setEditorKey((k) => k + 1);
@@ -185,11 +185,32 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
       const problem = addingVariants ? variantProblem(variantRows) : "";
       if (problem) return showToast("error", problem);
 
+      // the photo is uploaded only now, when the product is saved
+      let photoId = photo?._id || null;
+      let uploadedId = null;
+      if (photo?.file) {
+        try {
+          const body = new FormData();
+          body.append("file", photo.file);
+          const { data } = await axios.post("/api/media/upload", body, { headers: { "Content-Type": "multipart/form-data" } });
+          if (!data?.success) throw new Error(data?.message);
+          photoId = uploadedId = String(data.media._id);
+        } catch (error) {
+          return showToast("error", error?.response?.data?.message || error.message || "Could not upload the photo");
+        }
+      }
+      // an older product may hold more photos; they stay behind the main one
+      const extraIds = savedMedia.slice(1).map((m) => String(m._id));
+      const mediaIds = [photoId, ...extraIds].filter(Boolean);
+      const oldPhotoId = savedMedia[0] ? String(savedMedia[0]._id) : null;
+
       const mrp = Number(values.mrp) || Number(values.sellingPrice);
       const name = values.name.trim();
       const saved = await onSave(
         {
           ...values,
+          media: mediaIds,
+          ...(!mediaIds.length && { showInWebsite: false }),
           name,
           mrp,
           slug: values.slug || `${slugify(name, { lower: true, strict: true })}-${Date.now().toString(36).slice(-4)}`,
@@ -199,6 +220,13 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         simpleItem,
         addingVariants ? variantPayload(variantRows) : [],
       );
+      // drop whichever photo is no longer used, from the library and the cloud
+      const unused = saved ? (oldPhotoId && oldPhotoId !== photoId ? oldPhotoId : null) : uploadedId;
+      if (unused) axios.delete("/api/media/delete", { data: { ids: [unused], deleteType: "PD" } }).catch(() => {});
+      if (saved && photo?.file) {
+        URL.revokeObjectURL(photo.url);
+        setPhoto({ _id: photoId, url: photo.url });
+      }
       if (saved && !editing) clear();
     },
     (errors) => showToast("error", Object.values(errors)[0]?.message || "Check the required fields"),
@@ -515,7 +543,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </summary>
           <div className="space-y-4 border-t border-[#ebeff2] p-4 dark:border-border">
             {/* the POS shows one photo per product */}
-            <UploadMedia isMultiple={false} selectedMedia={media} setSelectedMedia={setMedia} />
+            <ProductPhoto photo={photo} setPhoto={setPhoto} />
             <RichText
               key={editorKey}
               value={watch("description")}

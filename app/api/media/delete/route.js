@@ -1,4 +1,5 @@
 import { connectDB } from "@/lib/databaseconnection";
+import cloudinary from "@/lib/cloudinary";
 import MediaModel from "@/models/Media.model";
 import { catchError, response } from "@/lib/helperfunction";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
@@ -70,6 +71,14 @@ export async function DELETE(request) {
     if (deleteType !== "PD") {
       return response(false, 400, "Delete type must be PD.");
     }
+
+    // the file itself goes too, or the cloud keeps filling up
+    const docs = await MediaModel.find({ _id: { $in: ids } }).select("public_id").lean();
+    await Promise.all(
+      docs
+        .filter((d) => d.public_id)
+        .map((d) => cloudinary.uploader.destroy(d.public_id).catch((e) => console.error("CLOUDINARY DESTROY:", e?.message))),
+    );
 
     const result = await MediaModel.deleteMany({ _id: { $in: ids } });
 
