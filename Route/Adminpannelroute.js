@@ -89,6 +89,11 @@ export const ADMIN_PURCHASE_RETURNABLE = "/admin/purchase/returnable";
 export const ADMIN_PURCHASE_RETURN_TYPES = "/admin/purchase/return-types";
 
 // Expense routes
+export const ADMIN_SALES = "/admin/sales";
+export const ADMIN_SALES_OF = (type) => `/admin/sales?type=${type}`;
+export const ADMIN_SALE_RETURN_ADD = (id) => `/admin/sales/${id}/return`;
+export const ADMIN_SALE_RETURNS = "/admin/sales/returns";
+
 export const ADMIN_EMPLOYEES = "/admin/employees";
 export const ADMIN_EMPLOYEE_ADD = "/admin/employees/add";
 export const ADMIN_EMPLOYEE_EDIT = (id) => `/admin/employees/edit/${id}`;

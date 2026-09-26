@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ShowroomStock from "@/models/ShowroomStock";
+import { returnedImeiCounts } from "@/lib/saleReturnService";
 import Posorder from "@/models/posorder.model";
 import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { connectDB } from "@/lib/databaseconnection";
@@ -151,17 +152,22 @@ export async function POST(req) {
       throw new Error("The same IMEI / serial is entered twice");
     }
     if (allImeis.length) {
-      const sold = await Posorder.findOne({
+      // a handset that came back on a sales return may be sold again, so an
+      // IMEI is taken only while it has been sold more times than returned
+      const soldBefore = await Posorder.find({
         "items.imeis": { $in: allImeis },
         status: "completed",
       })
         .select("orderNumber items.imeis")
         .lean();
-      if (sold) {
-        const dup = sold.items
-          .flatMap((i) => i.imeis || [])
-          .find((s) => allImeis.includes(s));
-        throw new Error(`IMEI ${dup} was already sold (${sold.orderNumber})`);
+      if (soldBefore.length) {
+        const returned = await returnedImeiCounts(allImeis);
+        for (const imei of allImeis) {
+          const sales = soldBefore.filter((o) => o.items.some((i) => (i.imeis || []).includes(imei)));
+          if (sales.length > (returned.get(imei) || 0)) {
+            throw new Error(`IMEI ${imei} was already sold (${sales.at(-1).orderNumber})`);
+          }
+        }
       }
     }
 
