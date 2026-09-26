@@ -59,8 +59,8 @@ export default function EditProduct({ params }) {
 
   return (
     <div className="space-y-4">
-      <ProductForm key={version} product={product} onSave={save} saving={saving} />
-      <VariantList key={version} product={product} />
+      <ProductForm key={`form-${version}`} product={product} onSave={save} saving={saving} />
+      <VariantList key={`variants-${version}`} product={product} />
     </div>
   );
 }
