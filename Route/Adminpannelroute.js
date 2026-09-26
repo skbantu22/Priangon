@@ -89,6 +89,13 @@ export const ADMIN_PURCHASE_RETURNABLE = "/admin/purchase/returnable";
 export const ADMIN_PURCHASE_RETURN_TYPES = "/admin/purchase/return-types";
 
 // Expense routes
+export const ADMIN_EMPLOYEES = "/admin/employees";
+export const ADMIN_EMPLOYEE_ADD = "/admin/employees/add";
+export const ADMIN_EMPLOYEE_EDIT = (id) => `/admin/employees/edit/${id}`;
+export const ADMIN_EMPLOYEE_SALARY = "/admin/employees/salary";
+export const ADMIN_EMPLOYEE_COMMISSIONS = "/admin/employees/commissions";
+export const ADMIN_EMPLOYEE_COMMISSION_PAYMENTS = "/admin/employees/commission-payments";
+
 export const ADMIN_EXPENSE_SHOW = "/admin/expenses";
 export const ADMIN_EXPENSE_ADD = "/admin/expenses/add";
 export const ADMIN_EXPENSE_EDIT = (id) => `/admin/expenses/edit/${id}`;
