@@ -13,6 +13,7 @@ import {
   ReceiptText,
   ShoppingCart,
   LogOut,
+  BookOpenText,
 } from "lucide-react";
 import { ToastContainer } from "react-toastify";
 import { logout } from "@/store/reducer/authReducer";
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/partner", label: "Dashboard", icon: LayoutDashboard },
   { href: "/partner/products", label: "Products & Stock", icon: Smartphone },
   { href: "/partner/orders", label: "Orders & Invoices", icon: ReceiptText },
+  { href: "/partner/statement", label: "Statement", icon: BookOpenText },
 ];
 
 function Header() {
