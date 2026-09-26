@@ -1,4 +1,5 @@
 import { z } from "zod";
+import slugify from "slugify";
 import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import { zSchema } from "@/lib/zodschema";
@@ -17,6 +18,12 @@ export async function POST(request) {
     await connectDB();
 
     const payload = await request.json();
+
+    // the slug is made from the name; nobody types one in
+    if (String(payload.slug || "").trim().length < 3) {
+      const base = slugify(String(payload.name || ""), { lower: true, strict: true }) || "product";
+      payload.slug = `${base}-${Date.now().toString(36).slice(-4)}`;
+    }
 
     // ✅ Validation schema
     const schema = zSchema.pick({

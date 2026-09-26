@@ -112,7 +112,8 @@ const productSchema = new mongoose.Schema(
       },
     ],
 
-    description: { type: String, required: true },
+    // a POS product needs no write-up
+    description: { type: String, default: "" },
 
     color: { type: String },
     size: { type: String },
