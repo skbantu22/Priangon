@@ -756,7 +756,8 @@ export default function POSPage() {
   const activeShowroomId = selectedShowroomId || currentUser?.showroomId;
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    // h-dvh: on phones h-screen runs under the browser bar and hides the bottom
+    <div className="flex h-dvh flex-col bg-background">
       <PosTopbar
         search={search}
         setSearch={setSearch}
@@ -818,7 +819,7 @@ export default function POSPage() {
         <button
           type="button"
           onClick={() => setMobileCartOpen(true)}
-          className="fixed inset-x-3 bottom-3 z-40 flex h-14 items-center gap-3 rounded-2xl bg-primary px-4 text-white shadow-xl shadow-primary/40 lg:hidden"
+          className="fixed inset-x-3 bottom-12 z-40 flex h-14 items-center gap-3 rounded-2xl bg-primary px-4 text-white shadow-xl shadow-primary/40 lg:hidden"
         >
           <span className="relative">
             <ShoppingCart className="size-6" />

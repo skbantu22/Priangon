@@ -41,7 +41,7 @@ export default function Layout({ children }) {
 
             {isPos ? (
               // POS has its own top bar and fills the screen
-              <main className="flex-1 min-w-0 h-screen overflow-hidden">
+              <main className="flex-1 min-w-0 h-dvh overflow-hidden">
                 {children}
               </main>
             ) : (

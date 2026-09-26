@@ -30,8 +30,8 @@ export default function PosFooter({ showroomName }) {
   }, []);
 
   return (
-    <footer className="hidden h-11 shrink-0 lg:flex items-center gap-4 border-t border-gray-200 bg-white px-4 text-xs text-gray-500 select-none dark:border-white/10 dark:bg-card">
-      <div className="hidden md:flex items-center gap-4">
+    <footer className="flex h-9 lg:h-11 shrink-0 items-center gap-4 border-t border-gray-200 bg-white px-4 text-xs text-gray-500 select-none dark:border-white/10 dark:bg-card">
+      <div className="hidden lg:flex items-center gap-4">
         {SHORTCUTS.map(([key, label]) => (
           <span key={key} className="flex items-center gap-1.5">
             <kbd className="rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">

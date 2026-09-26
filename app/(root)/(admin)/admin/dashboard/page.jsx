@@ -58,15 +58,16 @@ const isoDay = (d) => {
 // ---------------------------------------------------------------------------
 // building blocks
 // ---------------------------------------------------------------------------
+// card background / icon square, the colours of the 360 dashboard
 const TONES = {
-  orange: "bg-orange-50 dark:bg-orange-500/10 [&_.kpi-icon]:bg-orange-500",
-  indigo: "bg-indigo-50 dark:bg-indigo-500/10 [&_.kpi-icon]:bg-indigo-600",
-  violet: "bg-violet-50 dark:bg-violet-500/10 [&_.kpi-icon]:bg-violet-600",
-  emerald: "bg-emerald-50 dark:bg-emerald-500/10 [&_.kpi-icon]:bg-emerald-600",
-  cyan: "bg-cyan-50 dark:bg-cyan-500/10 [&_.kpi-icon]:bg-cyan-600",
-  rose: "bg-rose-50 dark:bg-rose-500/10 [&_.kpi-icon]:bg-rose-500",
-  red: "bg-red-50 dark:bg-red-500/10 [&_.kpi-icon]:bg-red-600",
-  amber: "bg-amber-50 dark:bg-amber-500/10 [&_.kpi-icon]:bg-amber-500",
+  orange: ["#ffe8de", "#ff6a1f"],
+  indigo: ["#e6e5ff", "#4429ff"],
+  violet: ["#eae0f3", "#851eec"],
+  emerald: ["#dcfbf5", "#00b293"],
+  cyan: ["#e0f7fa", "#0097a7"],
+  rose: ["#fce4ec", "#e91e63"],
+  red: ["#ffebee", "#d32f2f"],
+  amber: ["#fffde7", "#f9a825"],
 };
 
 // tiles fade up one after another; panels slide in as they scroll into view
@@ -92,21 +93,25 @@ function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
   const body = (
     <motion.div
       variants={tileItem}
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2 }}
       transition={{ type: "spring", stiffness: 320, damping: 22 }}
-      className={`flex h-full items-center gap-4 rounded-2xl border border-black/5 p-5 shadow-sm transition-shadow dark:border-white/10 ${TONES[tone]} ${href ? "hover:shadow-lg" : ""}`}
+      style={{ background: TONES[tone][0] }}
+      className={`flex h-full items-center gap-3.5 p-[18px] transition-shadow dark:brightness-[0.35] ${href ? "hover:shadow-md" : ""}`}
     >
-      <span className="kpi-icon flex size-14 shrink-0 items-center justify-center rounded-xl text-white shadow-sm">
+      <span
+        style={{ background: TONES[tone][1] }}
+        className="flex size-[58px] shrink-0 items-center justify-center text-white"
+      >
         <Icon className="size-7" />
       </span>
       <div className="min-w-0 flex-1">
         {children || (
-          <p className="truncate text-2xl font-bold text-gray-900 tabular-nums dark:text-white">
+          <p className="truncate text-xl font-semibold leading-tight text-[#343a40] tabular-nums 2xl:text-2xl">
             {value}
           </p>
         )}
-        <p className="text-[15px] text-gray-600 dark:text-gray-100">{label}</p>
-        {sub && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-200">{sub}</p>}
+        <p className="text-[15px] text-[#495057]">{label}</p>
+        {sub && <p className="mt-0.5 text-xs text-[#6c757d]">{sub}</p>}
       </div>
     </motion.div>
   );
@@ -120,13 +125,13 @@ function Panel({ title, action, children, className = "" }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.7, ease: EASE }}
-      className={`flex flex-col rounded-2xl border border-gray-200/70 bg-card p-5 shadow-sm dark:border-white/10 ${className}`}
+      className={`flex min-w-0 flex-col border border-[#eef0f3] bg-card shadow-[0_1px_3px_rgba(15,23,42,.06)] dark:border-white/10 ${className}`}
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f2f5] px-4 py-3 dark:border-white/10">
+        <h2 className="text-base font-semibold text-[#343a40] dark:text-white">{title}</h2>
         {action}
       </div>
-      {children}
+      <div className="min-h-0 flex-1 p-3.5">{children}</div>
     </motion.section>
   );
 }
@@ -137,7 +142,7 @@ function Empty({ children = "No data for this period" }) {
 
 function ListHead({ cols }) {
   return (
-    <div className="flex items-center gap-3 rounded-full bg-primary/10 px-3 py-2 text-[13px] font-semibold text-gray-800 dark:text-gray-100">
+    <div className="flex items-center gap-3 bg-[#00801a] px-3 py-2 text-[13px] font-semibold text-white">
       {cols}
     </div>
   );
@@ -199,13 +204,13 @@ export default function Dashboard() {
   const payTotal = data.payments.reduce((s, p) => s + p.amount, 0);
 
   const pill = (active) =>
-    `h-9 rounded-lg px-4 text-sm font-semibold transition ${
+    `h-[30px] px-3 text-[13px] font-medium transition ${
       active
-        ? "bg-primary text-white shadow-md shadow-primary/30"
-        : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-100"
+        ? "bg-[#188ae2] text-white"
+        : "bg-white text-[#495057] hover:bg-[#f1f7fd] dark:bg-card dark:text-gray-100"
     }`;
   const input =
-    "h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-card";
+    "h-[32px] rounded-[6px] border border-[#e3e3e3] bg-white px-3 text-[13px] text-[#495057] outline-none focus:border-[#188ae2] dark:border-white/10 dark:bg-card";
 
   return (
     <MotionConfig reducedMotion="user">
@@ -237,7 +242,7 @@ export default function Dashboard() {
         variants={tileList}
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
       >
         <Kpi
           icon={Store}
@@ -308,11 +313,13 @@ export default function Dashboard() {
           title="Sales Overview"
           action={
             <div className="flex flex-wrap items-center gap-2">
-              {["daily", "monthly", "yearly"].map((c) => (
-                <button key={c} type="button" onClick={() => setChart(c)} className={pill(chart === c)}>
-                  {c[0].toUpperCase() + c.slice(1)}
-                </button>
-              ))}
+              <div className="flex border border-[#dee2e6] dark:border-white/10" role="tablist">
+                {["daily", "monthly", "yearly"].map((c) => (
+                  <button key={c} type="button" role="tab" aria-selected={chart === c} onClick={() => setChart(c)} className={pill(chart === c)}>
+                    {c[0].toUpperCase() + c.slice(1)}
+                  </button>
+                ))}
+              </div>
               {chart === "daily" && (
                 <input type="month" value={period} onChange={(e) => e.target.value && setPeriod(e.target.value)} className={input} />
               )}
@@ -438,7 +445,7 @@ export default function Dashboard() {
       </div>
 
       {/* ================= RANGE FILTER (for the ranking widgets) ================= */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200/70 bg-card px-4 py-3 dark:border-white/10">
+      <div className="flex flex-wrap items-center justify-end gap-2 border border-[#eef0f3] bg-card px-4 py-3 dark:border-white/10">
         <span className="text-sm font-semibold">Period for rankings:</span>
         <input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} className={input} />
         <span className="text-sm text-muted-foreground">to</span>
@@ -473,7 +480,7 @@ export default function Dashboard() {
           {data.lowStock.length === 0 ? (
             <Empty>All items are well stocked 👍</Empty>
           ) : (
-            <ul className="mt-1 max-h-80 divide-y divide-gray-100 overflow-y-auto dark:divide-white/10">
+            <ul className="mt-1 divide-y divide-gray-100 lg:max-h-80 lg:overflow-y-auto dark:divide-white/10">
               {data.lowStock.map((s, i) => (
                 <li key={s._id} className="flex items-center gap-3 px-3 py-2.5">
                   <span className="w-6 text-center text-sm text-muted-foreground">{i + 1}.</span>
@@ -539,8 +546,8 @@ export default function Dashboard() {
               <>
                 <span className="w-6 text-center">Sl</span>
                 <span className="flex-1">Product</span>
-                <span className="w-14 text-right">Qty</span>
-                <span className="w-28 text-right">Sales</span>
+                <span className="w-10 text-right sm:w-14">Qty</span>
+                <span className="w-20 text-right sm:w-28">Sales</span>
               </>
             }
           />
@@ -554,9 +561,9 @@ export default function Dashboard() {
                   <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-gray-50">
                     <Image src={p.image || "/placeholder.png"} alt="" fill sizes="36px" className="object-contain" unoptimized={skipOptimize(p.image)} />
                   </div>
-                  <span className="min-w-0 flex-1 truncate text-sm">{p.name}</span>
-                  <span className="w-14 text-right text-sm tabular-nums">{p.qty}</span>
-                  <span className="w-28 text-right text-sm font-semibold tabular-nums">{money(p.revenue)}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-sm">{p.name}</span>
+                  <span className="w-10 text-right text-sm tabular-nums sm:w-14">{p.qty}</span>
+                  <span className="w-20 text-right text-sm font-semibold tabular-nums sm:w-28">{money(p.revenue)}</span>
                 </li>
               ))}
             </ul>
@@ -569,8 +576,8 @@ export default function Dashboard() {
               <>
                 <span className="w-6 text-center">Sl</span>
                 <span className="flex-1">Customer</span>
-                <span className="w-16 text-right">Invoices</span>
-                <span className="w-28 text-right">Purchased</span>
+                <span className="w-10 text-right sm:w-16">Inv.</span>
+                <span className="w-20 text-right sm:w-28">Purchased</span>
               </>
             }
           />
@@ -582,14 +589,14 @@ export default function Dashboard() {
                 <li key={c._id} className="flex items-center gap-3 px-3 py-2">
                   <span className="w-6 text-center text-sm text-muted-foreground">{i + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{c.name}</p>
+                    <p className="line-clamp-2 text-sm">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {c._id}
                       {c.due > 0 && <span className="text-red-600"> · due {money(c.due)}</span>}
                     </p>
                   </div>
-                  <span className="w-16 text-right text-sm tabular-nums">{c.orders}</span>
-                  <span className="w-28 text-right text-sm font-semibold tabular-nums">{money(c.spent)}</span>
+                  <span className="w-10 text-right text-sm tabular-nums sm:w-16">{c.orders}</span>
+                  <span className="w-20 text-right text-sm font-semibold tabular-nums sm:w-28">{money(c.spent)}</span>
                 </li>
               ))}
             </ul>
@@ -607,7 +614,7 @@ export default function Dashboard() {
               {data.payments.map((p, i) => {
                 const Icon = p.type === "Card" ? CreditCard : p.type === "Mobile Banking" ? Smartphone : Banknote;
                 return (
-                  <li key={`${p.type}-${p.option}`} className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+                  <li key={`${p.type}-${p.option}`} className="border border-[#f0f2f5] bg-white dark:bg-white/5 p-3 dark:bg-white/5">
                     <div className="flex items-center gap-3">
                       <span className="flex size-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
                         {i + 1}
@@ -646,14 +653,14 @@ export default function Dashboard() {
           {data.customerDues.length === 0 ? (
             <Empty>No customer has due 🎉</Empty>
           ) : (
-            <ul className="mt-1 max-h-80 space-y-1.5 overflow-y-auto pt-1">
+            <ul className="mt-1 space-y-1.5 pt-1 lg:max-h-80 lg:overflow-y-auto">
               {data.customerDues.map((c, i) => (
-                <li key={String(c._id)} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2 dark:bg-white/5">
+                <li key={String(c._id)} className="flex items-center gap-3 border border-[#f0f2f5] bg-white dark:bg-white/5 px-3 py-2 dark:bg-white/5">
                   <span className="flex size-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{c.name}</p>
+                    <p className="line-clamp-2 text-sm">{c.name}</p>
                     <p className="text-xs text-muted-foreground">{c.phone}</p>
                   </div>
                   <span className="rounded-md bg-red-100 px-2.5 py-1 text-sm font-bold tabular-nums text-red-600 dark:bg-red-500/15 dark:text-red-400">
@@ -679,7 +686,7 @@ export default function Dashboard() {
               ["Ready", k.readyClaims, "text-emerald-600"],
               ["Delivered", data.claims.delivered || 0, "text-gray-600 dark:text-gray-100"],
             ].map(([label, n, color]) => (
-              <div key={label} className="rounded-xl bg-gray-50 py-3 dark:bg-white/5">
+              <div key={label} className="border border-[#f0f2f5] bg-white dark:bg-white/5 py-3 dark:bg-white/5">
                 <p className={`text-xl font-bold tabular-nums ${color}`}>{n}</p>
                 <p className="text-xs text-muted-foreground">{label}</p>
               </div>
@@ -689,9 +696,9 @@ export default function Dashboard() {
           {data.expiring.length === 0 ? (
             <p className="text-sm text-muted-foreground">None</p>
           ) : (
-            <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+            <ul className="space-y-1.5 lg:max-h-56 lg:overflow-y-auto">
               {data.expiring.map((e) => (
-                <li key={`${e.orderNumber}-${e.imei}`} className="rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
+                <li key={`${e.orderNumber}-${e.imei}`} className="border border-[#f0f2f5] bg-white dark:bg-white/5 px-3 py-2 text-sm dark:bg-white/5">
                   <div className="flex justify-between gap-2">
                     <span className="truncate font-medium">{e.productName}</span>
                     <span className="shrink-0 text-xs text-amber-700 dark:text-amber-400">{fmtDate(e.expiry)}</span>
