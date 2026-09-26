@@ -260,8 +260,8 @@ function AddPurchase() {
           </Link>
         }
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Supplier Name" required htmlFor="pur-supplier" className="md:col-span-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Field label="Supplier Name" required htmlFor="pur-supplier">
             <SupplierPicker
               id="pur-supplier"
               value={head.supplierId}
@@ -288,6 +288,12 @@ function AddPurchase() {
           <Field label="Reference" htmlFor="pur-ref">
             <input id="pur-ref" value={head.referenceNo} onChange={setH("referenceNo")} placeholder="Supplier's invoice / challan no" maxLength={255} className={inputClass} />
           </Field>
+          <Field label="Note" htmlFor="pur-note">
+            <input id="pur-note" value={head.note} onChange={setH("note")} placeholder="Note" maxLength={5000} className={inputClass} />
+          </Field>
+          <Field label="Attachment" htmlFor="pur-attach">
+            <AttachmentInput id="pur-attach" value={attachment} onChange={setAttachment} />
+          </Field>
           <Field label="Stock" htmlFor="pur-status">
             <select id="pur-status" value={head.status} onChange={setH("status")} className={inputClass}>
               <option value="received">Received now (stock in)</option>
@@ -305,12 +311,6 @@ function AddPurchase() {
               ))}
             </select>
           </Field>
-          <Field label="Attachment" htmlFor="pur-attach">
-            <AttachmentInput id="pur-attach" value={attachment} onChange={setAttachment} />
-          </Field>
-          <Field label="Note" htmlFor="pur-note" className="md:col-span-2 xl:col-span-4">
-            <input id="pur-note" value={head.note} onChange={setH("note")} placeholder="Note" maxLength={5000} className={inputClass} />
-          </Field>
         </div>
       </ListCard>
 
@@ -325,34 +325,23 @@ function AddPurchase() {
         <ProductSearch onPick={addItem} />
 
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[1560px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
             <thead>
               <tr className={theadClass}>
-                {["SL No", "Product Name", "Received Qty", "Extra Qty", "Qty", "Actual Purchase Price", "Purchase Price", "Discount", "Subtotal", "Expire Date"].map((h) => (
-                  <th key={h} rowSpan={2} className={thClass}>
+                {["SL No", "Product Name", "Received Qty", "Extra Qty", "Qty", "Actual Purchase Price", "Purchase Price", "Discount", "Subtotal", "Expire Date", "IMEI"].map((h) => (
+                  <th key={h} className={`${thClass} text-center`}>
                     {h}
                   </th>
                 ))}
-                <th colSpan={4} className={`${thClass} text-center`}>
-                  Sale rate · margin at this cost
+                <th className={`${thClass} text-center`} aria-label="Remove">
+                  <Trash2 size={14} className="mx-auto" />
                 </th>
-                <th rowSpan={2} className={thClass}>
-                  IMEI
-                </th>
-                <th rowSpan={2} className={thClass} aria-label="Remove" />
-              </tr>
-              <tr className={theadClass}>
-                {RATES.map(([f, label]) => (
-                  <th key={f} className={thClass}>
-                    {label}
-                  </th>
-                ))}
               </tr>
             </thead>
             <tbody>
               {!items.length && (
                 <tr>
-                  <td colSpan={16} className={`${tdClass} py-10 text-center text-muted-foreground`}>
+                  <td colSpan={12} className={`${tdClass} py-10 text-center text-muted-foreground`}>
                     Search above to add products to this purchase.
                   </td>
                 </tr>
@@ -423,19 +412,6 @@ function AddPurchase() {
                     <td className={tdClass}>
                       <input type="date" value={item.expireDate} onChange={(e) => updateItem(index, { expireDate: e.target.value })} className={`${cell} w-[140px]`} aria-label={`Expire date for ${item.productName}`} />
                     </td>
-                    {RATES.map(([f]) => {
-                      const rate = item.rates?.[f];
-                      if (!rate) return <td key={f} className={`${tdClass} text-[12px] text-amber-600`}>Not set</td>;
-                      const pct = cost ? Math.round(((rate - cost) / cost) * 100) : null;
-                      const loss = pct !== null && pct <= 0;
-                      return (
-                        <td key={f} className={`${tdClass} whitespace-nowrap ${loss ? "font-semibold text-red-600" : ""}`}>
-                          {item.newRate?.[f] && <span className="mr-0.5 text-[#188ae2]" title="New rate from the purchase order">●</span>}
-                          {money(rate)}
-                          {pct !== null && <span className={`ml-1 text-[11px] ${loss ? "" : "text-emerald-600"}`}>{pct > 0 ? "+" : ""}{pct}%</span>}
-                        </td>
-                      );
-                    })}
                     <td className={tdClass}>
                       <button
                         type="button"
@@ -469,7 +445,7 @@ function AddPurchase() {
                   <td className={tdClass}>{totals.itemCount}</td>
                   <td colSpan={3} className={tdClass} />
                   <td className={tdClass}>{money(totals.subtotal)}</td>
-                  <td colSpan={7} className={tdClass} />
+                  <td colSpan={3} className={tdClass} />
                 </tr>
               </tfoot>
             )}
@@ -483,67 +459,78 @@ function AddPurchase() {
           </p>
         )}
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_420px]">
-          <div className="space-y-[10px]">
-            <p className="m-0 text-[14px] font-medium">Payment</p>
-            {payments.map((payment, index) => (
-              <div key={index} className="flex flex-wrap items-center gap-2">
-                <select value={payment.method} onChange={(e) => setPayment(index, { method: e.target.value })} className={`${inputClass} !w-[160px]`} aria-label="Payment type">
-                  {PAYMENT_METHODS.map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <input type="number" min="0" step="0.01" placeholder="Amount" value={payment.amount} onChange={(e) => setPayment(index, { amount: e.target.value })} className={`${inputClass} !w-[150px]`} aria-label="Paying amount" />
-                {payment.method !== "cash" && (
-                  <input
-                    placeholder={payment.method === "cheque" ? "Cheque No." : "Trx / reference"}
-                    value={payment.reference}
-                    onChange={(e) => setPayment(index, { reference: e.target.value })}
-                    className={`${inputClass} !w-[170px]`}
-                    aria-label="Payment reference"
-                  />
-                )}
-                {payments.length > 1 && (
-                  <button type="button" onClick={() => setPayments(payments.filter((_, i) => i !== index))} className="rounded p-1.5 text-[#ff5b5b] hover:bg-[#fff1f1]" aria-label="Remove payment">
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className={btn.info} onClick={() => setPayments([...payments, newPayment()])}>
-                <Plus size={14} /> Add payment
-              </button>
-              {totals.grand > 0 && (
-                <button type="button" className={btn.warning} onClick={payFull}>
-                  Pay full
-                </button>
-              )}
-            </div>
-          </div>
-
-          <dl className="m-0 space-y-2 rounded-[6px] border border-[#ebeff2] bg-[#fafbfc] p-4 text-[14px] dark:border-border dark:bg-muted">
-            <Row label="Item Count" value={totals.itemCount} />
-            <Row label="Subtotal" value={`৳ ${money(totals.subtotal)}`} />
-            <Row label="Discount">
-              <span className="flex gap-1">
-                <select value={discount.type} onChange={(e) => setDiscount({ ...discount, type: e.target.value })} className={`${cell} !w-[110px]`} aria-label="Discount type">
+        <div className="mt-6 border-t border-[#ebeff2] pt-5 dark:border-border">
+          <div className="ml-auto max-w-[760px] space-y-3">
+            <SumRow label="Item Count">
+              <Box>{totals.itemCount}</Box>
+            </SumRow>
+            <SumRow label="Subtotal">
+              <Box>{money(totals.subtotal)}</Box>
+            </SumRow>
+            <SumRow label="Discount">
+              <div className="flex">
+                <select value={discount.type} onChange={(e) => setDiscount({ ...discount, type: e.target.value })} className={`${inputClass} !w-[130px] !rounded-r-none`} aria-label="Discount type">
                   <option value="amount">Amount</option>
                   <option value="percent">Percentage</option>
                 </select>
-                <input type="number" min="0" step="0.01" placeholder="Enter discount" value={discount.value} onChange={(e) => setDiscount({ ...discount, value: e.target.value })} className={`${cell} !w-[110px]`} aria-label="Discount value" />
-              </span>
-            </Row>
-            <Row label="Total Discount" value={`৳ ${money(totals.discountAmount)}`} />
-            <Row label="Shipping / Labour (+)">
-              <input type="number" min="0" step="0.01" placeholder="0" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} className={`${cell} !w-[120px]`} aria-label="Shipping or labour cost" />
-            </Row>
-            <Row label="Grand Total" value={`৳ ${money(totals.grand)}`} strong divider />
-            <Row label="Paid" value={`৳ ${money(totals.paid)}`} tone="text-[#0b8a45]" />
-            <Row label="Due" value={`৳ ${money(totals.due)}`} strong tone={totals.due > 0 ? "text-[#ff5b5b]" : ""} />
-          </dl>
+                <input type="number" min="0" step="0.01" placeholder="0" value={discount.value} onChange={(e) => setDiscount({ ...discount, value: e.target.value })} className={`${inputClass} !rounded-l-none text-right`} aria-label="Discount value" />
+              </div>
+            </SumRow>
+            <SumRow label="Total Discount">
+              <Box>{money(totals.discountAmount)}</Box>
+            </SumRow>
+            <SumRow label="Shipping / Labour (+)">
+              <input type="number" min="0" step="0.01" placeholder="0" value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} className={`${inputClass} text-right`} aria-label="Shipping or labour cost" />
+            </SumRow>
+            <SumRow label="Grand Total" strong>
+              <Box strong>{money(totals.grand)}</Box>
+            </SumRow>
+            {payments.map((payment, index) => (
+              <SumRow key={index} label={index === 0 ? "Payment Type" : ""}>
+                <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                  <select value={payment.method} onChange={(e) => setPayment(index, { method: e.target.value })} className={`${inputClass} sm:!w-[170px]`} aria-label="Payment type">
+                    {PAYMENT_METHODS.map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  {payment.method !== "cash" && (
+                    <input
+                      placeholder={payment.method === "cheque" ? "Cheque No." : "Trx / reference"}
+                      value={payment.reference}
+                      onChange={(e) => setPayment(index, { reference: e.target.value })}
+                      className={inputClass}
+                      aria-label="Payment reference"
+                    />
+                  )}
+                  <input type="number" min="0" step="0.01" placeholder="Amount" value={payment.amount} onChange={(e) => setPayment(index, { amount: e.target.value })} className={`${inputClass} text-right`} aria-label="Paying amount" />
+                  {index === 0 ? (
+                    <button type="button" onClick={() => setPayments([...payments, newPayment()])} className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-[4px] border border-[#10c469] text-[#10c469] hover:bg-[#10c469] hover:text-white" aria-label="Add another payment" title="Add another payment">
+                      <Plus size={16} />
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => setPayments(payments.filter((_, i) => i !== index))} className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-[4px] border border-[#ff5b5b] text-[#ff5b5b] hover:bg-[#ff5b5b] hover:text-white" aria-label="Remove payment">
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </SumRow>
+            ))}
+            <SumRow label="Paid">
+              <div className="flex gap-2">
+                <Box tone="text-[#0b8a45]">{money(totals.paid)}</Box>
+                {totals.grand > 0 && (
+                  <button type="button" className={`${btn.warning} shrink-0`} onClick={payFull}>
+                    Pay full
+                  </button>
+                )}
+              </div>
+            </SumRow>
+            <SumRow label="Due" strong>
+              <Box strong tone={totals.due > 0 ? "text-[#ff5b5b]" : ""}>{money(totals.due)}</Box>
+            </SumRow>
+          </div>
         </div>
 
         <div className="mt-[18px] flex justify-end gap-2">
@@ -588,11 +575,22 @@ function AddPurchase() {
   );
 }
 
-function Row({ label, value, strong, divider, tone = "", children }) {
+// one line of the totals: label on the left, value box on the right
+function SumRow({ label, strong, children }) {
   return (
-    <div className={`flex items-center justify-between gap-3 ${divider ? "border-t border-[#e3e8ee] pt-2 dark:border-border" : ""}`}>
-      <dt className={strong ? "font-semibold" : ""}>{label}</dt>
-      <dd className={`m-0 tabular-nums ${strong ? "text-[16px] font-bold" : ""} ${tone}`}>{children ?? value}</dd>
+    <div className="grid grid-cols-1 items-center gap-1 sm:grid-cols-[170px_1fr] sm:gap-4">
+      <span className={`text-[14px] sm:text-right ${strong ? "text-[16px] font-bold" : "font-medium"}`}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function Box({ strong, tone = "", children }) {
+  return (
+    <div
+      className={`flex h-[38px] w-full items-center justify-end rounded-[4px] bg-[#e9ecef] px-3 tabular-nums dark:bg-muted ${strong ? "text-[16px] font-bold" : "text-[14px]"} ${tone}`}
+    >
+      {children}
     </div>
   );
 }

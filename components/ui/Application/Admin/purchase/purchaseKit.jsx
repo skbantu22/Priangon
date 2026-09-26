@@ -5,6 +5,7 @@ import axios from "axios";
 import { Paperclip, Plus, Search, X, ScanBarcode } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import SupplierFormModal from "@/components/ui/Application/Admin/supplier/SupplierFormModal";
 import { formatNumberBD } from "@/lib/bdFormat";
 import { filterInput } from "@/components/ui/Application/Admin/listKit";
 import { PAYMENT_METHODS } from "@/components/ui/Application/Admin/supplier/supplierKit";
@@ -100,25 +101,17 @@ export function useSuppliers() {
 
 /** Supplier dropdown with the blue "+" that adds one on the spot */
 export function SupplierPicker({ id, value, onChange, suppliers, reload, placeholder = "Select or Add Supplier" }) {
-  const add = async () => {
-    const name = window.prompt("Supplier name")?.trim();
-    if (!name) return;
-    const phone = window.prompt("Supplier mobile")?.trim();
-    if (!phone) return;
+  const [adding, setAdding] = useState(false);
 
-    try {
-      const { data } = await axios.post("/api/supplier/create", { name, phone });
-      if (!data.success) return showToast("error", data.message || "Could not add supplier");
-      await reload();
-      if (data.data?._id) onChange(data.data._id);
-      showToast("success", `Supplier "${name}" added`);
-    } catch (error) {
-      showToast("error", error.response?.data?.message || "Could not add supplier");
-    }
+  const saved = async (supplier) => {
+    setAdding(false);
+    await reload();
+    if (supplier?._id) onChange(String(supplier._id));
   };
 
   return (
     <div className="flex">
+      {adding && <SupplierFormModal onClose={() => setAdding(false)} onSaved={saved} />}
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={`${filterInput} rounded-r-none`}>
         <option value="">{placeholder}</option>
         {suppliers.map((s) => (
@@ -130,7 +123,7 @@ export function SupplierPicker({ id, value, onChange, suppliers, reload, placeho
       </select>
       <button
         type="button"
-        onClick={add}
+        onClick={() => setAdding(true)}
         title="Add supplier"
         aria-label="Add supplier"
         className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-r-[6px] bg-[#188ae2] text-white hover:bg-[#1379c7]"

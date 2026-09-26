@@ -90,7 +90,7 @@ export default function StockLedgerPage({ params }) {
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1150px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1040px] border-collapse text-left text-[13px]">
           <thead>
             <tr className={theadClass}>
               {["SL", "Date", "Branch", "Details", "Invoice No", "Type", "In Qty", "Out Qty", "Stock", "Rate", "Total", "Profit / Loss"].map((h) => (
@@ -114,7 +114,7 @@ export default function StockLedgerPage({ params }) {
                 <td className={tdClass}>{i + 1}</td>
                 <td className={`${tdClass} whitespace-nowrap`}>{fmtDate(r.date)}</td>
                 <td className={tdClass}>{r.branch}</td>
-                <td className={`${tdClass} max-w-[280px] text-[12.5px]`}>{r.details || "—"}</td>
+                <td className={`${tdClass} max-w-[220px] text-[12px]`}>{r.details || "—"}</td>
                 <td className={`${tdClass} whitespace-nowrap font-mono text-[12.5px]`}>{r.invoiceNo || "—"}</td>
                 <td className={`${tdClass} whitespace-nowrap font-medium ${TYPE_TONE[r.type] || "text-[#0b7a3b]"}`}>{r.type}</td>
                 <td className={`${tdClass} tabular-nums text-[#0b7a3b]`}>{r.inQty ? qty(r.inQty) : "—"}</td>
