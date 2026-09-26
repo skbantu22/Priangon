@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { FiEdit2, FiPlus, FiTrash2 } from "react-icons/fi";
 
@@ -58,8 +59,17 @@ const SLOTS = [
 
 const emptyForm = { name: "", slot: "size", isActive: true, values: [] };
 
-const AttributePage = () => {
-  const [attributes, setAttributes] = useState([]);
+// ?slot=color is the Colors menu, ?slot=size the Storage / Size one
+const TITLES = {
+  color: ["Colors", "Handset colours offered while generating variants"],
+  size: ["Attributes (Storage / Size)", "RAM / storage and sizes offered while generating variants"],
+};
+
+const AttributeList = () => {
+  const slotFilter = useSearchParams().get("slot") || "";
+  const [title, subtitle] = TITLES[slotFilter] || ["Attributes", "The lists offered while creating a product variant"];
+  const [allAttributes, setAttributes] = useState([]);
+  const attributes = slotFilter ? allAttributes.filter((a) => a.slot === slotFilter) : allAttributes;
   const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
@@ -97,7 +107,7 @@ const AttributePage = () => {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, slot: slotFilter || emptyForm.slot });
     setNewLabel("");
     setNewValue("");
     setOpen(true);
@@ -227,10 +237,8 @@ const AttributePage = () => {
       <Card className="py-0 rounded shadow-sm">
         <CardHeader className="pt-3 px-3 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h4 className="text-xl font-semibold">Attributes</h4>
-            <p className="text-sm text-muted-foreground">
-              The lists offered while creating a product variant
-            </p>
+            <h4 className="text-xl font-semibold">{title}</h4>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
 
           <Button onClick={openCreate}>
@@ -451,5 +459,11 @@ const AttributePage = () => {
     </div>
   );
 };
+
+const AttributePage = () => (
+  <Suspense fallback={<Skeleton className="h-48 w-full" />}>
+    <AttributeList />
+  </Suspense>
+);
 
 export default AttributePage;

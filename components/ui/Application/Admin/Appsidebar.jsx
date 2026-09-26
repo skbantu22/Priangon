@@ -37,8 +37,11 @@ import { resetOrderNotification } from "@/store/reducer/notificationSlice";
 const menuButtonClass =
   "h-10 gap-3 rounded-lg px-3 text-[14px] font-medium text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-primary data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-black/20 [&>svg]:size-[18px]";
 
-const isPathActive = (pathname, url) =>
-  !!url && url !== "#" && (pathname === url || pathname.startsWith(url + "/"));
+// a link may carry a query (Colors is /admin/attributes?slot=color); the path decides
+const isPathActive = (pathname, url) => {
+  const path = url?.split("?")[0];
+  return !!path && path !== "#" && (pathname === path || pathname.startsWith(path + "/"));
+};
 
 export default function Appsidebar() {
   const { language } = useLanguage();

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import Link from "next/link";
 import { Plus, Trash2, Wand2 } from "lucide-react";
 
 import { btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
@@ -20,6 +22,82 @@ const BULK = [
   ["stock", "Opening Stock"],
 ];
 const EMPTY_BULK = { purchasePrice: "", mrp: "", sellingPrice: "", stock: "" };
+
+/**
+ * Saved values to pick from (Products → Attributes / Colors), shown as
+ * chips under a box. A chip toggles its value in the comma list; typing
+ * still works for anything not saved yet.
+ */
+function PickBox({ label, text, setText, groups, placeholder, onEnter, search, manageHref }) {
+  const [term, setTerm] = useState("");
+  const picked = new Set(split(text).map((v) => v.toLowerCase()));
+  const toggle = (value) => {
+    const list = split(text);
+    const next = picked.has(value.toLowerCase())
+      ? list.filter((v) => v.toLowerCase() !== value.toLowerCase())
+      : [...list, value];
+    setText(next.join(", "));
+  };
+  const needle = term.trim().toLowerCase();
+
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium">
+          {label} <span className="text-red-500">*</span>
+        </span>
+        <Link href={manageHref} target="_blank" className="text-[12px] text-[#188ae2] hover:underline">
+          Manage list
+        </Link>
+      </div>
+      <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter} placeholder={placeholder} className={inputClass} />
+      {groups.length > 0 && (
+        <div className="mt-1.5 border border-[#ebeff2] p-2 dark:border-border">
+          {search && (
+            <input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder="Search…"
+              className={`${cell} mb-2 w-full`}
+              aria-label={`Search ${label}`}
+            />
+          )}
+          <div className="max-h-[140px] space-y-1.5 overflow-y-auto">
+            {groups.map((group) => {
+              const values = group.values.filter((v) => !needle || v.toLowerCase().includes(needle));
+              if (!values.length) return null;
+              return (
+                <div key={group.name}>
+                  {groups.length > 1 && <p className="mb-1 text-[11px] font-semibold uppercase text-[#8a939c]">{group.name}</p>}
+                  <div className="flex flex-wrap gap-1.5">
+                    {values.map((value) => {
+                      const on = picked.has(value.toLowerCase());
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => toggle(value)}
+                          aria-pressed={on}
+                          className={`h-[26px] border px-2 text-[12.5px] transition ${
+                            on
+                              ? "border-[#10c469] bg-[#10c469] text-white"
+                              : "border-[#dfe3e8] bg-white text-[#3b4652] hover:border-[#188ae2] dark:border-border dark:bg-card dark:text-foreground"
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 let seq = 0;
 export const emptyVariant = (color = "", size = "") => ({
@@ -71,6 +149,28 @@ export const variantProblem = (rows) => {
  */
 export default function VariantDraft({ rows, setRows, product }) {
   const [gen, setGen] = useState({ colors: "", sizes: "" });
+  // saved Storage / Size and Color lists (Products → Attributes)
+  const [saved, setSaved] = useState({ size: [], color: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get("/api/attribute?active=true")
+      .then(({ data }) => {
+        if (cancelled || !data?.success) return;
+        const groups = (slot) =>
+          data.data
+            .filter((a) => a.slot === slot && a.values?.length)
+            .map((a) => ({ name: a.name, values: [...a.values].sort((x, y) => x.sortOrder - y.sortOrder).map((v) => v.value) }))
+            // a phone shop picks storage most, so it comes first
+            .sort((x, y) => Number(/storage/i.test(y.name)) - Number(/storage/i.test(x.name)));
+        setSaved({ size: groups("size"), color: groups("color") });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [bulk, setBulk] = useState(EMPTY_BULK);
 
   const generate = () => {
@@ -115,32 +215,27 @@ export default function VariantDraft({ rows, setRows, product }) {
   return (
     <div className="space-y-4">
       {/* 1. generate storage x color */}
-      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <label>
-          <span className="mb-1 block text-[13px] font-medium">
-            Storage / Size <span className="text-red-500">*</span>
-          </span>
-          <input
-            value={gen.sizes}
-            onChange={(e) => setGen({ ...gen, sizes: e.target.value })}
-            onKeyDown={onEnter(generate)}
-            placeholder="8/128, 8/256, 12/256"
-            className={inputClass}
-          />
-        </label>
-        <label>
-          <span className="mb-1 block text-[13px] font-medium">
-            Color <span className="text-red-500">*</span>
-          </span>
-          <input
-            value={gen.colors}
-            onChange={(e) => setGen({ ...gen, colors: e.target.value })}
-            onKeyDown={onEnter(generate)}
-            placeholder="Black, Blue, Green"
-            className={inputClass}
-          />
-        </label>
-        <button type="button" className={`${btn.success} h-[38px] md:min-w-[190px] justify-center`} onClick={generate}>
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <PickBox
+          label="Storage / Size"
+          text={gen.sizes}
+          setText={(sizes) => setGen((g) => ({ ...g, sizes }))}
+          groups={saved.size}
+          placeholder="Pick below or type: 8/128GB, 8/256GB"
+          onEnter={onEnter(generate)}
+          manageHref="/admin/attributes?slot=size"
+        />
+        <PickBox
+          label="Color"
+          text={gen.colors}
+          setText={(colors) => setGen((g) => ({ ...g, colors }))}
+          groups={saved.color}
+          placeholder="Pick below or type: Black, Blue"
+          onEnter={onEnter(generate)}
+          search
+          manageHref="/admin/attributes?slot=color"
+        />
+        <button type="button" className={`${btn.success} h-[38px] justify-center md:mt-[22px] md:min-w-[190px]`} onClick={generate}>
           <Wand2 size={14} /> Generate Variant
         </button>
       </div>
@@ -181,7 +276,7 @@ export default function VariantDraft({ rows, setRows, product }) {
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] border-collapse text-sm">
+          <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
               <tr className={theadClass}>
                 {[
@@ -216,7 +311,7 @@ export default function VariantDraft({ rows, setRows, product }) {
                 const rates = ratesFor(product, { sellingPrice: Number(r.sellingPrice) || Number(product.sellingPrice) || 0 });
                 const cost = Number(r.purchasePrice) || Number(product.purchasePrice) || 0;
                 const tier = (field) => {
-                  if (!Number(product[field])) return <span className="text-[12px] text-amber-600">= Buyer</span>;
+                  if (!Number(product[field])) return <span className="whitespace-nowrap text-[12px] text-amber-600">= Buyer</span>;
                   const loss = cost > 0 && rates[field] <= cost;
                   return <span className={`tabular-nums ${loss ? "font-semibold text-red-600" : ""}`}>{money(rates[field])}</span>;
                 };
@@ -234,14 +329,14 @@ export default function VariantDraft({ rows, setRows, product }) {
                           onChange={(e) => edit(r.key, { size: e.target.value })}
                           placeholder="8/128"
                           aria-label={`Storage / size of variant ${i + 1}`}
-                          className={`${cell} w-[70px]`}
+                          className={`${cell} w-[92px]`}
                         />
                         <input
                           value={r.color}
                           onChange={(e) => edit(r.key, { color: e.target.value })}
                           placeholder="Black"
                           aria-label={`Color of variant ${i + 1}`}
-                          className={`${cell} w-[80px]`}
+                          className={`${cell} w-[112px]`}
                         />
                       </div>
                     </td>
