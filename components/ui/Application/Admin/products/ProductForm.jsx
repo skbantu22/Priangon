@@ -13,7 +13,7 @@ import { List, Plus } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
-import VariantDraft, { variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
+import VariantDraft, { makeBarcode, variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSchema";
@@ -80,6 +80,13 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     (product?.media || []).filter((m) => m?._id).map((m) => ({ _id: m._id, url: m.secure_url || m.url, secure_url: m.secure_url })),
   );
   const [simpleItem, setSimpleItem] = useState({ barcode: "", stock: "" });
+  // a new product starts with an 8 digit barcode; made after mount so the
+  // server and browser render the same empty box first
+  useEffect(() => {
+    if (editing) return undefined;
+    const timer = setTimeout(() => setSimpleItem((item) => (item.barcode ? item : { ...item, barcode: makeBarcode() })));
+    return () => clearTimeout(timer);
+  }, [editing]);
   // a variant product being added: its lines are typed in on this screen
   const [variantRows, setVariantRows] = useState([]);
   const [editorKey, setEditorKey] = useState(0);
@@ -160,7 +167,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   const clear = () => {
     reset(productFormValues(null));
     setMedia([]);
-    setSimpleItem({ barcode: "", stock: "" });
+    setSimpleItem({ barcode: makeBarcode(), stock: "" });
     setVariantRows([]);
     setEditorKey((k) => k + 1);
     warrantyTouched.current = false;
@@ -329,13 +336,14 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
                           value={simpleItem.barcode}
                           onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
                           placeholder="Scan or auto"
+                          maxLength={32}
                           aria-label="Barcode"
                           className={`${inputClass} !h-[34px] !w-[120px] shrink-0 !px-2 font-mono !text-[13px]`}
                         />
                         <button
                           type="button"
-                          onClick={() => setSimpleItem({ ...simpleItem, barcode: String(Math.floor(10000000 + Math.random() * 90000000)) })}
-                          title="Make a barcode"
+                          onClick={() => setSimpleItem({ ...simpleItem, barcode: makeBarcode() })}
+                          title="Make a new barcode"
                           aria-label="Make a barcode"
                           className="flex h-[34px] w-[30px] shrink-0 items-center justify-center bg-[#10c469] text-white hover:bg-[#0eab5c]"
                         >

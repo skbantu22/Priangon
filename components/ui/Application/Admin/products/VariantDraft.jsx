@@ -108,11 +108,14 @@ function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHre
 const newKey = () =>
   globalThis.crypto?.randomUUID?.() ?? `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
+// an 8 digit barcode, the same kind the server makes
+export const makeBarcode = () => String(Math.floor(10000000 + Math.random() * 90000000));
+
 export const emptyVariant = (color = "", size = "") => ({
   key: newKey(),
   color,
   size,
-  barcode: "",
+  barcode: makeBarcode(),
   purchasePrice: "",
   mrp: "",
   sellingPrice: "",
@@ -345,7 +348,7 @@ export default function VariantDraft({ rows, setRows, product }) {
                       <input
                         value={r.barcode}
                         onChange={(e) => edit(r.key, { barcode: e.target.value })}
-                        placeholder="Auto"
+                        placeholder="Scan or auto"
                         className={`${cell} w-[96px] font-mono`}
                       />
                     </td>
@@ -391,7 +394,7 @@ export default function VariantDraft({ rows, setRows, product }) {
           </table>
         </div>
         <p className="m-0 mt-1.5 text-[12px] text-muted-foreground">
-          A blank price uses the product&apos;s price; a blank barcode is made for you. Dealer, Sub
+          A blank price uses the product&apos;s price; each line gets an 8 digit barcode you can scan over. Dealer, Sub
           Dealer and Wholesaler follow the Price List above and scale with a dearer variant.{" "}
           <span className="text-amber-600">= Buyer</span> means that rate is not set. Red = at or below cost.
         </p>
