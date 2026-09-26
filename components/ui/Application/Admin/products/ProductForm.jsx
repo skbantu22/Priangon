@@ -12,7 +12,7 @@ import { z } from "zod";
 import { List, Plus } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass } from "@/components/ui/Application/Admin/listKit";
-import Editor from "@/components/ui/Application/Admin/Editor";
+import RichText from "@/components/ui/Application/Admin/RichText";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSchema";
@@ -404,26 +404,19 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </div>
         </Section>
 
-        {/* ---------- website, optional ---------- */}
+        {/* ---------- photos and description, optional ---------- */}
         <details className="mt-5 rounded-[6px] border border-[#ebeff2] dark:border-border" open={editing && media.length > 0}>
           <summary className="cursor-pointer select-none px-4 py-2.5 text-[14px] font-semibold">
-            Website (optional) — photos &amp; description
+            Photos &amp; description (optional)
           </summary>
           <div className="space-y-4 border-t border-[#ebeff2] p-4 dark:border-border">
             <UploadMedia isMultiple selectedMedia={media} setSelectedMedia={setMedia} />
-            <div className="overflow-hidden rounded-[6px] border bg-white text-black">
-              <Editor key={editorKey} initialData={getValues("description")} onChange={(event, editor) => setValue("description", editor.getData())} />
-            </div>
-            <div className="flex flex-wrap gap-5 text-[13px]">
-              <label className={`flex items-center gap-2 ${media.length ? "" : "opacity-50"}`}>
-                <input type="checkbox" className="size-4" disabled={!media.length} checked={!!watch("showInWebsite")} onChange={(e) => setValue("showInWebsite", e.target.checked)} />
-                Show on website {!media.length && "(add a photo first)"}
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" className="size-4" checked={!!watch("freeDelivery")} onChange={(e) => setValue("freeDelivery", e.target.checked)} />
-                Free delivery
-              </label>
-            </div>
+            <RichText
+              key={editorKey}
+              value={watch("description")}
+              onChange={(html) => setValue("description", html)}
+              placeholder="Product details, box contents, specifications…"
+            />
           </div>
         </details>
 
