@@ -7,6 +7,7 @@ import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
 import { isValidBdMobile, normalizeBdMobile } from "@/lib/bdFormat";
+import { PARTNER_ROLES } from "@/lib/priceTiers";
 
 export async function PUT(req, { params }) {
   try {
@@ -60,7 +61,10 @@ export async function PUT(req, { params }) {
       );
     }
 
-    if (mongoose.isValidObjectId(body.roleId)) {
+    const isPartner = PARTNER_ROLES.includes(user.role);
+
+    // a partner keeps its type; staff roles do not apply to it
+    if (!isPartner && mongoose.isValidObjectId(body.roleId)) {
       const role = await RoleModel.findOne({
         _id: body.roleId,
         deletedAt: null,
@@ -90,6 +94,7 @@ export async function PUT(req, { params }) {
     }
 
     if (typeof body.isActive === "boolean") user.isActive = body.isActive;
+    if (isPartner && typeof body.canOrder === "boolean") user.canOrder = body.canOrder;
 
     // Changing a password signs the old sessions out
     if (body.password) {

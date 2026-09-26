@@ -19,7 +19,7 @@ export async function GET() {
   await connectDB();
 
   const users = await UserModel.find({ role: { $in: PARTNER_ROLES }, deletedAt: null })
-    .select("name email role customerId createdAt")
+    .select("name email role customerId canOrder createdAt")
     .sort({ createdAt: -1 })
     .lean();
   const customerIds = users.map((u) => u.customerId).filter(Boolean);
@@ -51,6 +51,7 @@ export async function GET() {
         name: u.name,
         email: u.email,
         role: u.role,
+        canOrder: u.canOrder !== false,
         typeLabel: CUSTOMER_TYPES[u.role]?.short || u.role,
         business: c.name || "",
         phone: c.phone || "",
@@ -112,6 +113,7 @@ export async function POST(req) {
       role,
       customerId: customer._id,
       phone,
+      canOrder: body.canOrder !== false,
       isEmailVerified: true,
     });
 
@@ -119,6 +121,25 @@ export async function POST(req) {
       success: true,
       partner: { _id: user._id, name: user.name, email: user.email, role, business },
     });
+  } catch (error) {
+    return fail(error.message);
+  }
+}
+
+// PATCH { id, canOrder }: turn ordering on or off for one partner login
+export async function PATCH(req) {
+  if (!(await adminOnly())) return fail("Unauthorized", 403);
+  await connectDB();
+
+  try {
+    const { id, canOrder } = await req.json();
+    const user = await UserModel.findOne({ _id: id, role: { $in: PARTNER_ROLES }, deletedAt: null });
+    if (!user) throw new Error("Partner login not found");
+
+    user.canOrder = Boolean(canOrder);
+    await user.save();
+
+    return NextResponse.json({ success: true, canOrder: user.canOrder });
   } catch (error) {
     return fail(error.message);
   }

@@ -13,7 +13,7 @@ const ROLE_OPTIONS = [
   ["wholesaler", "Wholesaler (পাইকারি)"],
 ];
 const money = (n) => `৳${Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-const EMPTY = { role: "dealer", business: "", name: "", phone: "", address: "", email: "", password: "" };
+const EMPTY = { role: "dealer", business: "", name: "", phone: "", address: "", email: "", password: "", canOrder: true };
 
 function NewPartnerForm({ onClose, onSaved, defaultRole }) {
   const [form, setForm] = useState({ ...EMPTY, role: defaultRole || "dealer" });
@@ -78,6 +78,10 @@ function NewPartnerForm({ onClose, onSaved, defaultRole }) {
           <input required minLength={6} value={form.password} onChange={(e) => set("password", e.target.value)} className={input} placeholder="min 6 characters" />
         </label>
       </div>
+      <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={form.canOrder} onChange={(e) => set("canOrder", e.target.checked)} className="size-4 accent-primary" />
+        Can place orders (অর্ডার দিতে পারবে)
+      </label>
       <div className="mt-4 flex justify-end">
         <button disabled={saving} className="flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">
           {saving && <Loader2 className="size-4 animate-spin" />} Create login
@@ -98,6 +102,15 @@ function Partners() {
     queryKey: ["partners"],
     queryFn: async () => (await axios.get("/api/partners")).data,
   });
+
+  const toggleOrdering = async (partner) => {
+    try {
+      await axios.patch("/api/partners", { id: partner._id, canOrder: !partner.canOrder });
+      queryClient.invalidateQueries({ queryKey: ["partners"] });
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Could not change ordering");
+    }
+  };
 
   const q = search.trim().toLowerCase();
   const rows = (data?.partners || []).filter(
@@ -154,6 +167,7 @@ function Partners() {
                 <th className="px-4 py-2">Type</th>
                 <th className="px-4 py-2">Contact</th>
                 <th className="px-4 py-2">Login</th>
+                <th className="px-4 py-2 text-center">Can order</th>
                 <th className="px-4 py-2 text-right">Invoices</th>
                 <th className="px-4 py-2 text-right">Purchased</th>
                 <th className="px-4 py-2 text-right">Due</th>
@@ -161,13 +175,13 @@ function Partners() {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={7} className="py-10 text-center text-muted-foreground"><Loader2 className="mr-2 inline size-4 animate-spin" />Loading...</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground"><Loader2 className="mr-2 inline size-4 animate-spin" />Loading...</td></tr>
               )}
               {isError && (
-                <tr><td colSpan={7} className="py-10 text-center text-red-500">Could not load partners.</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-red-500">Could not load partners.</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
-                <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">No partner accounts yet.</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">No partner accounts yet.</td></tr>
               )}
               {rows.map((p) => (
                 <tr key={p._id} className="border-t">
@@ -183,6 +197,9 @@ function Partners() {
                     <p className="text-xs text-muted-foreground">{p.phone}</p>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{p.email}</td>
+                  <td className="px-4 py-3 text-center">
+                    <input type="checkbox" checked={p.canOrder} onChange={() => toggleOrdering(p)} className="size-4 cursor-pointer accent-primary" aria-label={`${p.business} can place orders`} />
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums">{p.invoices}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{money(p.spent)}</td>
                   <td className={`px-4 py-3 text-right font-semibold tabular-nums ${p.due > 0 ? "text-red-600" : "text-emerald-600"}`}>{money(p.due)}</td>
@@ -192,7 +209,7 @@ function Partners() {
             {rows.length > 0 && (
               <tfoot>
                 <tr className="border-t bg-gray-50 font-semibold dark:bg-white/5">
-                  <td className="px-4 py-2.5" colSpan={6}>Total due</td>
+                  <td className="px-4 py-2.5" colSpan={7}>Total due</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-red-600">{money(totalDue)}</td>
                 </tr>
               </tfoot>

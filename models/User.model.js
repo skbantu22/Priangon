@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
 
+    // partner logins: may place orders from the partner portal. Off, they
+    // can still see their prices, invoices and dues.
+    canOrder: { type: Boolean, default: true },
+
     // partner logins: the Customer account their invoices and dues belong to
     customerId: {
       type: mongoose.Schema.Types.ObjectId,

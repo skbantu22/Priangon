@@ -36,6 +36,13 @@ export async function POST(req) {
   const partner = await getPartner();
   if (!partner) return partnerUnauthorized();
 
+  if (partner.user.canOrder === false) {
+    return NextResponse.json(
+      { success: false, message: "Ordering is turned off for your account. Please call the shop." },
+      { status: 403 },
+    );
+  }
+
   try {
     const { items = [], note = "" } = await req.json();
 

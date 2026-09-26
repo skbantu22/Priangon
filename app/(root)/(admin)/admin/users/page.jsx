@@ -53,6 +53,7 @@ const UsersPage = () => {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [type, setType] = useState("all");
 
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(null);
@@ -66,6 +67,7 @@ const UsersPage = () => {
 
       if (search.trim()) params.set("search", search.trim());
       if (status !== "all") params.set("status", status);
+      if (type !== "all") params.set("type", type);
 
       const { data } = await axios.get(`/api/users?${params.toString()}`);
 
@@ -76,11 +78,14 @@ const UsersPage = () => {
 
       setUsers(data.data);
     } catch (error) {
-      showToast("error", error.response?.data?.message || "Could not load users");
+      showToast(
+        "error",
+        error.response?.data?.message || "Could not load users",
+      );
     } finally {
       setLoading(false);
     }
-  }, [search, status]);
+  }, [search, status, type]);
 
   useEffect(() => {
     const timer = setTimeout(loadUsers, 250);
@@ -110,6 +115,7 @@ const UsersPage = () => {
       phone: user.phone || "",
       roleId: user.roleId || "",
       isActive: user.isActive,
+      canOrder: user.canOrder,
       password: "",
     });
   };
@@ -189,7 +195,8 @@ const UsersPage = () => {
           <div>
             <h4 className="text-xl font-semibold">Users</h4>
             <p className="text-sm text-muted-foreground">
-              {users.length} staff login{users.length === 1 ? "" : "s"}
+              {users.length} login{users.length === 1 ? "" : "s"}: staff,
+              dealers, sub dealers and wholesalers
             </p>
           </div>
 
@@ -203,6 +210,18 @@ const UsersPage = () => {
                 className="pl-9 w-full sm:w-56"
               />
             </div>
+
+            <select
+              className={selectClass}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
+              <option value="all">All users</option>
+              <option value="staff">Staff</option>
+              <option value="dealer">Dealer</option>
+              <option value="subDealer">Sub Dealer</option>
+              <option value="wholesaler">Wholesaler</option>
+            </select>
 
             <select
               className={selectClass}
@@ -292,6 +311,11 @@ const UsersPage = () => {
 
                       <TableCell className="capitalize">
                         {user.roleName}
+                        {user.isPartner && !user.canOrder && (
+                          <span className="block text-xs normal-case text-muted-foreground">
+                            Ordering off
+                          </span>
+                        )}
                       </TableCell>
 
                       <TableCell>{user.showroom || "—"}</TableCell>
@@ -369,22 +393,38 @@ const UsersPage = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-role">Role</Label>
-                <select
-                  id="edit-role"
-                  className={`${selectClass} w-full`}
-                  value={form.roleId}
-                  onChange={(e) => setForm({ ...form, roleId: e.target.value })}
-                >
-                  <option value="">Keep as is</option>
-                  {roles.map((role) => (
-                    <option key={role._id} value={role._id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {editing?.isPartner ? (
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={form.canOrder}
+                    onChange={(e) =>
+                      setForm({ ...form, canOrder: e.target.checked })
+                    }
+                    className="size-4 accent-primary"
+                  />
+                  Can place orders (অর্ডার দিতে পারবে)
+                </label>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">Role</Label>
+                  <select
+                    id="edit-role"
+                    className={`${selectClass} w-full`}
+                    value={form.roleId}
+                    onChange={(e) =>
+                      setForm({ ...form, roleId: e.target.value })
+                    }
+                  >
+                    <option value="">Keep as is</option>
+                    {roles.map((role) => (
+                      <option key={role._id} value={role._id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="edit-password">New Password</Label>

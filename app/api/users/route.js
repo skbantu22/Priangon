@@ -6,9 +6,9 @@ import Showroom from "@/models/Showroom.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
-import { PARTNER_ROLES } from "@/lib/priceTiers";
+import { CUSTOMER_TYPES, PARTNER_ROLES } from "@/lib/priceTiers";
 
-// GET /api/users: the staff login list behind the Users page
+// GET /api/users: every login behind the Users page, staff and partners
 export async function GET(req) {
   try {
     const auth = await requirePermission("users.view");
@@ -21,10 +21,11 @@ export async function GET(req) {
 
     const filter = { deletedAt: null };
 
-    // Dealer and wholesaler logins have their own page
-    if (searchParams.get("include") !== "partners") {
-      filter.role = { $nin: [...PARTNER_ROLES, "customer"] };
-    }
+    // ?type=staff | dealer | subDealer | wholesaler
+    const type = searchParams.get("type");
+    if (type === "staff") filter.role = { $nin: [...PARTNER_ROLES, "customer"] };
+    else if (PARTNER_ROLES.includes(type)) filter.role = type;
+    else filter.role = { $ne: "customer" };
 
     const status = searchParams.get("status");
     if (status === "active") filter.isActive = { $ne: false };
@@ -38,7 +39,7 @@ export async function GET(req) {
     }
 
     const users = await UserModel.find(filter)
-      .select("name email phone role roleId showroomId isActive createdAt")
+      .select("name email phone role roleId showroomId isActive canOrder createdAt")
       .populate({ path: "roleId", model: RoleModel, select: "name systemKey" })
       .populate({ path: "showroomId", model: Showroom, select: "name" })
       .sort({ createdAt: -1 })
@@ -53,7 +54,9 @@ export async function GET(req) {
         email: user.email,
         phone: user.phone || "",
         // A user made before roles existed still shows the key they hold
-        roleName: user.roleId?.name || user.role,
+        roleName: CUSTOMER_TYPES[user.role]?.short || user.roleId?.name || user.role,
+        isPartner: PARTNER_ROLES.includes(user.role),
+        canOrder: user.canOrder !== false,
         roleId: user.roleId?._id || null,
         role: user.role,
         showroom: user.showroomId?.name || "",
