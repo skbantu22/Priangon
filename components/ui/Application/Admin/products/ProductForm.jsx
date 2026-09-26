@@ -13,6 +13,7 @@ import { List, Plus } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
+import VariantDraft, { emptyVariant, variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
 import UploadMedia from "@/components/ui/Application/Admin/uploadmedia";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSchema";
@@ -79,6 +80,8 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     (product?.media || []).filter((m) => m?._id).map((m) => ({ _id: m._id, url: m.secure_url || m.url, secure_url: m.secure_url })),
   );
   const [simpleItem, setSimpleItem] = useState({ barcode: "", stock: "" });
+  // a variant product being added: its lines are typed in on this screen
+  const [variantRows, setVariantRows] = useState(() => [emptyVariant()]);
   const [editorKey, setEditorKey] = useState(0);
   const warrantyTouched = useRef(editing);
 
@@ -158,6 +161,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     reset(productFormValues(null));
     setMedia([]);
     setSimpleItem({ barcode: "", stock: "" });
+    setVariantRows([emptyVariant()]);
     setEditorKey((k) => k + 1);
     warrantyTouched.current = false;
   };
@@ -165,6 +169,9 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   const submit = form.handleSubmit(
     async (values) => {
       if (!(Number(values.sellingPrice) > 0)) return showToast("error", "Enter the Buyer (sale) price");
+      const addingVariants = !editing && values.productType === "variant";
+      const problem = addingVariants ? variantProblem(variantRows) : "";
+      if (problem) return showToast("error", problem);
 
       const mrp = Number(values.mrp) || Number(values.sellingPrice);
       const name = values.name.trim();
@@ -178,6 +185,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           description: values.description || "",
         },
         simpleItem,
+        addingVariants ? variantPayload(variantRows) : [],
       );
       if (saved && !editing) clear();
     },
@@ -404,6 +412,16 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </div>
         </Section>
 
+        {!editing && productType === "variant" && (
+          <Section title="Variants (color / storage)" note="Each line sells with its own barcode, price and stock.">
+            <VariantDraft
+              rows={variantRows}
+              setRows={setVariantRows}
+              defaults={{ purchasePrice: purchase, mrp: Number(watch("mrp")) || 0, sellingPrice: retail }}
+            />
+          </Section>
+        )}
+
         {/* ---------- photos and description, optional ---------- */}
         <details className="mt-5 rounded-[6px] border border-[#ebeff2] dark:border-border" open={editing && media.length > 0}>
           <summary className="cursor-pointer select-none px-4 py-2.5 text-[14px] font-semibold">
@@ -428,7 +446,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
             </button>
           )}
           <button type="submit" disabled={saving} className={btn.success}>
-            {saving ? "Saving..." : editing ? "Update" : productType === "simple" ? "Save" : "Save & Add Variants"}
+            {saving ? "Saving..." : editing ? "Update" : "Save"}
           </button>
         </div>
       </ListCard>

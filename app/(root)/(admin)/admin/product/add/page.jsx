@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
 import ProductForm from "@/components/ui/Application/Admin/products/ProductForm";
-import { ADMIN_PRODUCT_EDIT, ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
+import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
 import { showToast } from "@/lib/showToast";
 
 export default function AddProduct() {
@@ -14,7 +14,7 @@ export default function AddProduct() {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
 
-  const save = async (values, simpleItem) => {
+  const save = async (values, simpleItem, variants) => {
     setSaving(true);
     try {
       const { data } = await axios.post("/api/product/create", values);
@@ -25,24 +25,24 @@ export default function AddProduct() {
         return false;
       }
 
-      // a simple product sells as one "Default" item: create it right away
-      if (values.productType === "simple") {
-        await axios.post("/api/product-variant/create", {
-          productId: created._id,
-          variants: [{ color: "Default", size: "Standard", barcode: simpleItem.barcode, stock: Number(simpleItem.stock) || 0 }],
-        });
+      // a simple product sells as one "Default" item; a variant product
+      // brings the lines typed in on the form
+      const lines =
+        values.productType === "simple"
+          ? [{ color: "Default", size: "Standard", barcode: simpleItem.barcode, stock: Number(simpleItem.stock) || 0 }]
+          : variants;
+      if (lines.length) {
+        await axios.post("/api/product-variant/create", { productId: created._id, variants: lines });
       }
 
       queryClient.invalidateQueries({ queryKey: ["product-list"] });
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });
 
-      if (values.productType === "simple") {
-        showToast("success", "Product saved and ready to sell.");
-        router.push(ADMIN_PRODUCT_SHOW);
-      } else {
-        showToast("success", "Product saved. Now add its variants (color / storage).");
-        router.push(ADMIN_PRODUCT_EDIT(created._id));
-      }
+      showToast(
+        "success",
+        values.productType === "simple" ? "Product saved and ready to sell." : `Product saved with ${lines.length} variants.`,
+      );
+      router.push(ADMIN_PRODUCT_SHOW);
       return true;
     } catch (error) {
       showToast("error", error?.response?.data?.message || "Could not save product");
@@ -53,10 +53,6 @@ export default function AddProduct() {
   };
 
   return (
-    <ProductForm
-      onSave={save}
-      saving={saving}
-      footerNote="Variant product: colors / storage and their barcodes are added on the next screen."
-    />
+    <ProductForm onSave={save} saving={saving} />
   );
 }

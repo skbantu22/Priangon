@@ -3,7 +3,9 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
 import WarehouseStock from "@/models/WarehouseStock.model";
-import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { actorFullName, requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { applyStockChange } from "@/lib/stockService";
+import { mainStockLocation } from "@/lib/purchaseService";
 
 // SKU generator
 const generateSKU = (productId) => {
@@ -27,9 +29,6 @@ export async function POST(request) {
 
     const payload = await request.json();
 
-    console.log("========== VARIANT CREATE ==========");
-    console.log(JSON.stringify(payload, null, 2));
-
     const productId = payload.productId; // ✅ ONLY SOURCE OF TRUTH
 
     const variants = Array.isArray(payload.variants) ? payload.variants : [];
@@ -46,12 +45,11 @@ export async function POST(request) {
     }
 
     const createdVariants = [];
+    let location;
+    let createdBy;
     const productVariantIds = [];
 
     for (const item of variants) {
-      console.log("ITEM:", item);
-      console.log("openingStock =", item.openingStock);
-      console.log("stock =", item.stock);
       const existingVariant = await ProductVariantModel.findOne({
         product: productId,
         color: item.color || "",
@@ -60,8 +58,6 @@ export async function POST(request) {
 
       if (existingVariant) continue;
       const stock = Math.max(0, Number(item.stock || 0));
-
-      console.log("FINAL STOCK =", stock);
 
       const barcode = item.barcode?.trim()
         ? item.barcode.trim()
@@ -95,13 +91,30 @@ export async function POST(request) {
         isActive: item.isActive ?? true,
       });
 
-      // warehouse stock
       await WarehouseStock.create({
         productId,
         variantId: variant._id,
-        stock,
+        stock: 0,
         reservedStock: 0,
       });
+
+      // opening stock goes where the POS sells from (the main store), not
+      // the warehouse, or the POS would not see it
+      if (stock > 0) {
+        location ??= await mainStockLocation();
+        createdBy ??= await actorFullName(auth);
+        await applyStockChange({
+          locationType: location.locationType,
+          locationId: location.locationId,
+          productId,
+          variantId: variant._id,
+          delta: stock,
+          type: "OPENING",
+          note: "Opening stock",
+          createdBy,
+          productName: `${item.color || ""} ${item.size || ""}`.trim() || "item",
+        });
+      }
 
       createdVariants.push(variant);
       productVariantIds.push(variant._id);
