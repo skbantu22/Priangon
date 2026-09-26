@@ -253,7 +253,7 @@ export default function Dashboard() {
           value={<CountUp value={k.todaySales} format={money} />}
           label="Today's Sales"
           sub={`${k.todayOrders} invoices · ${k.todayUnits} items`}
-          href="/admin/all-orders/pos-orders"
+          href="/admin/sales"
         />
         <Kpi
           icon={Wallet}

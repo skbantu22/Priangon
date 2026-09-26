@@ -158,7 +158,7 @@ export default function PosTopbar({
           <span className="hidden lg:inline">Exchange (F6)</span>
         </button>
 
-        <Link href="/admin/all-orders/pos-orders" className={`${topButton} max-sm:hidden`}>
+        <Link href="/admin/sales" className={`${topButton} max-sm:hidden`}>
           <History className="size-5" />
           <span className="hidden lg:inline">Recent Sales</span>
         </Link>

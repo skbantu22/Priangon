@@ -1,27 +1,39 @@
-import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
-// import { NextResponse } from "next/server";
-// import ColorModel from "@/models/ColorModel";
-// import { connectDB } from "@/lib/databaseconnection";
+import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 
-// export async function DELETE(req, { params }) {
+import ColorModel from "@/models/ColorModel";
+import { connectDB } from "@/lib/databaseconnection";
+import { requireRoles, ADMIN_ONLY } from "@/lib/apiAuth";
+
+// The sign-in check used to sit outside this function, at the top of the
+// file. Loading the file then awaited it forever, which hung `next build`
+// on "Collecting page data".
+export async function DELETE(req, { params }) {
   const auth = await requireRoles(ADMIN_ONLY);
   if (auth.response) return auth.response;
 
-//   try {
-//     await connectDB();
+  try {
+    await connectDB();
 
-//     const { id } = await params;
+    const { id } = await params;
 
-//     await ColorModel.findByIdAndDelete(id);
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ success: false, message: "Color not found" }, { status: 404 });
+    }
 
-//     return NextResponse.json({
-//       success: true,
-//       message: "Color deleted successfully",
-//     });
-//   } catch (error) {
-//     return NextResponse.json({
-//       success: false,
-//       message: error.message,
-//     });
-//   }
-// }
+    await ColorModel.findByIdAndDelete(id);
+
+    return NextResponse.json({
+      success: true,
+      message: "Color deleted successfully",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message,
+      },
+      { status: 500 },
+    );
+  }
+}

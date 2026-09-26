@@ -158,7 +158,7 @@ export default function ExchangeModal({
 
     try {
       const res = await fetch(
-        `/api/wirehouse-stock?showroomId=${showroomId}&q=${encodeURIComponent(search.trim())}`,
+        `/api/pos/stock-search?showroomId=${showroomId}&q=${encodeURIComponent(search.trim())}`,
       );
 
       if (!res.ok) {

@@ -18,7 +18,6 @@ import {
 
 import {
   DT_CATEGORY_COLUMN,
-  DT_COUPON_COLUMN,
   DT_CUSTOMERS_COLUMN,
   DT_PRODUCT_COLUMN,
   DT_PRODUCT_VARIANT_COLUMN,
@@ -61,13 +60,6 @@ const TRASH_CONFIG = {
     deleteUrl: "/api/product-variant/delete",
   },
 
-  coupon: {
-    title: "Coupon Trash",
-    columns: DT_COUPON_COLUMN,
-    fetchUrl: "/api/coupon",
-    exportUrl: "/api/coupon/export",
-    deleteUrl: "/api/coupon/delete",
-  },
   customers: {
     title: "Customers Trash",
     columns: DT_CUSTOMERS_COLUMN,
