@@ -11,6 +11,8 @@ import ProductVariant from "@/models/ProductVariant.model ";
 import ShowroomStock from "@/models/ShowroomStock";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import Showroom from "@/models/Showroom.model";
+import PurchaseModel from "@/models/Purchase.model";
+import CategoryModel from "@/models/category.model";
 
 const TYPE_LABELS = {
   OPENING: "Opening Stock",
@@ -51,7 +53,8 @@ export async function GET(req) {
       return NextResponse.json({ success: false, message: "Select a product" }, { status: 400 });
     }
 
-    const product = await ProductModel.findById(productId).select("name unit").lean();
+    const product = await ProductModel.findById(productId).select("name unit category").lean();
+    const category = product?.category ? await CategoryModel.findById(product.category).select("name").lean() : null;
     if (!product) return NextResponse.json({ success: false, message: "Product not found" }, { status: 404 });
 
     const pid = new mongoose.Types.ObjectId(productId);
@@ -94,6 +97,7 @@ export async function GET(req) {
         branch: branchOf(log.showroomId),
         details: [variantText(log.variantId), log.note].filter(Boolean).join(" | "),
         invoiceNo: String(log.note || "").match(/\b[A-Z]{2,4}-\d+\b/)?.[0] || "",
+        link: "",
         type: TYPE_LABELS[log.type] || log.type,
         change,
         rate,
@@ -118,6 +122,7 @@ export async function GET(req) {
             branch,
             details: variantText(item.variantId),
             invoiceNo: order.orderNumber,
+            link: `/admin/print/${order._id}`,
             type,
             change: sign * qty,
             rate: price,
@@ -135,6 +140,14 @@ export async function GET(req) {
     }
 
     rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // purchases named in the stock log open their purchase
+    const numbers = [...new Set(rows.filter((r) => r.invoiceNo && !r.link).map((r) => r.invoiceNo))];
+    if (numbers.length) {
+      const purchases = await PurchaseModel.find({ purchaseNumber: { $in: numbers } }).select("purchaseNumber").lean();
+      const byNumber = new Map(purchases.map((p) => [p.purchaseNumber, `/admin/purchase/${p._id}`]));
+      for (const r of rows) if (!r.link && byNumber.has(r.invoiceNo)) r.link = byNumber.get(r.invoiceNo);
+    }
 
     // stock that was already there before anything was recorded
     const onHand = (Number(shopStock[0]?.stock) || 0) + (Number(warehouseStock[0]?.stock) || 0);
@@ -175,6 +188,7 @@ export async function GET(req) {
         branch: r.branch,
         details: r.details,
         invoiceNo: r.invoiceNo,
+        link: r.link || "",
         type: r.type,
         inQty: r.change > 0 ? round2(r.change) : 0,
         outQty: r.change < 0 ? round2(-r.change) : 0,
@@ -190,7 +204,7 @@ export async function GET(req) {
 
     return NextResponse.json({
       success: true,
-      product: { _id: productId, name: product.name, unit: product.unit || "Pcs" },
+      product: { _id: productId, name: product.name, unit: product.unit || "Pcs", category: category?.name || "" },
       openingForRange: from ? openingForRange : null,
       rows: list,
       summary: {
