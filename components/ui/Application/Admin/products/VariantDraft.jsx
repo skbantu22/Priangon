@@ -25,20 +25,29 @@ const EMPTY_BULK = { purchasePrice: "", mrp: "", sellingPrice: "", stock: "" };
 
 /**
  * Saved values to pick from (Products → Attributes / Colors), shown as
- * chips under a box. A chip toggles its value in the comma list; typing
- * still works for anything not saved yet.
+ * chips under a box. What is being typed after the last comma filters
+ * the chips; a chip picks its value (replacing the half-typed word) or
+ * drops it again. A value not saved yet can still be typed in full.
  */
-function PickBox({ label, text, setText, groups, placeholder, onEnter, search, manageHref }) {
-  const [term, setTerm] = useState("");
-  const picked = new Set(split(text).map((v) => v.toLowerCase()));
+function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHref }) {
+  const parts = text.split(",");
+  const typing = parts[parts.length - 1].trim();
+  const known = new Set(groups.flatMap((g) => g.values.map((v) => v.toLowerCase())));
+  // a finished saved value is a pick, not a search
+  const typedIsValue = known.has(typing.toLowerCase());
+  const chosen = [...split(parts.slice(0, -1).join(",")), ...(typedIsValue ? [typing] : [])];
+  const picked = new Set(chosen.map((v) => v.toLowerCase()));
+  const needle = typedIsValue ? "" : typing.toLowerCase();
+  const matches = (v) => !needle || v.toLowerCase().includes(needle);
+  const anyMatch = groups.some((g) => g.values.some(matches));
+
   const toggle = (value) => {
-    const list = split(text);
     const next = picked.has(value.toLowerCase())
-      ? list.filter((v) => v.toLowerCase() !== value.toLowerCase())
-      : [...list, value];
-    setText(next.join(", "));
+      ? chosen.filter((v) => v.toLowerCase() !== value.toLowerCase())
+      : [...chosen, value];
+    // the trailing comma starts the next word, so typing goes on filtering
+    setText(next.length ? `${next.join(", ")}, ` : "");
   };
-  const needle = term.trim().toLowerCase();
 
   return (
     <div>
@@ -53,18 +62,14 @@ function PickBox({ label, text, setText, groups, placeholder, onEnter, search, m
       <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter} placeholder={placeholder} className={inputClass} />
       {groups.length > 0 && (
         <div className="mt-1.5 border border-[#ebeff2] p-2 dark:border-border">
-          {search && (
-            <input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder="Search…"
-              className={`${cell} mb-2 w-full`}
-              aria-label={`Search ${label}`}
-            />
-          )}
           <div className="max-h-[140px] space-y-1.5 overflow-y-auto">
+            {!anyMatch && (
+              <p className="py-1 text-[12.5px] text-[#8a939c]">
+                No saved value matches &quot;{typing}&quot;. It will be used as typed.
+              </p>
+            )}
             {groups.map((group) => {
-              const values = group.values.filter((v) => !needle || v.toLowerCase().includes(needle));
+              const values = group.values.filter(matches);
               if (!values.length) return null;
               return (
                 <div key={group.name}>
@@ -232,7 +237,6 @@ export default function VariantDraft({ rows, setRows, product }) {
           groups={saved.color}
           placeholder="Pick below or type: Black, Blue"
           onEnter={onEnter(generate)}
-          search
           manageHref="/admin/attributes?slot=color"
         />
         <button type="button" className={`${btn.success} h-[38px] justify-center md:mt-[22px] md:min-w-[190px]`} onClick={generate}>
