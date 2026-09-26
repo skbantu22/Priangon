@@ -92,6 +92,11 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   const [editorKey, setEditorKey] = useState(0);
   const warrantyTouched = useRef(editing);
 
+  const { data: vatGroups = [] } = useQuery({
+    queryKey: ["vat-groups"],
+    queryFn: async () => (await axios.get("/api/vat-groups")).data?.data || [],
+    refetchOnWindowFocus: false,
+  });
   const { data: existingBrands = [] } = useQuery({ ...posBrandsQueryOptions(), refetchOnWindowFocus: false });
   const { brands, units } = useProductLookups({ fallbackBrands: existingBrands });
 
@@ -309,6 +314,20 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </Field>
           <Field label="Rack No" className="sm:col-span-2">
             <input {...register("rackNo")} placeholder="Ex: A-12" className={inputClass} />
+          </Field>
+          <Field
+            label="VAT/SD Group"
+            className="sm:col-span-2"
+            hint={vatGroups.length ? "Added on top of the price at POS" : "Add groups in Settings → VAT Settings"}
+          >
+            <select {...register("vatGroup")} className={inputClass}>
+              <option value="">No VAT</option>
+              {vatGroups.map((g) => (
+                <option key={g._id} value={g._id}>
+                  {g.name} ({g.percent}%)
+                </option>
+              ))}
+            </select>
           </Field>
 
         </div>

@@ -327,6 +327,7 @@ export default function POSPage() {
           warrantyType: product.warranty?.type || "none",
           warrantyMonths: product.warranty?.months || 0,
           trackSerial: !!product.trackSerial,
+          vatPercent: Number(product.vatPercent) || 0,
           imeis: [],
         }),
       );

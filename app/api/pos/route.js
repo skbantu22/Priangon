@@ -1,4 +1,5 @@
 import { connectDB } from "@/lib/databaseconnection";
+import VatGroupModel from "@/models/VatGroup.model";
 import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import ProductVariant from "@/models/ProductVariant.model ";
@@ -94,7 +95,7 @@ export async function GET(req) {
       }[sort] || { _id: -1 };
 
     const products = await Product.find(query)
-      .select("name brand category sellingPrice dealerPrice subDealerPrice wholesalerPrice media variants warranty trackSerial")
+      .select("name brand category sellingPrice dealerPrice subDealerPrice wholesalerPrice media variants warranty trackSerial vatGroup")
       .sort(sortBy)
       .skip(skip)
       .limit(limit)
@@ -148,6 +149,16 @@ export async function GET(req) {
       stockMap.set(key, (stockMap.get(key) || 0) + Number(stock.stock || 0));
     }
 
+    // VAT / SD groups (Settings → VAT Settings) by id
+    const vatGroupIds = [...new Set(products.map((p) => p.vatGroup).filter(Boolean).map(String))];
+    const vatPercent = new Map(
+      vatGroupIds.length
+        ? (await VatGroupModel.find({ _id: { $in: vatGroupIds }, deletedAt: null, isActive: { $ne: false } }).select("percent").lean()).map(
+            (g) => [String(g._id), Number(g.percent) || 0],
+          )
+        : [],
+    );
+
     const items = products.map((product) => {
       // first media that still exists, same as populate used to give
       const productImage =
@@ -164,6 +175,7 @@ export async function GET(req) {
           warranty: product.warranty || { type: "none", months: 0 },
           trackSerial: !!product.trackSerial,
           sellingPrice: product.sellingPrice,
+          vatPercent: vatPercent.get(String(product.vatGroup)) || 0,
           // price list per customer type (purchase price stays on the server)
           tierPrices: {
             dealerPrice: product.dealerPrice || 0,

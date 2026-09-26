@@ -260,12 +260,20 @@ export const selectPosSummary = (state) => {
   // 3. After Discount Price
   const afterDiscount = Math.max(0, subtotal - discount);
 
-  // 4. VAT calculation
-  let vat = 0;
+  // 4. VAT calculation: each product's VAT / SD group, on its line after
+  // its share of the sale discount, plus any VAT typed in on the cart
+  const discountShare = subtotal > 0 ? afterDiscount / subtotal : 0;
+  const groupVat = cart.reduce(
+    (sum, item) =>
+      sum + (Number(item.price) || 0) * (Number(item.qty) || 0) * discountShare * ((Number(item.vatPercent) || 0) / 100),
+    0,
+  );
+
+  let vat = Math.round(groupVat * 100) / 100;
   if (vatType === "percent") {
-    vat = (afterDiscount * vatValue) / 100;
+    vat += (afterDiscount * vatValue) / 100;
   } else {
-    vat = vatValue;
+    vat += vatValue;
   }
 
   // 5. Grand Total calculation

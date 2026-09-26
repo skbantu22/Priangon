@@ -50,6 +50,9 @@ const productSchema = new mongoose.Schema(
     alertQuantity: { type: Number, min: 0, default: 0 },
     // the POS may not sell below this (0 = no limit)
     minSalePrice: { type: Number, min: 0, default: 0 },
+
+    // Settings → VAT Settings: the POS adds the group's percent on top
+    vatGroup: { type: mongoose.Schema.Types.ObjectId, ref: "VatGroup", default: null },
     // listed on the website shop
     showInWebsite: { type: Boolean, default: true },
 
