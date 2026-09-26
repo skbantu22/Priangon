@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Paperclip, Plus, Search, X } from "lucide-react";
+import { Paperclip, Plus, Search, X, ScanBarcode } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
 import { formatNumberBD } from "@/lib/bdFormat";
@@ -150,7 +150,14 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [active, setActive] = useState(0);
+  const [lastAdded, setLastAdded] = useState("");
   const box = useRef(null);
+
+  const search = async (q) => {
+    const { data } = await axios.get(`/api/purchase/variant-search?q=${encodeURIComponent(q)}`);
+    return data.success ? data.data : [];
+  };
 
   // debounced so a scanner typing character by character hits the API once
   useEffect(() => {
@@ -161,8 +168,8 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const { data } = await axios.get(`/api/purchase/variant-search?q=${encodeURIComponent(query.trim())}`);
-        if (data.success) setResults(data.data);
+        setResults(await search(query.trim()));
+        setActive(0);
       } catch {
         showToast("error", "Product search failed");
       } finally {
@@ -174,42 +181,90 @@ export function ProductSearch({ onPick, placeholder = "Scan barcode or type prod
 
   const pick = (hit) => {
     onPick(hit);
+    setLastAdded(`${hit.productName}${hit.variantLabel ? ` · ${hit.variantLabel}` : ""}`);
     setQuery("");
     setResults([]);
+    setActive(0);
     box.current?.focus();
   };
 
-  const onKey = (event) => {
+  const exactIn = (list, q) => list.find((r) => r.barcode?.toLowerCase() === q || r.sku?.toLowerCase() === q);
+
+  const onKey = async (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!results.length) return;
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActive((i) => (i + step + results.length) % results.length);
+      return;
+    }
+    if (event.key === "Escape") {
+      setResults([]);
+      return;
+    }
     if (event.key !== "Enter") return;
     event.preventDefault();
     const q = query.trim().toLowerCase();
-    const exact = results.find((r) => r.barcode.toLowerCase() === q || r.sku.toLowerCase() === q);
-    if (exact || results.length === 1) pick(exact || results[0]);
+    if (!q) return;
+
+    // a scanner types the code and presses Enter before the search above
+    // has answered: look the code up now instead of doing nothing
+    let list = results;
+    let exact = exactIn(list, q);
+    if (!exact && (searching || !list.length)) {
+      try {
+        list = await search(query.trim());
+      } catch {
+        return showToast("error", "Product search failed");
+      }
+      exact = exactIn(list, q);
+    }
+    if (exact) return pick(exact);
+    if (list.length === 1) return pick(list[0]);
+    if (list.length > 1) return pick(list[Math.min(active, list.length - 1)]);
+    showToast("error", `No product found for "${query.trim()}"`);
   };
 
   return (
     <div className="relative">
-      <Search size={16} className="absolute left-3 top-[11px] text-[#98a6ad]" />
-      <input
-        ref={box}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={onKey}
-        placeholder={placeholder}
-        className={`${filterInput} !pl-9`}
-        autoFocus={autoFocus}
-      />
+      <div className="flex">
+        <span className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-l-[4px] border border-r-0 border-[#e3e3e3] bg-[#f1f3f5] text-[#3b4652] dark:border-border dark:bg-muted">
+          <ScanBarcode size={18} />
+        </span>
+        <input
+          ref={box}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onKey}
+          placeholder={placeholder}
+          className={`${filterInput} !rounded-l-none`}
+          autoFocus={autoFocus}
+          aria-label="Scan or search product"
+        />
+      </div>
+      <p className="m-0 mt-1 min-h-[16px] text-[12px] text-muted-foreground">
+        {lastAdded ? (
+          <>
+            Added <b className="text-[#0b8a45]">{lastAdded}</b> · scan the next one
+          </>
+        ) : (
+          "Scan a barcode, or type and use ↑ ↓ and Enter."
+        )}
+      </p>
       {(results.length > 0 || searching) && (
         <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-[6px] border border-[#e3e3e3] bg-white shadow-lg dark:bg-popover">
           {searching && !results.length ? (
             <p className="m-0 p-3 text-[13px] text-muted-foreground">Searching...</p>
           ) : (
-            results.map((r) => (
+            results.map((r, i) => (
               <button
                 key={r.variantId}
                 type="button"
                 onClick={() => pick(r)}
-                className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left text-[13px] last:border-b-0 hover:bg-[#f1f7fd] dark:hover:bg-muted"
+                onMouseEnter={() => setActive(i)}
+                className={`flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left text-[13px] last:border-b-0 ${
+                  i === active ? "bg-[#e8f3fd] dark:bg-muted" : "hover:bg-[#f1f7fd] dark:hover:bg-muted"
+                }`}
               >
                 <span className="min-w-0">
                   <span className="font-medium">{r.productName}</span>

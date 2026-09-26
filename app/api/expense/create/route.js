@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { longNumber } from "@/lib/documentNumber";
 
 import ExpenseModel from "@/models/Expense.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { readExpense } from "@/lib/expenseService";
 
 export async function POST(req) {
@@ -19,11 +19,9 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: error }, { status: 400 });
     }
 
-    const seq = await getNextInvoiceNumber("expense");
-
     const expense = await ExpenseModel.create({
       ...data,
-      voucherNumber: `EXP-${seq}`,
+      voucherNumber: longNumber(),
       createdBy: await actorFullName(auth),
     });
 

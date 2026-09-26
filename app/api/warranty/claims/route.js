@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import POSOrder from "@/models/posorder.model";
 import WarrantyClaim, { CLAIM_STATUSES } from "@/models/WarrantyClaim.model";
 import { warrantyStatus } from "@/lib/warranty";
+import { longNumber } from "@/lib/documentNumber";
 
 const STAFF = ["admin", "manager", "cashier"];
 
@@ -80,10 +80,8 @@ export async function POST(req) {
       throw new Error(`A claim is already open for this unit (${open.claimNumber})`);
     }
 
-    const seq = await getNextInvoiceNumber("warranty_claim");
-
     const claim = await WarrantyClaim.create({
-      claimNumber: `WC-${String(seq).padStart(5, "0")}`,
+      claimNumber: longNumber(),
       orderId,
       orderNumber: order.orderNumber,
       productId: item.productId,

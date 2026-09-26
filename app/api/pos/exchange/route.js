@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/databaseconnection";
 import Posorder from "@/models/posorder.model";
 import ShowroomStock from "@/models/ShowroomStock";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { longNumber } from "@/lib/documentNumber";
 
 export async function POST(req) {
   const auth = await requireRoles(STAFF_ROLES);
@@ -178,9 +178,7 @@ export async function POST(req) {
     // =========================
     // EXCHANGE NUMBER
     // =========================
-    const seq = await getNextInvoiceNumber("exchange_invoice");
-
-    const exchangeNumber = `EXC-${String(seq).padStart(6, "0")}`;
+    const exchangeNumber = longNumber();
 
     // =========================
     // SAVE ORDER

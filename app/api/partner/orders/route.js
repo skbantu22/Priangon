@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPartner, partnerUnauthorized } from "@/lib/partner.server";
 import { partnerPrice } from "@/lib/priceTiers";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import Product from "@/models/Product.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import ShowroomStock from "@/models/ShowroomStock";
@@ -9,6 +8,7 @@ import Showroom from "@/models/Showroom.model";
 import Media from "@/models/Media.model";
 import POSOrder from "@/models/posorder.model";
 import PartnerOrder from "@/models/PartnerOrder.model";
+import { longNumber } from "@/lib/documentNumber";
 
 const MAX_LINES = 100;
 
@@ -107,10 +107,9 @@ export async function POST(req) {
       };
     });
 
-    const seq = await getNextInvoiceNumber("partner_order");
     const order = await PartnerOrder.create({
       // DO- (dealer order), so it never reads like a purchase order (PO-)
-      orderNumber: `DO-${String(seq).padStart(5, "0")}`,
+      orderNumber: longNumber(),
       userId: partner.user._id,
       customerId: partner.customer._id,
       customerType: partner.type,

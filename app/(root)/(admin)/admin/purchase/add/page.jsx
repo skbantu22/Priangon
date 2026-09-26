@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
-import { ClipboardList, List, Plus, Trash2, X } from "lucide-react";
+import { ClipboardList, List, Minus, Plus, Trash2, X } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
 import { ADMIN_PURCHASE_SHOW, ADMIN_PURCHASE_VIEW } from "@/Route/Adminpannelroute";
@@ -71,7 +71,6 @@ function AddPurchase() {
     stockLocation: "",
     note: "",
   });
-  const [numberEdited, setNumberEdited] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const [order, setOrder] = useState(null);
   const [items, setItems] = useState([]);
@@ -150,7 +149,6 @@ function AddPurchase() {
       const at = current.findIndex((item) => item.variantId === hit.variantId);
       if (at >= 0) return current.map((item, i) => (i === at ? { ...item, quantity: String(num(item.quantity) + 1) } : item));
       return [
-        ...current,
         {
           ...hit,
           quantity: "1",
@@ -160,6 +158,7 @@ function AddPurchase() {
           expireDate: "",
           imeis: [],
         },
+        ...current,
       ];
     });
 
@@ -217,7 +216,7 @@ function AddPurchase() {
     try {
       const { data } = await axios.post("/api/purchase/create", {
         ...head,
-        purchaseNumber: numberEdited ? head.purchaseNumber : "",
+        purchaseNumber: head.purchaseNumber,
         purchaseOrderId: order?._id || null,
         attachment,
         items: items.map((item) => ({
@@ -276,10 +275,7 @@ function AddPurchase() {
               id="pur-number"
               value={head.purchaseNumber}
               maxLength={40}
-              onChange={(e) => {
-                setNumberEdited(true);
-                setHead({ ...head, purchaseNumber: e.target.value });
-              }}
+              onChange={(e) => setHead({ ...head, purchaseNumber: e.target.value })}
               className={inputClass}
             />
           </Field>
@@ -367,15 +363,43 @@ function AddPurchase() {
                 const units = num(item.quantity) + num(item.extraQty);
                 return (
                   <tr key={item.variantId}>
-                    <td className={tdClass}>{index + 1}</td>
+                    <td className={tdClass}>{items.length - index}</td>
                     <td className={`${tdClass} min-w-[220px]`}>
-                      <b className="block font-medium">{item.productName}</b>
-                      <span className="text-[12px] text-muted-foreground">
-                        {[item.variantLabel, item.barcode].filter(Boolean).join(" · ")} · Stock {item.stock}
+                      <b className="block font-medium">
+                        {item.productName}
+                        {item.variantLabel && <span className="font-normal text-muted-foreground"> · {item.variantLabel}</span>}
+                      </b>
+                      <span className="block text-[12px] text-muted-foreground">
+                        Barcode: <span className="font-mono">{item.barcode || "—"}</span> · Stock {item.stock}
                       </span>
                     </td>
                     <td className={tdClass}>
-                      <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} className={`${cell} w-[80px]`} aria-label={`Received quantity for ${item.productName}`} />
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, { quantity: String(Math.max(1, num(item.quantity) - 1)) })}
+                          className="flex h-[32px] w-[30px] items-center justify-center rounded-l-[4px] bg-[#ff5b5b] text-white hover:bg-[#f24242]"
+                          aria-label={`One less ${item.productName}`}
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(index, { quantity: e.target.value })}
+                          className={`${cell} w-[64px] rounded-none text-center`}
+                          aria-label={`Received quantity for ${item.productName}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, { quantity: String(num(item.quantity) + 1) })}
+                          className="flex h-[32px] w-[30px] items-center justify-center rounded-r-[4px] bg-[#10c469] text-white hover:bg-[#0eab5c]"
+                          aria-label={`One more ${item.productName}`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                     </td>
                     <td className={tdClass}>
                       <input type="number" min="0" value={item.extraQty} placeholder="0" onChange={(e) => updateItem(index, { extraQty: e.target.value })} className={`${cell} w-[80px]`} aria-label={`Extra quantity for ${item.productName}`} />

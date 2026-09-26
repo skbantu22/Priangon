@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import ShowroomStock from "@/models/ShowroomStock";
 import { returnedImeiCounts } from "@/lib/saleReturnService";
 import Posorder from "@/models/posorder.model";
-import { getNextInvoiceNumber } from "@/lib/getNextOrderNumber";
 import { connectDB } from "@/lib/databaseconnection";
 import { NextResponse } from "next/server";
 import Customer from "@/models/Customer.model";
@@ -11,6 +10,7 @@ import Product from "@/models/Product.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import { warrantyExpiryDate } from "@/lib/warranty";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { longNumber } from "@/lib/documentNumber";
 /* =========================
    GET ORDER
 ========================= */
@@ -207,8 +207,7 @@ export async function POST(req) {
       }
     }
 
-    const seq = await getNextInvoiceNumber("pos_invoice");
-    const orderNumber = `INV-${String(seq).padStart(6, "0")}`;
+    const orderNumber = longNumber();
 
     /* =========================
        CUSTOMER CREATE / UPDATE
