@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { FiEye, FiFileText } from "react-icons/fi";
@@ -486,14 +487,14 @@ const StockPage = () => {
                           >
                             <FiEye />
                           </button>
-                          <button
-                            type="button"
-                            title="Stock movements"
-                            onClick={() => openReport(row)}
+                          <Link
+                            href={`/admin/inventory/stock/${row.productId}/ledger`}
+                            title="Stock Ledger"
+                            aria-label={`Stock ledger of ${row.name}`}
                             className="rounded-r-[4px] bg-[#10c469] px-3 py-1.5 text-white hover:bg-[#0dab5b]"
                           >
                             <FiFileText />
-                          </button>
+                          </Link>
                         </div>
                       </td>
                     </tr>
