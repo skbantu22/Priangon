@@ -16,15 +16,15 @@ export async function POST(request) {
 
     // ================= REQUEST BODY =================
     const payload = await request.json();
-    console.log("🔥 LOGIN PAYLOAD:", payload);
 
     // ================= VALIDATION =================
-    const validationSchema = zSchema.pick({ email: true }).extend({
+    // "email" holds an email or a mobile number (dealer / wholesaler logins)
+    const validationSchema = z.object({
+      email: z.string().trim().min(3, "Enter your email or mobile number"),
       password: z.string().min(4, "Password must be at least 6 characters"),
     });
 
     const validatedData = validationSchema.safeParse(payload);
-    console.log("🧪 VALIDATION RESULT:", validatedData);
 
     if (!validatedData.success) {
       return response(
@@ -35,20 +35,34 @@ export async function POST(request) {
       );
     }
 
-    const { email, password } = validatedData.data;
-
-    console.log("📧 EMAIL:", email);
+    const { email: login, password } = validatedData.data;
 
     // ================= FIND USER =================
-    const getUser = await UserModel.findOne({ email }).select("+password");
-
-    console.log("👤 USER FROM DB:", getUser);
+    // 01XXXXXXXXX (or +8801...) is a mobile login, anything else an email
+    const mobile = login.replace(/[\s-]/g, "").replace(/^\+?88(?=01)/, "");
+    const byMobile = /^01\d{9}$/.test(mobile);
+    // Several logins can share a mobile (staff made before numbers were kept
+    // apart): the one whose password matches is the one signing in.
+    const candidates = await UserModel.find(
+      byMobile ? { phone: mobile, deletedAt: null } : { email: login.toLowerCase() },
+    )
+      .sort({ createdAt: 1 })
+      .select("+password");
+    let getUser = candidates[0] || null;
+    if (candidates.length > 1) {
+      for (const candidate of candidates) {
+        if (await candidate.comparePassword(password)) {
+          getUser = candidate;
+          break;
+        }
+      }
+    }
+    const email = getUser?.email || login;
 
     if (!getUser) {
       return response(false, 404, "Invalid login credentials.");
     }
 
-    console.log("📨 EMAIL VERIFIED STATUS:", getUser.isEmailVerified);
 
     // ================= EMAIL VERIFY CHECK =================
     if (!getUser.isEmailVerified) {
@@ -79,7 +93,6 @@ export async function POST(request) {
     // ================= PASSWORD CHECK =================
     const isPasswordVerified = await getUser.comparePassword(password);
 
-    console.log("🔑 PASSWORD MATCH:", isPasswordVerified);
 
     if (!isPasswordVerified) {
       return response(false, 400, "Invalid login credentials.");
@@ -133,7 +146,6 @@ export async function POST(request) {
       },
     };
 
-    console.log("✅ LOGIN SUCCESS RESPONSE:", responseData);
 
     return response(true, 200, "Login success.", responseData);
   } catch (error) {

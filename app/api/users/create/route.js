@@ -5,6 +5,7 @@ import Showroom from "@/models/Showroom.model";
 import mongoose from "mongoose";
 import RoleModel, { ensureSystemRoles } from "@/models/Role.model";
 import { normalizeBdMobile, isValidBdMobile } from "@/lib/bdFormat";
+import { standInEmail } from "@/lib/mobileLogin";
 
 const STAFF_ROLES = ["admin", "manager", "cashier"];
 
@@ -43,12 +44,18 @@ export async function POST(req) {
     if (!roleDoc && !STAFF_ROLES.includes(body.role)) {
       throw new Error("Choose a role");
     }
-    if (!body.name?.trim() || !body.email?.trim()) throw new Error("Name and email are required");
+    if (!body.name?.trim()) throw new Error("Name is required");
+    // a login needs a mobile number or an email to sign in with
+    if (!body.phone?.trim() && !body.email?.trim()) throw new Error("Enter a mobile number or an email to log in with");
     if (String(body.password || "").length < 6) {
       throw new Error("Password must be at least 6 characters");
     }
     if (body.phone && !isValidBdMobile(body.phone)) {
       throw new Error("Enter a Bangladeshi mobile number (01XXXXXXXXX)");
+    }
+    // the mobile number is a login, so two logins cannot share one
+    if (body.phone && (await User.exists({ phone: normalizeBdMobile(body.phone), deletedAt: null }))) {
+      throw new Error("This mobile number already has a login");
     }
 
     // single store: a cashier sells from the one store
@@ -62,7 +69,7 @@ export async function POST(req) {
     // ================= CREATE USER =================
     const user = await User.create({
       name: body.name.trim(),
-      email: body.email.trim().toLowerCase(),
+      email: body.email?.trim() ? body.email.trim().toLowerCase() : standInEmail(normalizeBdMobile(body.phone)),
       password: body.password,
       role: body.role,
       roleId: roleDoc?._id || null,

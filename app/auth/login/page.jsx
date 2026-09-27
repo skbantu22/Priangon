@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
@@ -21,6 +22,8 @@ import logoWide from "@/public/assets/sbt-logo-wide.png";
 export const formSchema = zSchema
   .pick({ email: true })
   .extend({
+    // the mobile number (an old email login still works)
+    email: z.string().trim().min(3, "Enter your mobile number"),
     password: zSchema.shape?.password ?? undefined,
   })
   .superRefine((val, ctx) => {
@@ -184,12 +187,13 @@ export default function Login() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-200">Email</FormLabel>
+                      <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-200">Mobile Number</FormLabel>
                       <FormControl>
                         <input
-                          type="email"
+                          type="text"
+                          inputMode="tel"
                           autoComplete="username"
-                          placeholder="name@company.com"
+                          placeholder="01XXXXXXXXX"
                           className={inputClass}
                           {...field}
                         />

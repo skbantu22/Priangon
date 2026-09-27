@@ -7,6 +7,7 @@ import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
 import { CUSTOMER_TYPES, PARTNER_ROLES } from "@/lib/priceTiers";
+import { shownEmail } from "@/lib/mobileLogin";
 
 // GET /api/users: every login behind the Users page, staff and partners
 export async function GET(req) {
@@ -51,7 +52,7 @@ export async function GET(req) {
       data: users.map((user) => ({
         _id: user._id,
         name: user.name,
-        email: user.email,
+        email: shownEmail(user.email),
         phone: user.phone || "",
         // A user made before roles existed still shows the key they hold
         roleName: CUSTOMER_TYPES[user.role]?.short || user.roleId?.name || user.role,

@@ -3,6 +3,7 @@ import { isAuthenticated } from "@/lib/auth.server";
 import { connectDB } from "@/lib/databaseconnection";
 import { CUSTOMER_TYPES, isPartnerRole, PARTNER_ROLES } from "@/lib/priceTiers";
 import UserModel from "@/models/User.model";
+import { shownEmail, standInEmail } from "@/lib/mobileLogin";
 import Customer from "@/models/Customer.model";
 import POSOrder from "@/models/posorder.model";
 
@@ -77,15 +78,18 @@ export async function POST(req) {
     const business = String(body.business || "").trim();
     const name = String(body.name || "").trim() || business;
     const phone = String(body.phone || "").trim();
-    const email = String(body.email || "").trim().toLowerCase();
+    // the mobile number is the login; without an email a stand-in is kept
+    const email = String(body.email || "").trim().toLowerCase() || standInEmail(phone);
     const password = String(body.password || "");
 
     if (!isPartnerRole(role)) throw new Error("Choose Dealer, Sub Dealer or Wholesaler");
     if (!business) throw new Error("Business / shop name is required");
     if (!/^01\d{9}$/.test(phone)) throw new Error("Phone must be 01XXXXXXXXX");
-    if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Valid email is required");
+    if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email, or leave it blank");
     if (password.length < 6) throw new Error("Password must be at least 6 characters");
     if (await UserModel.exists({ email })) throw new Error("This email already has a login");
+    // the mobile number is what they log in with, so it must be theirs alone
+    if (await UserModel.exists({ phone, deletedAt: null })) throw new Error("This mobile number already has a login");
 
     // an existing customer (same phone) becomes the partner account
     let customer = await Customer.findOne({ phone });

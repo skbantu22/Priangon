@@ -61,6 +61,18 @@ export async function PUT(req, { params }) {
       );
     }
 
+    // the mobile number is a login, so two logins cannot share one
+    if (
+      body.phone &&
+      normalizeBdMobile(body.phone) !== user.phone &&
+      (await UserModel.exists({ _id: { $ne: id }, phone: normalizeBdMobile(body.phone), deletedAt: null }))
+    ) {
+      return NextResponse.json(
+        { success: false, message: "This mobile number already has a login" },
+        { status: 409 },
+      );
+    }
+
     const isPartner = PARTNER_ROLES.includes(user.role);
 
     // a partner keeps its type; staff roles do not apply to it

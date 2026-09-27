@@ -92,8 +92,13 @@ const CreateUserPage = () => {
       : "";
 
   const save = async () => {
-    if (!form.name.trim() || !form.email.trim()) {
-      showToast("error", "Name and email are required");
+    if (!form.name.trim()) {
+      showToast("error", "Name is required");
+      return;
+    }
+
+    if (!form.phone.trim() && !form.email.trim()) {
+      showToast("error", "Enter a mobile number or an email to log in with");
       return;
     }
 
@@ -188,7 +193,9 @@ const CreateUserPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="user-phone">Mobile Number</Label>
+              <Label htmlFor="user-phone">
+                Mobile Number (login)
+              </Label>
               <Input
                 id="user-phone"
                 value={form.phone}
@@ -211,7 +218,7 @@ const CreateUserPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="user-email">
-                Email (login) <span className="text-destructive">*</span>
+                Email (or log in with this)
               </Label>
               <Input
                 id="user-email"
