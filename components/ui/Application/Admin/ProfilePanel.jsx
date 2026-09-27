@@ -126,7 +126,10 @@ const ProfilePanel = ({ open, onOpenChange }) => {
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full p-0 sm:max-w-sm">
+        <SheetContent
+          side="right"
+          className="w-[min(90vw,24rem)] p-0 sm:max-w-sm"
+        >
           <SheetHeader className="border-b px-4 py-3">
             <SheetTitle className="text-left">
               {shopName || user?.name || "Account"}
