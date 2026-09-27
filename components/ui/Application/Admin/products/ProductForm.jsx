@@ -391,7 +391,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
 
         {/* ---------- a new simple product: one line with its prices and stock ---------- */}
         {!editing && productType === "simple" ? (
-          <Section title="Price and Stock" note="A simple product sells as one item. The POS charges each customer the rate of their type; an empty rate charges the Buyer price.">
+          <Section title="Price List (রেট)" note="The POS charges each customer the rate of their type. An empty rate charges the Buyer price.">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
               {PRICES.map(([field, label, bn]) => (
                 <label key={field} className="block min-w-0">
@@ -409,44 +409,47 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
                   <span className="mt-0.5 block min-h-[16px] text-[11px] tabular-nums">{rateNote(field)}</span>
                 </label>
               ))}
-              <label className="block min-w-0">
-                <span className="block text-[13px] font-medium">Opening Stock</span>
-                <span className="block text-[11px] text-muted-foreground">Initial quantity</span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <label htmlFor="simple-product-opening-stock" className="mb-1 block text-[13px] font-medium">
+                  Opening Stock
+                </label>
                 <input
+                  id="simple-product-opening-stock"
                   type="number"
                   min="0"
                   inputMode="numeric"
                   value={simpleItem.stock}
                   onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
                   placeholder="0"
-                  aria-label="Opening stock"
-                  className={`${inputClass} mt-1 text-right`}
+                  className={`${inputClass} text-right`}
                 />
-              </label>
-            </div>
-
-            <div className="mt-4 rounded-lg border bg-muted/20 p-3">
-              <label htmlFor="simple-product-barcode" className="mb-1 block text-[13px] font-medium">
-                Barcode <span className="font-normal text-muted-foreground">(optional)</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="simple-product-barcode"
-                  value={simpleItem.barcode}
-                  onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
-                  placeholder="Scan or enter barcode"
-                  maxLength={32}
-                  className={`${inputClass} min-w-0 flex-1 font-mono`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setSimpleItem({ ...simpleItem, barcode: makeBarcode() })}
-                  title="Generate a new barcode"
-                  aria-label="Generate a new barcode"
-                  className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90"
-                >
-                  <RefreshCw size={16} />
-                </button>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <label htmlFor="simple-product-barcode" className="mb-1 block text-[13px] font-medium">
+                  Barcode <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="simple-product-barcode"
+                    value={simpleItem.barcode}
+                    onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
+                    placeholder="Scan or enter barcode"
+                    maxLength={32}
+                    className={`${inputClass} min-w-0 flex-1 font-mono`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSimpleItem({ ...simpleItem, barcode: makeBarcode() })}
+                    title="Generate a new barcode"
+                    aria-label="Generate a new barcode"
+                    className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90"
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
               </div>
             </div>
             {tierOrderWarning && (
