@@ -23,6 +23,17 @@ import { WARRANTY_TYPES, formatWarrantyPeriod } from "@/lib/warranty";
 import { posBrandsQueryOptions } from "@/lib/posProducts";
 import { useProductLookups } from "@/hooks/useProductLookups";
 import { showToast } from "@/lib/showToast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // categories whose items are serialised (IMEI) and carry a warranty by default
 const SERIAL_CATEGORY = /phone|mobile|watch|tablet|tab\b|earbud|airpod/i;
@@ -106,6 +117,9 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
   const categoryId = watch("category");
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
+  const [quickAddKind, setQuickAddKind] = useState(null);
+  const [quickAddName, setQuickAddName] = useState("");
+  const [quickAddSaving, setQuickAddSaving] = useState(false);
 
   useEffect(() => {
     axios
@@ -138,26 +152,40 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     if (serial) setValue("productType", "variant");
   };
 
-  const quickAdd = async (kind) => {
-    const name = window.prompt(kind === "category" ? "New category name" : "New sub category name")?.trim();
-    if (!name || name.length < 2) return;
+  const openQuickAdd = (kind) => {
+    setQuickAddKind(kind);
+    setQuickAddName("");
+  };
+
+  const quickAdd = async () => {
+    const name = quickAddName.trim();
+    if (name.length < 2) return;
+    setQuickAddSaving(true);
     try {
-      if (kind === "category") {
+      if (quickAddKind === "category") {
         const { data } = await axios.post("/api/category/create", { name, slug: slugify(name, { lower: true, strict: true }) });
         if (data?.data?._id) {
           setCategories((list) => [...list, data.data]);
           pickCategory(data.data._id);
+        } else {
+          throw new Error(data?.message || "Could not add category");
         }
       } else {
         const { data } = await axios.post("/api/subcategory/create", { categoryId, name });
         if (data?.data?._id) {
           setSubcategories((list) => [...list, data.data]);
           setValue("subcategory", data.data._id);
+        } else {
+          throw new Error(data?.message || "Could not add subcategory");
         }
       }
       showToast("success", `"${name}" added`);
+      setQuickAddKind(null);
+      setQuickAddName("");
     } catch (error) {
-      showToast("error", error?.response?.data?.message || "Could not add");
+      showToast("error", error?.response?.data?.message || error.message || "Could not add");
+    } finally {
+      setQuickAddSaving(false);
     }
   };
 
@@ -268,7 +296,8 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     formState.errors[name] && <p className="m-0 mt-1 text-[12px] text-red-600">{formState.errors[name].message}</p>;
 
   return (
-    <form onSubmit={submit} noValidate>
+    <>
+      <form onSubmit={submit} noValidate>
       <ListCard
         title={editing ? "Update Product" : "Add New Product"}
         actions={
@@ -302,7 +331,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
                   </option>
                 ))}
               </select>
-              <AddButton onClick={() => quickAdd("category")} label="Add category" />
+              <AddButton onClick={() => openQuickAdd("category")} label="Add category" />
             </div>
             {err("category")}
           </Field>
@@ -316,7 +345,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
                   </option>
                 ))}
               </select>
-              <AddButton onClick={() => quickAdd("sub")} label="Add sub category" disabled={!categoryId} />
+              <AddButton onClick={() => openQuickAdd("sub")} label="Add sub category" disabled={!categoryId} />
             </div>
           </Field>
           <Field label="Brand" className="sm:col-span-2">
@@ -565,7 +594,46 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </button>
         </div>
       </ListCard>
-    </form>
+      </form>
+
+      <Dialog open={!!quickAddKind} onOpenChange={(open) => !open && !quickAddSaving && setQuickAddKind(null)}>
+        <DialogContent className="w-[calc(100%-2rem)] rounded-xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{quickAddKind === "category" ? "Add category" : "Add subcategory"}</DialogTitle>
+            <DialogDescription>
+              {quickAddKind === "category"
+                ? "Create a category and select it for this product."
+                : "Create a subcategory under the selected category."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="quick-category-name">Name</Label>
+            <Input
+              id="quick-category-name"
+              autoFocus
+              value={quickAddName}
+              onChange={(event) => setQuickAddName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  quickAdd();
+                }
+              }}
+              placeholder={quickAddKind === "category" ? "e.g. Accessories" : "e.g. Chargers"}
+              maxLength={80}
+            />
+          </div>
+          <DialogFooter className="flex-row justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setQuickAddKind(null)} disabled={quickAddSaving}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={quickAdd} disabled={quickAddSaving || quickAddName.trim().length < 2}>
+              {quickAddSaving ? "Adding..." : "Add"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
