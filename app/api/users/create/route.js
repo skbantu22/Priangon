@@ -47,8 +47,8 @@ export async function POST(req) {
     if (!body.name?.trim()) throw new Error("Name is required");
     // a login needs a mobile number or an email to sign in with
     if (!body.phone?.trim() && !body.email?.trim()) throw new Error("Enter a mobile number or an email to log in with");
-    if (String(body.password || "").length < 6) {
-      throw new Error("Password must be at least 6 characters");
+    if (String(body.password || "").length < 4) {
+      throw new Error("Password must be at least 4 characters");
     }
     if (body.phone && !isValidBdMobile(body.phone)) {
       throw new Error("Enter a Bangladeshi mobile number (01XXXXXXXXX)");

@@ -13,13 +13,23 @@ const split = (text) => [...new Set(String(text || "").split(",").map((s) => s.t
 
 const cell = `${inputClass} !h-[32px] !px-2 !text-[13px]`;
 
-const EDITABLE = ["color", "size", "barcode", "purchasePrice", "mrp", "sellingPrice"];
+const EDITABLE = [
+  "color",
+  "size",
+  "barcode",
+  "purchasePrice",
+  "mrp",
+  "sellingPrice",
+  "dealerPrice",
+  "subDealerPrice",
+  "wholesalerPrice",
+];
 
 let tempId = 0;
 
 /**
  * Variants of one product as a plain table, like the 360 variant screen:
- * color and storage / size, barcode, cost and prices per line. The dealer,
+ * color and attribute value, barcode, cost and prices per line. The dealer,
  * sub dealer and wholesaler rates the POS will charge are shown beside each
  * line (they follow the product's price list, scaled for a dearer variant).
  */
@@ -43,6 +53,9 @@ export default function VariantList({ product }) {
             purchasePrice: v.purchasePrice ? String(v.purchasePrice) : "",
             mrp: v.mrp ? String(v.mrp) : "",
             sellingPrice: v.sellingPrice ? String(v.sellingPrice) : "",
+            dealerPrice: v.dealerPrice ? String(v.dealerPrice) : "",
+            subDealerPrice: v.subDealerPrice ? String(v.subDealerPrice) : "",
+            wholesalerPrice: v.wholesalerPrice ? String(v.wholesalerPrice) : "",
             stock: v.liveStock ?? 0,
             dirty: false,
           })),
@@ -68,6 +81,9 @@ export default function VariantList({ product }) {
     purchasePrice: product.purchasePrice ? String(product.purchasePrice) : "",
     mrp: product.mrp ? String(product.mrp) : "",
     sellingPrice: product.sellingPrice ? String(product.sellingPrice) : "",
+    dealerPrice: "",
+    subDealerPrice: "",
+    wholesalerPrice: "",
     stock: "",
     dirty: true,
   });
@@ -113,6 +129,11 @@ export default function VariantList({ product }) {
     if (!fresh.length && !changed.length) return showToast("error", "Nothing to save");
     if ([...fresh, ...changed].some((r) => !r.color.trim() || !r.size.trim())) {
       return showToast("error", "Every variant needs a color and a storage / size");
+    }
+    if (fresh.some((r) =>
+      ["dealerPrice", "subDealerPrice", "wholesalerPrice"].some((field) => !(Number(r[field]) > 0)),
+    )) {
+      return showToast("error", "Enter Dealer, Sub Dealer, and Wholesaler prices for every new variant");
     }
 
     const pick = (r) => Object.fromEntries(EDITABLE.map((k) => [k, r[k]]));
@@ -174,7 +195,7 @@ export default function VariantList({ product }) {
         <table className="w-full min-w-[1150px] border-collapse text-sm">
           <thead>
             <tr className={theadClass}>
-              {["SL", "Color", "Storage / Size", "Barcode", "Cost", "MRP", "Buyer", "Dealer", "Sub Dealer", "Wholesaler", "Stock", ""].map((h) => (
+                {["SL", "Color", "Attribute", "Barcode", "Cost", "MRP", "Buyer", "Dealer", "Sub Dealer", "Wholesaler", "Stock", ""].map((h) => (
                 <th key={h} className={thClass}>
                   {h}
                 </th>
@@ -200,14 +221,8 @@ export default function VariantList({ product }) {
 
             {!loading &&
               rows.map((r, i) => {
-                const rates = ratesFor(product, { sellingPrice: Number(r.sellingPrice) || 0 });
+                const rates = ratesFor(product, { ...r, sellingPrice: Number(r.sellingPrice) || 0 });
                 const cost = Number(r.purchasePrice) || 0;
-                const tier = (field) => {
-                  const rate = rates[field];
-                  if (!Number(product[field])) return <span className="text-[12px] text-amber-600">= Buyer</span>;
-                  const loss = cost > 0 && rate <= cost;
-                  return <span className={loss ? "font-semibold text-red-600" : ""}>{money(rate)}</span>;
-                };
 
                 return (
                   <tr key={r._id} className={r.dirty ? "bg-amber-50/60 dark:bg-amber-500/5" : ""}>
@@ -237,9 +252,19 @@ export default function VariantList({ product }) {
                         />
                       </td>
                     ))}
-                    <td className={tdClass}>{tier("dealerPrice")}</td>
-                    <td className={tdClass}>{tier("subDealerPrice")}</td>
-                    <td className={tdClass}>{tier("wholesalerPrice")}</td>
+                    {["dealerPrice", "subDealerPrice", "wholesalerPrice"].map((field) => (
+                      <td key={field} className={tdClass}>
+                        <input
+                          type="number"
+                          min="0.01"
+                          required={r.isNew}
+                          value={r[field]}
+                          onChange={(e) => edit(r._id, field, e.target.value)}
+                          placeholder={rates[field] ? String(rates[field]) : "Buyer price"}
+                          className={`${cell} w-[90px] text-right`}
+                        />
+                      </td>
+                    ))}
                     <td className={tdClass}>
                       {r.isNew ? (
                         <input

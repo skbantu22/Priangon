@@ -43,7 +43,7 @@ export async function GET(req) {
       deletedAt: null,
       isActive: true,
     })
-      .select("product color size media sku barcode mrp sellingPrice")
+      .select("product color size media sku barcode mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice")
       .populate("media", "secure_url")
       .lean();
 

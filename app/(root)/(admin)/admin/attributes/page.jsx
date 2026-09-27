@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { FiEdit2, FiPlus, FiTrash2 } from "react-icons/fi";
@@ -31,11 +32,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const breadcrumbData = [
-  { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_ATTRIBUTE_SHOW, label: "Attributes" },
-];
-
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
@@ -58,6 +54,7 @@ const SLOTS = [
 ];
 
 const emptyForm = { name: "", slot: "size", isActive: true, values: [] };
+const emptyValueForm = { categoryId: "", label: "", value: "" };
 
 // ?slot=color is the Colors menu, ?slot=size the Storage / Size one
 const TITLES = {
@@ -66,10 +63,26 @@ const TITLES = {
 };
 
 const AttributeList = () => {
-  const slotFilter = useSearchParams().get("slot") || "";
-  const [title, subtitle] = TITLES[slotFilter] || ["Attributes", "The lists offered while creating a product variant"];
+  const searchParams = useSearchParams();
+  const slotFilter = searchParams.get("slot") || "";
+  const categoryView = searchParams.get("view") === "categories";
+  const colorView = slotFilter === "color";
+  const [title, subtitle] = categoryView
+    ? ["Attribute Category List", "Manage categories used to organize product attributes"]
+    : colorView
+      ? TITLES.color
+      : ["Attribute List", "Manage attribute values used when creating product variants"];
   const [allAttributes, setAttributes] = useState([]);
-  const attributes = slotFilter ? allAttributes.filter((a) => a.slot === slotFilter) : allAttributes;
+  const categories = allAttributes.filter((attribute) => attribute.slot !== "color");
+  const visibleCategories = slotFilter && !colorView
+    ? categories.filter((attribute) => attribute.slot === slotFilter)
+    : categories;
+  const attributeRows = visibleCategories.flatMap((category) =>
+    category.values.map((value) => ({ category, value })),
+  );
+  const colorAttributes = colorView
+    ? allAttributes.filter((attribute) => attribute.slot === "color")
+    : [];
   const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
@@ -79,6 +92,9 @@ const AttributeList = () => {
 
   const [newLabel, setNewLabel] = useState("");
   const [newValue, setNewValue] = useState("");
+  const [valueOpen, setValueOpen] = useState(false);
+  const [editingValue, setEditingValue] = useState(null);
+  const [valueForm, setValueForm] = useState(emptyValueForm);
 
   const loadAttributes = useCallback(async () => {
     setLoading(true);
@@ -130,6 +146,18 @@ const AttributeList = () => {
     setOpen(true);
   };
 
+  const openValueCreate = () => {
+    setEditingValue(null);
+    setValueForm({ ...emptyValueForm, categoryId: visibleCategories[0]?._id || "" });
+    setValueOpen(true);
+  };
+
+  const openValueEdit = (category, value) => {
+    setEditingValue({ categoryId: category._id, valueId: value._id });
+    setValueForm({ categoryId: category._id, label: value.label, value: value.value });
+    setValueOpen(true);
+  };
+
   const addValue = () => {
     const label = newLabel.trim();
 
@@ -171,7 +199,7 @@ const AttributeList = () => {
       return;
     }
 
-    if (form.values.length === 0) {
+    if (!categoryView && form.values.length === 0) {
       showToast("error", "Add at least one value");
       return;
     }
@@ -204,6 +232,68 @@ const AttributeList = () => {
     }
   };
 
+  const saveValue = async () => {
+    const category = allAttributes.find((item) => String(item._id) === valueForm.categoryId);
+    const label = valueForm.label.trim();
+    const value = (valueForm.value.trim() || label).trim();
+
+    if (!category) return showToast("error", "Choose an attribute category");
+    if (!label) return showToast("error", "Attribute name is required");
+    if (category.values.some((item) =>
+      item.value.toLowerCase() === value.toLowerCase() && String(item._id) !== String(editingValue?.valueId),
+    )) return showToast("error", `"${value}" is already in this category`);
+
+    const values = editingValue
+      ? category.values.map((item) => String(item._id) === String(editingValue.valueId) ? { ...item, label, value } : item)
+      : [...category.values, { label, value, sortOrder: category.values.length }];
+
+    setSaving(true);
+    try {
+      const { data } = await axios.put(`/api/attribute/update/${category._id}`, {
+        name: category.name,
+        slot: category.slot,
+        isActive: category.isActive,
+        values,
+      });
+
+      if (!data.success) {
+        showToast("error", data.message || "Could not save attribute");
+        return;
+      }
+
+      showToast("success", editingValue ? "Attribute updated" : "Attribute created");
+      setValueOpen(false);
+      loadAttributes();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || "Could not save attribute");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteValue = async (category, value) => {
+    if (!confirm(`Delete attribute "${value.label}"?`)) return;
+
+    try {
+      const { data } = await axios.put(`/api/attribute/update/${category._id}`, {
+        name: category.name,
+        slot: category.slot,
+        isActive: category.isActive,
+        values: category.values.filter((item) => String(item._id) !== String(value._id)),
+      });
+
+      if (!data.success) {
+        showToast("error", data.message || "Could not delete attribute");
+        return;
+      }
+
+      showToast("success", "Attribute deleted");
+      loadAttributes();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || "Could not delete attribute");
+    }
+  };
+
   const deleteAttribute = async (attribute) => {
     if (!confirm(`Move "${attribute.name}" to trash?`)) return;
 
@@ -229,6 +319,10 @@ const AttributeList = () => {
 
   const slotLabel = (slot) =>
     SLOTS.find((item) => item.value === slot)?.label || slot;
+  const breadcrumbData = [
+    { href: ADMIN_DASHBOARD, label: "Home" },
+    { href: ADMIN_ATTRIBUTE_SHOW, label: categoryView ? "Attribute Categories" : "Attributes" },
+  ];
 
   return (
     <div>
@@ -241,9 +335,9 @@ const AttributeList = () => {
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
 
-          <Button onClick={openCreate}>
+          <Button onClick={categoryView || colorView ? openCreate : openValueCreate}>
             <FiPlus className="mr-2" />
-            New Attribute
+            {categoryView ? "Add New" : colorView ? "New Attribute" : "Add New"}
           </Button>
         </CardHeader>
 
@@ -254,7 +348,78 @@ const AttributeList = () => {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : attributes.length === 0 ? (
+          ) : categoryView ? visibleCategories.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">No attribute category yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">SL</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleCategories.map((category, index) => (
+                    <TableRow key={category._id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{category.name}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(category)} aria-label={`Edit ${category.name}`}>
+                            <FiEdit2 />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteAttribute(category)} aria-label={`Delete ${category.name}`}>
+                            <FiTrash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : !colorView && attributeRows.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              <p>No attribute yet.</p>
+              <Link className="mt-2 inline-block text-primary underline" href={`${ADMIN_ATTRIBUTE_SHOW}?view=categories`}>
+                Add an attribute category first
+              </Link>
+            </div>
+          ) : !colorView ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">SL</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attributeRows.map(({ category, value }, index) => (
+                    <TableRow key={`${category._id}-${value._id}`}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{value.label}</TableCell>
+                      <TableCell>{category.name}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openValueEdit(category, value)} aria-label={`Edit ${value.label}`}>
+                            <FiEdit2 />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteValue(category, value)} aria-label={`Delete ${value.label}`}>
+                            <FiTrash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : colorAttributes.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
               <p>No attribute yet.</p>
               <p className="mt-1">
@@ -278,7 +443,7 @@ const AttributeList = () => {
                 </TableHeader>
 
                 <TableBody>
-                  {attributes.map((attribute) => (
+                  {colorAttributes.map((attribute) => (
                     <TableRow key={attribute._id}>
                       <TableCell className="font-medium">
                         {attribute.name}
@@ -341,18 +506,18 @@ const AttributeList = () => {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? "Edit Attribute" : "New Attribute"}
+              {categoryView ? editingId ? "Edit Attribute Category" : "New Attribute Category" : editingId ? "Edit Attribute" : "New Attribute"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="attr-name">Attribute Name</Label>
+              <Label htmlFor="attr-name">{categoryView ? "Category Name" : "Attribute Name"}</Label>
               <Input
                 id="attr-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Storage"
+                placeholder={categoryView ? "Size" : "Storage"}
               />
             </div>
 
@@ -375,7 +540,7 @@ const AttributeList = () => {
               </p>
             </div>
 
-            <div className="space-y-2">
+            {!categoryView && <div className="space-y-2">
               <Label>Values</Label>
 
               <div className="flex gap-2">
@@ -430,9 +595,9 @@ const AttributeList = () => {
                   ))}
                 </ul>
               )}
-            </div>
+            </div>}
 
-            <label className="flex items-center gap-2 text-sm">
+            {!categoryView && <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={form.isActive}
@@ -442,7 +607,7 @@ const AttributeList = () => {
                 className="size-4"
               />
               Active (offer these values on new variants)
-            </label>
+            </label>}
           </div>
 
           <DialogFooter>
@@ -451,8 +616,45 @@ const AttributeList = () => {
             </Button>
 
             <Button onClick={saveAttribute} disabled={saving}>
-              {saving ? "Saving..." : editingId ? "Update" : "Save"}
+              {saving ? "Saving..." : editingId ? "Update" : categoryView ? "Save" : "Save"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={valueOpen} onOpenChange={setValueOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingValue ? "Edit Attribute" : "New Attribute"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="value-category">Category</Label>
+              <select
+                id="value-category"
+                className={selectClass}
+                value={valueForm.categoryId}
+                disabled={!!editingValue}
+                onChange={(event) => setValueForm({ ...valueForm, categoryId: event.target.value })}
+              >
+                <option value="">Select category</option>
+                {visibleCategories.map((category) => (
+                  <option key={category._id} value={category._id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="value-label">Name</Label>
+              <Input id="value-label" value={valueForm.label} onChange={(event) => setValueForm({ ...valueForm, label: event.target.value })} placeholder="10 Rs" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="value-value">Stored value</Label>
+              <Input id="value-value" value={valueForm.value} onChange={(event) => setValueForm({ ...valueForm, value: event.target.value })} placeholder="Leave blank to use the name" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setValueOpen(false)}>Cancel</Button>
+            <Button onClick={saveValue} disabled={saving}>{saving ? "Saving..." : editingValue ? "Update" : "Save"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

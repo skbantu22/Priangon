@@ -121,8 +121,13 @@ const UsersPage = () => {
   };
 
   const saveUser = async () => {
-    if (!form.name.trim() || !form.email.trim()) {
-      showToast("error", "Name and email are required");
+    if (!form.name.trim()) {
+      showToast("error", "Name is required");
+      return;
+    }
+
+    if (!form.phone.trim() && !form.email.trim()) {
+      showToast("error", "Enter a mobile number or an email to log in with");
       return;
     }
 
@@ -131,8 +136,8 @@ const UsersPage = () => {
       return;
     }
 
-    if (form.password && form.password.length < 6) {
-      showToast("error", "Password must be at least 6 characters");
+    if (form.password && form.password.length < 4) {
+      showToast("error", "Password must be at least 4 characters");
       return;
     }
 
@@ -374,7 +379,7 @@ const UsersPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email (login)</Label>
+                <Label htmlFor="edit-email">Email (optional)</Label>
                 <Input
                   id="edit-email"
                   type="email"

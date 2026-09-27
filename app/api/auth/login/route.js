@@ -21,7 +21,7 @@ export async function POST(request) {
     // "email" holds an email or a mobile number (dealer / wholesaler logins)
     const validationSchema = z.object({
       email: z.string().trim().min(3, "Enter your email or mobile number"),
-      password: z.string().min(4, "Password must be at least 6 characters"),
+      password: z.string().min(4, "Password must be at least 4 characters"),
     });
 
     const validatedData = validationSchema.safeParse(payload);

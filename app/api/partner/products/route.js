@@ -45,7 +45,7 @@ export async function GET(req) {
 
     const [variants, medias, stocks] = await Promise.all([
       ProductVariant.find({ _id: { $in: variantIds }, deletedAt: null, isActive: { $ne: false } })
-        .select("product color size mrp sellingPrice media")
+        .select("product color size mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice media")
         .lean(),
       Media.find({ _id: { $in: mediaIds } }).select("secure_url").lean(),
       ShowroomStock.aggregate([

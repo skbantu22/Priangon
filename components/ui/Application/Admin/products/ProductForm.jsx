@@ -367,7 +367,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
               <table className="w-full min-w-[1040px] border-collapse text-sm">
                 <thead>
                   <tr className={theadClass}>
-                    {["Size - Color", "Barcode", ...PRICES.map(([, label]) => label), "Opening Stock"].map((h) => (
+                    {["Attribute - Color", "Barcode", ...PRICES.map(([, label]) => label), "Opening Stock"].map((h) => (
                       <th key={h} className={thClass}>
                         {h}
                       </th>
@@ -520,7 +520,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         </Section>
 
         {!editing && productType === "variant" && (
-          <Section title="Generate Variants (storage / color)" note="Each line sells with its own barcode, price and stock.">
+          <Section title="Generate Variants" note="Choose an attribute category, attribute, and color. Each line gets its own barcode and stock.">
             <VariantDraft
               rows={variantRows}
               setRows={setVariantRows}

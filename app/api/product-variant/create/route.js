@@ -38,7 +38,7 @@ export async function POST(request) {
     }
 
     const product =
-      await ProductModel.findById(productId).select("mrp sellingPrice");
+      await ProductModel.findById(productId).select("mrp sellingPrice productType");
 
     if (!product) {
       return response(false, 404, "Product not found");
@@ -47,8 +47,6 @@ export async function POST(request) {
     const createdVariants = [];
     let location;
     let createdBy;
-    const productVariantIds = [];
-
     for (const item of variants) {
       const existingVariant = await ProductVariantModel.findOne({
         product: productId,
@@ -56,7 +54,14 @@ export async function POST(request) {
         size: item.size || "",
       });
 
-      if (existingVariant) continue;
+      if (existingVariant) {
+        // A prior attempt may have created the variant but failed before
+        // linking it to the product. Link it so a retry can recover cleanly.
+        await ProductModel.findByIdAndUpdate(productId, {
+          $addToSet: { variants: existingVariant._id },
+        });
+        continue;
+      }
       const stock = Math.max(0, Number(item.stock || 0));
 
       const barcode = item.barcode?.trim()
@@ -74,6 +79,9 @@ export async function POST(request) {
 
         mrp: Number(item.mrp) || product.mrp,
         sellingPrice: Number(item.sellingPrice) || product.sellingPrice,
+        dealerPrice: Number(item.dealerPrice) || 0,
+        subDealerPrice: Number(item.subDealerPrice) || 0,
+        wholesalerPrice: Number(item.wholesalerPrice) || 0,
 
         purchasePrice: Number(item.purchasePrice) || 0,
         discountPercent: Number(item.discountPercent) || 0,
@@ -117,14 +125,9 @@ export async function POST(request) {
       }
 
       createdVariants.push(variant);
-      productVariantIds.push(variant._id);
-    }
-
-    // ✅ FIXED PRODUCT UPDATE
-    if (productVariantIds.length) {
       await ProductModel.findByIdAndUpdate(productId, {
         $addToSet: {
-          variants: { $each: productVariantIds },
+          variants: variant._id,
         },
       });
     }

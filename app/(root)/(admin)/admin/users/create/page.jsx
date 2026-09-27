@@ -117,8 +117,8 @@ const CreateUserPage = () => {
       return;
     }
 
-    if (form.password.length < 6) {
-      showToast("error", "Password must be at least 6 characters");
+    if (form.password.length < 4) {
+      showToast("error", "Password must be at least 4 characters");
       return;
     }
 
@@ -324,7 +324,7 @@ const CreateUserPage = () => {
                 type="password"
                 value={form.password}
                 onChange={(e) => set({ password: e.target.value })}
-                placeholder="At least 6 characters"
+                placeholder="At least 4 characters"
               />
             </div>
 

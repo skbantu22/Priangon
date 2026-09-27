@@ -62,6 +62,12 @@ export async function PUT(request, context) {
       }
     }
 
+    for (const field of ["dealerPrice", "subDealerPrice", "wholesalerPrice"]) {
+      if (payload[field] !== undefined) {
+        variant[field] = Math.max(0, Number(payload[field]) || 0);
+      }
+    }
+
     // =========================
     // NORMAL FIELDS
     // =========================

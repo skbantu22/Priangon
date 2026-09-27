@@ -47,8 +47,8 @@ export async function GET(req) {
       variantId: { $in: variants.map((v) => v._id) },
       stock: { $gt: 0 },
     })
-      .populate("productId", "name sellingPrice")
-      .populate("variantId", "color size sku barcode sellingPrice")
+      .populate("productId", "name sellingPrice dealerPrice subDealerPrice wholesalerPrice")
+      .populate("variantId", "color size sku barcode sellingPrice dealerPrice subDealerPrice wholesalerPrice")
       .limit(40)
       .lean();
 

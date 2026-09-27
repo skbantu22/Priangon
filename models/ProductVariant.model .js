@@ -24,6 +24,9 @@ const productVariantSchema = new mongoose.Schema(
 
     mrp: { type: Number, min: 0, default: 0 },
     sellingPrice: { type: Number, min: 0, default: 0 },
+    dealerPrice: { type: Number, min: 0, default: 0 },
+    subDealerPrice: { type: Number, min: 0, default: 0 },
+    wholesalerPrice: { type: Number, min: 0, default: 0 },
 
     discountPercentage: {
       type: Number,

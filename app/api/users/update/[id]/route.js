@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
 import { isValidBdMobile, normalizeBdMobile } from "@/lib/bdFormat";
 import { PARTNER_ROLES } from "@/lib/priceTiers";
+import { shownEmail, standInEmail } from "@/lib/mobileLogin";
 
 export async function PUT(req, { params }) {
   try {
@@ -30,11 +31,19 @@ export async function PUT(req, { params }) {
     }
 
     const name = body.name?.trim();
-    const email = body.email?.trim().toLowerCase();
+    const phone = body.phone ? normalizeBdMobile(body.phone) : "";
+    // the email is optional: a login signs in with its mobile number, and one
+    // without an email keeps the hidden stand-in the list shows as blank
+    const typedEmail = body.email?.trim().toLowerCase() || "";
+    const email = typedEmail || (shownEmail(user.email) ? standInEmail(phone || user.phone) : user.email);
 
-    if (!name || !email) {
+    if (!name) {
+      return NextResponse.json({ success: false, message: "Name is required" }, { status: 400 });
+    }
+
+    if (!typedEmail && !phone) {
       return NextResponse.json(
-        { success: false, message: "Name and email are required" },
+        { success: false, message: "Enter a mobile number or an email to log in with" },
         { status: 400 },
       );
     }
@@ -110,9 +119,9 @@ export async function PUT(req, { params }) {
 
     // Changing a password signs the old sessions out
     if (body.password) {
-      if (String(body.password).length < 6) {
+      if (String(body.password).length < 4) {
         return NextResponse.json(
-          { success: false, message: "Password must be at least 6 characters" },
+          { success: false, message: "Password must be at least 4 characters" },
           { status: 400 },
         );
       }

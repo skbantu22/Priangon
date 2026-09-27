@@ -9,7 +9,6 @@ import { btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/
 import { ratesFor } from "@/lib/priceTiers";
 import { showToast } from "@/lib/showToast";
 
-const split = (text) => [...new Set(String(text || "").split(",").map((s) => s.trim()).filter(Boolean))];
 const money = (n) => Number(n || 0).toLocaleString("en-BD");
 const cell = `${inputClass} !h-[34px] !px-2 !text-[13px]`;
 
@@ -18,36 +17,29 @@ const BULK = [
   ["purchasePrice", "Purchase Price"],
   ["mrp", "MRP"],
   ["sellingPrice", "Buyer Price"],
+  ["dealerPrice", "Dealer"],
+  ["subDealerPrice", "Sub Dealer"],
+  ["wholesalerPrice", "Wholesaler"],
   ["stock", "Opening Stock"],
 ];
-const EMPTY_BULK = { purchasePrice: "", mrp: "", sellingPrice: "", stock: "" };
+const EMPTY_BULK = {
+  purchasePrice: "",
+  mrp: "",
+  sellingPrice: "",
+  dealerPrice: "",
+  subDealerPrice: "",
+  wholesalerPrice: "",
+  stock: "",
+};
 
-/**
- * Saved values to pick from (Products → Attributes / Colors), shown as
- * chips under a box. What is being typed after the last comma filters
- * the chips; a chip picks its value (replacing the half-typed word) or
- * drops it again. A value not saved yet can still be typed in full.
- */
-function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHref }) {
-  const parts = text.split(",");
-  const typing = parts[parts.length - 1].trim();
-  const known = new Set(groups.flatMap((g) => g.values.map((v) => v.toLowerCase())));
-  // a finished saved value is a pick, not a search
-  const typedIsValue = known.has(typing.toLowerCase());
-  const chosen = [...split(parts.slice(0, -1).join(",")), ...(typedIsValue ? [typing] : [])];
-  const picked = new Set(chosen.map((v) => v.toLowerCase()));
-  const needle = typedIsValue ? "" : typing.toLowerCase();
-  const matches = (v) => !needle || v.toLowerCase().includes(needle);
-  const anyMatch = groups.some((g) => g.values.some(matches));
-
-  const toggle = (value) => {
-    const next = picked.has(value.toLowerCase())
-      ? chosen.filter((v) => v.toLowerCase() !== value.toLowerCase())
-      : [...chosen, value];
-    // the trailing comma starts the next word, so typing goes on filtering
-    setText(next.length ? `${next.join(", ")}, ` : "");
+  const onEnter = (action) => (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      action();
+    }
   };
-
+/** One value selector with a link to its attribute list. */
+function SelectBox({ label, value, onChange, options, placeholder, manageHref, disabled = false }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -58,47 +50,14 @@ function PickBox({ label, text, setText, groups, placeholder, onEnter, manageHre
           Manage list
         </Link>
       </div>
-      <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onEnter} placeholder={placeholder} className={inputClass} />
-      {groups.length > 0 && (
-        <div className="mt-1.5 border border-[#ebeff2] p-2 dark:border-border">
-          <div className="max-h-[140px] space-y-1.5 overflow-y-auto">
-            {!anyMatch && (
-              <p className="py-1 text-[12.5px] text-[#8a939c]">
-                No saved value matches &quot;{typing}&quot;. It will be used as typed.
-              </p>
-            )}
-            {groups.map((group) => {
-              const values = group.values.filter(matches);
-              if (!values.length) return null;
-              return (
-                <div key={group.name}>
-                  {groups.length > 1 && <p className="mb-1 text-[11px] font-semibold uppercase text-[#8a939c]">{group.name}</p>}
-                  <div className="flex flex-wrap gap-1.5">
-                    {values.map((value) => {
-                      const on = picked.has(value.toLowerCase());
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => toggle(value)}
-                          aria-pressed={on}
-                          className={`h-[26px] border px-2 text-[12.5px] transition ${
-                            on
-                              ? "border-[#10c469] bg-[#10c469] text-white"
-                              : "border-[#dfe3e8] bg-white text-[#3b4652] hover:border-[#188ae2] dark:border-border dark:bg-card dark:text-foreground"
-                          }`}
-                        >
-                          {value}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} disabled={disabled}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -119,6 +78,9 @@ export const emptyVariant = (color = "", size = "") => ({
   purchasePrice: "",
   mrp: "",
   sellingPrice: "",
+  dealerPrice: "",
+  subDealerPrice: "",
+  wholesalerPrice: "",
   stock: "",
 });
 
@@ -131,17 +93,20 @@ export const variantPayload = (rows) =>
     purchasePrice: Number(r.purchasePrice) || 0,
     mrp: Number(r.mrp) || 0,
     sellingPrice: Number(r.sellingPrice) || 0,
+    dealerPrice: Number(r.dealerPrice) || 0,
+    subDealerPrice: Number(r.subDealerPrice) || 0,
+    wholesalerPrice: Number(r.wholesalerPrice) || 0,
     stock: Number(r.stock) || 0,
   }));
 
 /** What is wrong with the rows, or "" when they can be saved */
 export const variantProblem = (rows) => {
-  if (!rows.length) return "Add at least one variant (color / storage)";
-  if (rows.some((r) => !r.color.trim() || !r.size.trim())) return "Every variant needs a color and a storage / size";
+  if (!rows.length) return "Add at least one variant (attribute / color)";
+  if (rows.some((r) => !r.color.trim() || !r.size.trim())) return "Every variant needs an attribute and a color";
   const seen = new Set();
   for (const r of rows) {
     const key = `${r.color.trim()}|${r.size.trim()}`.toLowerCase();
-    if (seen.has(key)) return `${r.color} ${r.size} is listed twice`;
+    if (seen.has(key)) return `${r.size} / ${r.color} is listed twice`;
     seen.add(key);
   }
   return "";
@@ -157,9 +122,8 @@ export const variantProblem = (rows) => {
  * `product` is the form's current price list (buyer and tier rates).
  */
 export default function VariantDraft({ rows, setRows, product }) {
-  const [gen, setGen] = useState({ colors: "", sizes: "" });
-  // saved Storage / Size and Color lists (Products → Attributes)
-  const [saved, setSaved] = useState({ size: [], color: [] });
+  const [gen, setGen] = useState({ category: "", attribute: "", color: "" });
+  const [saved, setSaved] = useState({ attributes: [], colors: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -170,10 +134,31 @@ export default function VariantDraft({ rows, setRows, product }) {
         const groups = (slot) =>
           data.data
             .filter((a) => a.slot === slot && a.values?.length)
-            .map((a) => ({ name: a.name, values: [...a.values].sort((x, y) => x.sortOrder - y.sortOrder).map((v) => v.value) }))
-            // a phone shop picks storage most, so it comes first
-            .sort((x, y) => Number(/storage/i.test(y.name)) - Number(/storage/i.test(x.name)));
-        setSaved({ size: groups("size"), color: groups("color") });
+            .map((a) => ({
+              id: String(a._id),
+              name: a.name,
+              slot: a.slot,
+              values: [...a.values]
+                .sort((x, y) => x.sortOrder - y.sortOrder)
+                .map((v) => ({ label: v.label, value: v.value })),
+            }));
+        const attributes = [...groups("size"), ...groups("spec")].sort(
+          (x, y) => Number(/storage|size/i.test(y.name)) - Number(/storage|size/i.test(x.name)) || x.name.localeCompare(y.name),
+        );
+        const colors = groups("color");
+        setSaved({ attributes, colors });
+        setGen((current) => {
+          const category = attributes.find((item) => item.id === current.category) || attributes[0];
+          return {
+            category: category?.id || "",
+            attribute: category?.values.some((item) => item.value === current.attribute)
+              ? current.attribute
+              : category?.values[0]?.value || "",
+            color: colors.some((group) => group.values.some((item) => item.value === current.color))
+              ? current.color
+              : colors[0]?.values[0]?.value || "",
+          };
+        });
       })
       .catch(() => {});
     return () => {
@@ -181,28 +166,23 @@ export default function VariantDraft({ rows, setRows, product }) {
     };
   }, []);
   const [bulk, setBulk] = useState(EMPTY_BULK);
+  const selectedCategory = saved.attributes.find((item) => item.id === gen.category);
+  const colorOptions = [...new Map(saved.colors.flatMap((group) => group.values).map((item) => [item.value, item])).values()];
 
   const generate = () => {
-    const colors = split(gen.colors);
-    const sizes = split(gen.sizes);
-    if (!colors.length && !sizes.length) return showToast("error", "Type storage / size and / or colors first");
+    const attribute = selectedCategory?.values.find((item) => item.value === gen.attribute);
+    if (!selectedCategory) return showToast("error", "Choose an attribute category");
+    if (!attribute) return showToast("error", "Choose an attribute");
+    if (!gen.color) return showToast("error", "Choose a color");
 
-    const have = new Set(rows.map((r) => `${r.color}|${r.size}`.toLowerCase()));
-    const added = [];
-    for (const size of sizes.length ? sizes : ["Standard"]) {
-      for (const color of colors.length ? colors : ["Default"]) {
-        const key = `${color}|${size}`.toLowerCase();
-        if (!have.has(key)) {
-          have.add(key);
-          added.push(emptyVariant(color, size));
-        }
-      }
+    const size = selectedCategory.slot === "size" ? attribute.value : `${selectedCategory.name}: ${attribute.value}`;
+    const key = `${gen.color}|${size}`.toLowerCase();
+    if (rows.some((row) => `${row.color}|${row.size}`.toLowerCase() === key)) {
+      return showToast("error", "That variant is already listed");
     }
-    if (!added.length) return showToast("error", "Those variants are already listed");
     // a blank row added by hand gives way to the generated ones
     const kept = rows.filter((r) => r.color || r.size || r.barcode || r.stock);
-    setRows([...kept, ...added]);
-    setGen({ colors: "", sizes: "" });
+    setRows([...kept, emptyVariant(gen.color, size)]);
   };
 
   const applyToAll = () => {
@@ -214,34 +194,39 @@ export default function VariantDraft({ rows, setRows, product }) {
   };
 
   const edit = (key, patch) => setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const onEnter = (action) => (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      action();
-    }
-  };
 
   return (
     <div className="space-y-4">
-      {/* 1. generate storage x color */}
-      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <PickBox
-          label="Storage / Size"
-          text={gen.sizes}
-          setText={(sizes) => setGen((g) => ({ ...g, sizes }))}
-          groups={saved.size}
-          placeholder="Pick below or type: 8/128GB, 8/256GB"
-          onEnter={onEnter(generate)}
+      {/* Select an attribute category, value, and color for each variant. */}
+      <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <SelectBox
+          label="Attribute Category"
+          value={gen.category}
+          onChange={(category) => {
+            const selected = saved.attributes.find((item) => item.id === category);
+            setGen((current) => ({ ...current, category, attribute: selected?.values[0]?.value || "" }));
+          }}
+          options={saved.attributes.map((item) => ({ value: item.id, label: item.name }))}
+          placeholder="Select category"
           manageHref="/admin/attributes?slot=size"
         />
-        <PickBox
+        <SelectBox
+          label="Attribute"
+          value={gen.attribute}
+          onChange={(attribute) => setGen((current) => ({ ...current, attribute }))}
+          options={(selectedCategory?.values || []).map((item) => ({ value: item.value, label: item.label }))}
+          placeholder="Select attribute"
+          manageHref={selectedCategory ? `/admin/attributes?slot=${selectedCategory.slot}` : "/admin/attributes?slot=size"}
+          disabled={!selectedCategory?.values.length}
+        />
+        <SelectBox
           label="Color"
-          text={gen.colors}
-          setText={(colors) => setGen((g) => ({ ...g, colors }))}
-          groups={saved.color}
-          placeholder="Pick below or type: Black, Blue"
-          onEnter={onEnter(generate)}
+          value={gen.color}
+          onChange={(color) => setGen((current) => ({ ...current, color }))}
+          options={colorOptions.map((item) => ({ value: item.value, label: item.label }))}
+          placeholder="Select color"
           manageHref="/admin/attributes?slot=color"
+          disabled={!colorOptions.length}
         />
         <button type="button" className={`${btn.success} h-[38px] justify-center md:mt-[22px] md:min-w-[190px]`} onClick={generate}>
           <Wand2 size={14} /> Generate Variant
@@ -253,7 +238,7 @@ export default function VariantDraft({ rows, setRows, product }) {
         <p className="mb-1.5 text-[13px] font-medium">
           Price and Stock <span className="text-red-500">*</span>
         </p>
-        <div className="grid grid-cols-2 gap-2 border border-[#ebeff2] bg-[#fafbfc] p-2 sm:grid-cols-3 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto] dark:border-border dark:bg-white/5">
+        <div className="grid grid-cols-2 gap-2 border border-[#ebeff2] bg-[#fafbfc] p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-[repeat(7,minmax(0,1fr))_auto] dark:border-border dark:bg-white/5">
           {BULK.map(([key, label]) => (
             <input
               key={key}
@@ -271,6 +256,9 @@ export default function VariantDraft({ rows, setRows, product }) {
             Apply to All
           </button>
         </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Leave a tier blank to use the product&apos;s Buyer price. Bulk fields apply one value to every row.
+        </p>
       </div>
 
       {/* 3. the lines */}
@@ -289,7 +277,7 @@ export default function VariantDraft({ rows, setRows, product }) {
               <tr className={theadClass}>
                 {[
                   "SL",
-                  "Size - Color *",
+                  "Attribute - Color *",
                   "Barcode",
                   "Purchase Price",
                   "MRP",
@@ -310,19 +298,13 @@ export default function VariantDraft({ rows, setRows, product }) {
               {rows.length === 0 && (
                 <tr>
                   <td colSpan={11} className={`${tdClass} py-6 text-center text-muted-foreground`}>
-                    Type storage and colors above and press Generate Variant, or Add Row.
+                    Select an attribute category, attribute, and color above, then press Generate Variant or Add Row.
                   </td>
                 </tr>
               )}
               {rows.map((r, i) => {
                 const rates = ratesFor(product, { sellingPrice: Number(r.sellingPrice) || Number(product.sellingPrice) || 0 });
                 const cost = Number(r.purchasePrice) || Number(product.purchasePrice) || 0;
-                const tier = (field) => {
-                  if (!Number(product[field])) return <span className="whitespace-nowrap text-[12px] text-amber-600">= Buyer</span>;
-                  const loss = cost > 0 && rates[field] <= cost;
-                  return <span className={`tabular-nums ${loss ? "font-semibold text-red-600" : ""}`}>{money(rates[field])}</span>;
-                };
-
                 return (
                   <tr key={r.key}>
                     <td className={tdClass}>{i + 1}</td>
@@ -331,8 +313,8 @@ export default function VariantDraft({ rows, setRows, product }) {
                         <input
                           value={r.size}
                           onChange={(e) => edit(r.key, { size: e.target.value })}
-                          placeholder="8/128"
-                          aria-label={`Storage / size of variant ${i + 1}`}
+                          placeholder="Category: value"
+                          aria-label={`Attribute of variant ${i + 1}`}
                           className={`${cell} w-[92px]`}
                         />
                         <input
@@ -356,7 +338,8 @@ export default function VariantDraft({ rows, setRows, product }) {
                       <td key={f} className={tdClass}>
                         <input
                           type="number"
-                          min="0"
+                          min="0.01"
+                          required
                           value={r[f]}
                           onChange={(e) => edit(r.key, { [f]: e.target.value })}
                           placeholder={Number(product[f]) ? String(product[f]) : "0"}
@@ -364,9 +347,19 @@ export default function VariantDraft({ rows, setRows, product }) {
                         />
                       </td>
                     ))}
-                    <td className={tdClass}>{tier("dealerPrice")}</td>
-                    <td className={tdClass}>{tier("subDealerPrice")}</td>
-                    <td className={tdClass}>{tier("wholesalerPrice")}</td>
+                    {["dealerPrice", "subDealerPrice", "wholesalerPrice"].map((field) => (
+                      <td key={field} className={tdClass}>
+                        <input
+                          type="number"
+                          min="0"
+                          value={r[field]}
+                          onChange={(e) => edit(r.key, { [field]: e.target.value })}
+                          placeholder={rates[field] ? String(rates[field]) : "Buyer price"}
+                          aria-label={`${field} for variant ${i + 1}`}
+                          className={`${cell} w-[84px] text-right`}
+                        />
+                      </td>
+                    ))}
                     <td className={tdClass}>
                       <input
                         type="number"

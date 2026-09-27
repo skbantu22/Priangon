@@ -50,7 +50,7 @@ export async function GET(req) {
         match: {
           barcode,
         },
-        select: "color size barcode sku mrp sellingPrice",
+        select: "color size barcode sku mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice",
       })
       .lean();
 
@@ -78,6 +78,9 @@ export async function GET(req) {
         sku: stock.variantId.sku,
         mrp: stock.variantId.mrp,
         sellingPrice: stock.variantId.sellingPrice,
+        dealerPrice: stock.variantId.dealerPrice,
+        subDealerPrice: stock.variantId.subDealerPrice,
+        wholesalerPrice: stock.variantId.wholesalerPrice,
         stock: stock.stock,
       },
     });

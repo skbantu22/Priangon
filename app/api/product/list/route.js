@@ -95,7 +95,7 @@ export async function GET(request) {
 
     const [variants, cats, whStock, srStock] = await Promise.all([
       ProductVariant.find({ _id: { $in: variantIds }, deletedAt: null })
-        .select("color size sku barcode mrp sellingPrice purchasePrice")
+        .select("color size sku barcode mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice")
         .lean(),
       CategoryModel.find({ _id: { $in: catIds } }).select("name").lean(),
       wantWarehouse

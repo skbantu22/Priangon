@@ -3,7 +3,15 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
-const NUMBER_FIELDS = ["mrp", "sellingPrice", "purchasePrice", "discountPercentage"];
+const NUMBER_FIELDS = [
+  "mrp",
+  "sellingPrice",
+  "purchasePrice",
+  "dealerPrice",
+  "subDealerPrice",
+  "wholesalerPrice",
+  "discountPercentage",
+];
 const TEXT_FIELDS = ["sku", "barcode", "color", "size"];
 
 // Update variants. Only the fields sent are changed, so a form that edits

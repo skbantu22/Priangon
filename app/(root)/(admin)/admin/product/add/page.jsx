@@ -13,16 +13,25 @@ export default function AddProduct() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
+  // Keep the newly created product while its variants are being saved. If
+  // that request fails, the user can retry without creating a duplicate.
+  const [pendingProduct, setPendingProduct] = useState(null);
 
   const save = async (values, simpleItem, variants) => {
+    let productWasCreated = !!pendingProduct;
     setSaving(true);
     try {
-      const { data } = await axios.post("/api/product/create", values);
-      const created = data?.data;
+      let created = pendingProduct;
+      if (!created) {
+        const { data } = await axios.post("/api/product/create", values);
+        created = data?.data;
 
-      if (!data?.success || !created?._id) {
-        showToast("error", data?.message || "Could not save product");
-        return false;
+        if (!data?.success || !created?._id) {
+          showToast("error", data?.message || "Could not save product");
+          return false;
+        }
+        setPendingProduct(created);
+        productWasCreated = true;
       }
 
       // a simple product sells as one "Default" item; a variant product
@@ -32,9 +41,11 @@ export default function AddProduct() {
           ? [{ color: "Default", size: "Standard", barcode: simpleItem.barcode, stock: Number(simpleItem.stock) || 0 }]
           : variants;
       if (lines.length) {
-        await axios.post("/api/product-variant/create", { productId: created._id, variants: lines });
+        const { data } = await axios.post("/api/product-variant/create", { productId: created._id, variants: lines });
+        if (!data?.success) throw new Error(data?.message || "Could not save variants");
       }
 
+      setPendingProduct(null);
       queryClient.invalidateQueries({ queryKey: ["product-list"] });
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });
 
@@ -45,7 +56,13 @@ export default function AddProduct() {
       router.push(ADMIN_PRODUCT_SHOW);
       return true;
     } catch (error) {
-      showToast("error", error?.response?.data?.message || "Could not save product");
+      const message = error?.response?.data?.message || error.message;
+      showToast(
+        "error",
+        productWasCreated
+          ? `${message || "Could not save variants"}. The product is saved; press Save again to retry variants.`
+          : message || "Could not save product",
+      );
       return false;
     } finally {
       setSaving(false);

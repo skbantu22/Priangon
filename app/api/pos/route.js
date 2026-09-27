@@ -130,7 +130,7 @@ export async function GET(req) {
 
     const [variants, mediaDocs, stocks] = await Promise.all([
       ProductVariant.find({ _id: { $in: variantIds } })
-        .select("color size sku barcode mrp sellingPrice media")
+        .select("color size sku barcode mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice media")
         .lean(),
       Media.find({ _id: { $in: mediaIds } })
         .select("secure_url")
@@ -196,6 +196,9 @@ export async function GET(req) {
             barcode: variant.barcode,
             mrp: variant.mrp,
             sellingPrice: variant.sellingPrice,
+            dealerPrice: variant.dealerPrice,
+            subDealerPrice: variant.subDealerPrice,
+            wholesalerPrice: variant.wholesalerPrice,
 
             // showroom wise stock (or all showroom total)
             showroomStock: stockMap.get(variant._id.toString()) ?? 0,
