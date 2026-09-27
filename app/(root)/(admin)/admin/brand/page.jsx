@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { FiEdit2, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 
@@ -52,7 +52,14 @@ const BrandPage = () => {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [logoFile, setLogoFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const logoInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!logoFile?.preview) return undefined;
+    return () => URL.revokeObjectURL(logoFile.preview);
+  }, [logoFile]);
 
   const loadBrands = useCallback(async () => {
     setLoading(true);
@@ -79,6 +86,7 @@ const BrandPage = () => {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setLogoFile(null);
     setOpen(true);
   };
 
@@ -92,6 +100,7 @@ const BrandPage = () => {
       sortOrder: brand.sortOrder || 0,
       isActive: brand.isActive,
     });
+    setLogoFile(null);
     setOpen(true);
   };
 
@@ -103,21 +112,46 @@ const BrandPage = () => {
 
     setSaving(true);
 
+    let uploadedLogoId = null;
+
     try {
+      let payload = form;
+      if (logoFile?.file) {
+        const body = new FormData();
+        body.append("file", logoFile.file);
+        const { data: uploadData } = await axios.post(
+          "/api/media/upload",
+          body,
+          { headers: { "Content-Type": "multipart/form-data" } },
+        );
+        if (!uploadData?.success || !uploadData.media?.secure_url) {
+          throw new Error(uploadData?.message || "Could not upload logo");
+        }
+        uploadedLogoId = uploadData.media._id;
+        payload = { ...form, logo: uploadData.media.secure_url };
+      }
+
       const { data } = editingId
-        ? await axios.put(`/api/brand/update/${editingId}`, form)
-        : await axios.post("/api/brand/create", form);
+        ? await axios.put(`/api/brand/update/${editingId}`, payload)
+        : await axios.post("/api/brand/create", payload);
 
       if (!data.success) {
+        if (uploadedLogoId) {
+          axios.delete("/api/media/delete", { data: { ids: [uploadedLogoId], deleteType: "PD" } }).catch(() => {});
+        }
         showToast("error", data.message || "Could not save brand");
         return;
       }
 
       showToast("success", editingId ? "Brand updated" : "Brand created");
+      setLogoFile(null);
       setOpen(false);
       loadBrands();
     } catch (error) {
-      showToast("error", error.response?.data?.message || "Could not save brand");
+      if (uploadedLogoId) {
+        axios.delete("/api/media/delete", { data: { ids: [uploadedLogoId], deleteType: "PD" } }).catch(() => {});
+      }
+      showToast("error", error.response?.data?.message || error.message || "Could not save brand");
     } finally {
       setSaving(false);
     }
@@ -264,7 +298,13 @@ const BrandPage = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) setLogoFile(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit Brand" : "New Brand"}</DialogTitle>
@@ -282,13 +322,51 @@ const BrandPage = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="brand-logo">Logo URL</Label>
-              <Input
-                id="brand-logo"
-                value={form.logo}
-                onChange={(e) => setForm({ ...form, logo: e.target.value })}
-                placeholder="https://..."
-              />
+              <Label htmlFor="brand-logo-upload">Brand Logo</Label>
+              <div className="flex items-center gap-3 rounded-lg border p-3">
+                {logoFile?.preview || form.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoFile?.preview || form.logo}
+                    alt="Brand logo preview"
+                    className="size-16 shrink-0 rounded-md border bg-white object-contain p-1"
+                  />
+                ) : (
+                  <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
+                    No logo
+                  </div>
+                )}
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  <Input
+                    ref={logoInputRef}
+                    id="brand-logo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) setLogoFile({ file, preview: URL.createObjectURL(file) });
+                      event.target.value = "";
+                    }}
+                  />
+                  <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()}>
+                    {logoFile?.file || form.logo ? "Change logo" : "Upload logo"}
+                  </Button>
+                  {(logoFile?.file || form.logo) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setLogoFile(null);
+                        setForm((current) => ({ ...current, logo: "" }));
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                  <p className="w-full text-xs text-muted-foreground">PNG, JPG, WEBP or SVG</p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -344,7 +422,10 @@ const BrandPage = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setOpen(false);
+              setLogoFile(null);
+            }}>
               Cancel
             </Button>
 
