@@ -93,13 +93,13 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[46px] z-50 w-[340px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[8px] border border-black/10 bg-white text-[#212529] shadow-[0_10px_30px_rgba(20,30,50,0.14)] dark:bg-popover dark:text-foreground">
+        <div className="fixed right-3 top-[72px] z-50 flex max-h-[70dvh] w-[min(320px,calc(100vw-24px))] flex-col overflow-hidden rounded-[8px] border border-black/10 bg-white text-[#212529] shadow-[0_10px_30px_rgba(20,30,50,0.14)] dark:bg-popover dark:text-foreground sm:absolute sm:right-0 sm:top-[46px] sm:max-h-none sm:w-[340px]">
           <div className="flex items-center justify-between border-b border-[#eef1f4] px-[14px] py-[10px] dark:border-border">
             <b className="text-[14px]">Notifications</b>
             <span className="text-[12px] text-[#6c757d]">{count ? `${count} need attention` : "All clear"}</span>
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto">
+          <div className="min-h-0 max-h-[60dvh] overflow-y-auto sm:max-h-[420px]">
             {!count && <p className="m-0 px-[14px] py-[22px] text-center text-[13px] text-[#6c757d]">Nothing needs attention right now.</p>}
 
             <Section

@@ -149,7 +149,6 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
     setValue("trackSerial", serial);
     setValue("warrantyType", serial ? "official" : "none");
     setValue("warrantyMonths", serial ? 12 : 0);
-    if (serial) setValue("productType", "variant");
   };
 
   const openQuickAdd = (kind) => {
