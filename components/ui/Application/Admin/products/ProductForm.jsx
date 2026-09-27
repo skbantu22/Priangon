@@ -9,9 +9,9 @@ import axios from "axios";
 import slugify from "slugify";
 import { decode } from "entities";
 import { z } from "zod";
-import { List, Plus } from "lucide-react";
+import { List, Plus, RefreshCw } from "lucide-react";
 
-import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
+import { ListCard, btn, filterInput as inputClass } from "@/components/ui/Application/Admin/listKit";
 import RichText from "@/components/ui/Application/Admin/RichText";
 import VariantDraft, { makeBarcode, variantPayload, variantProblem } from "@/components/ui/Application/Admin/products/VariantDraft";
 import ProductPhoto from "@/components/ui/Application/Admin/products/ProductPhoto";
@@ -392,70 +392,62 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         {/* ---------- a new simple product: one line with its prices and stock ---------- */}
         {!editing && productType === "simple" ? (
           <Section title="Price and Stock" note="A simple product sells as one item. The POS charges each customer the rate of their type; an empty rate charges the Buyer price.">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1040px] border-collapse text-sm">
-                <thead>
-                  <tr className={theadClass}>
-                    {["Attribute - Color", "Barcode", ...PRICES.map(([, label]) => label), "Opening Stock"].map((h) => (
-                      <th key={h} className={thClass}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className={`${tdClass} text-muted-foreground`}>Default</td>
-                    <td className={tdClass}>
-                      <div className="flex">
-                        <input
-                          value={simpleItem.barcode}
-                          onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
-                          placeholder="Scan or auto"
-                          maxLength={32}
-                          aria-label="Barcode"
-                          className={`${inputClass} !h-[34px] !w-[120px] shrink-0 !px-2 font-mono !text-[13px]`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSimpleItem({ ...simpleItem, barcode: makeBarcode() })}
-                          title="Make a new barcode"
-                          aria-label="Make a barcode"
-                          className="flex h-[34px] w-[30px] shrink-0 items-center justify-center bg-[#10c469] text-white hover:bg-[#0eab5c]"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </td>
-                    {PRICES.map(([field, label]) => (
-                      <td key={field} className={`${tdClass} align-top`}>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          inputMode="decimal"
-                          {...register(field)}
-                          aria-label={label}
-                          placeholder={["dealerPrice", "subDealerPrice", "wholesalerPrice"].includes(field) && retail ? String(retail) : "0"}
-                          className={`${inputClass} !h-[34px] w-[96px] !px-2 text-right !text-[13px] ${field === "sellingPrice" ? "font-semibold" : ""}`}
-                        />
-                        <span className="mt-0.5 block min-h-[14px] text-[11px] tabular-nums">{rateNote(field)}</span>
-                      </td>
-                    ))}
-                    <td className={`${tdClass} align-top`}>
-                      <input
-                        type="number"
-                        min="0"
-                        value={simpleItem.stock}
-                        onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
-                        placeholder="0"
-                        aria-label="Opening stock"
-                        className={`${inputClass} !h-[34px] w-[80px] !px-2 text-right !text-[13px]`}
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+              {PRICES.map(([field, label, bn]) => (
+                <label key={field} className="block min-w-0">
+                  <span className="block text-[13px] font-medium">{label}</span>
+                  <span className="block text-[11px] text-muted-foreground">{bn}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    {...register(field)}
+                    placeholder={["dealerPrice", "subDealerPrice", "wholesalerPrice"].includes(field) && retail ? String(retail) : "0"}
+                    className={`${inputClass} mt-1 text-right ${field === "sellingPrice" ? "font-semibold" : ""}`}
+                  />
+                  <span className="mt-0.5 block min-h-[16px] text-[11px] tabular-nums">{rateNote(field)}</span>
+                </label>
+              ))}
+              <label className="block min-w-0">
+                <span className="block text-[13px] font-medium">Opening Stock</span>
+                <span className="block text-[11px] text-muted-foreground">Initial quantity</span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={simpleItem.stock}
+                  onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
+                  placeholder="0"
+                  aria-label="Opening stock"
+                  className={`${inputClass} mt-1 text-right`}
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 rounded-lg border bg-muted/20 p-3">
+              <label htmlFor="simple-product-barcode" className="mb-1 block text-[13px] font-medium">
+                Barcode <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="simple-product-barcode"
+                  value={simpleItem.barcode}
+                  onChange={(e) => setSimpleItem({ ...simpleItem, barcode: e.target.value })}
+                  placeholder="Scan or enter barcode"
+                  maxLength={32}
+                  className={`${inputClass} min-w-0 flex-1 font-mono`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSimpleItem({ ...simpleItem, barcode: makeBarcode() })}
+                  title="Generate a new barcode"
+                  aria-label="Generate a new barcode"
+                  className="flex h-[38px] w-[42px] shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90"
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
             </div>
             {tierOrderWarning && (
               <p className="m-0 mt-2 rounded-[4px] bg-amber-50 px-3 py-1.5 text-[12px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
