@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import Customer from "@/models/Customer.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
-import { normalizeCustomerType } from "@/lib/priceTiers";
+import { PARTNER_ROLES, normalizeCustomerType } from "@/lib/priceTiers";
+import { standInEmail } from "@/lib/mobileLogin";
+import UserModel from "@/models/User.model";
 import { readCustomer } from "@/lib/customerService";
 
 /**
@@ -32,9 +34,40 @@ export async function POST(req) {
       );
     }
 
-    const customer = await Customer.create({ ...data, type: normalizeCustomerType(body.type) });
+    // a dealer, sub dealer or wholesaler also gets a portal login: their
+    // mobile number and a password
+    const type = normalizeCustomerType(body.type);
+    const password = String(body.password || "").trim();
+    const isPartner = PARTNER_ROLES.includes(type);
+    if (isPartner) {
+      if (password.length < 4) {
+        return NextResponse.json({ success: false, message: "Set a login password of at least 4 characters" }, { status: 400 });
+      }
+      if (await UserModel.exists({ phone: data.phone, deletedAt: null })) {
+        return NextResponse.json({ success: false, message: `${data.phone} already has a login` }, { status: 409 });
+      }
+    }
 
-    return NextResponse.json({ success: true, message: "Customer added", data: customer });
+    const customer = await Customer.create({ ...data, type });
+
+    if (isPartner) {
+      await UserModel.create({
+        name: data.name,
+        email: standInEmail(data.phone),
+        password,
+        role: type,
+        customerId: customer._id,
+        phone: data.phone,
+        address: data.address || "",
+        isEmailVerified: true,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: isPartner ? `Customer added · login made (${data.phone})` : "Customer added",
+      data: customer,
+    });
   } catch (error) {
     console.error("CUSTOMER CREATE ERROR:", error);
 

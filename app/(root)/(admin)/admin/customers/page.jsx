@@ -76,6 +76,7 @@ const emptyForm = {
   email: "",
   address: "",
   type: "retail",
+  password: "",
   initialAdvance: "",
   openingDue: "",
   openingDate: "",
@@ -748,6 +749,21 @@ export default function CustomersPage() {
                   ))}
                 </div>
               </div>
+
+              {!editing && form.type !== "retail" && (
+                <Field label="Portal login password *" className="sm:col-span-6">
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.password}
+                    onChange={set("password")}
+                    placeholder="At least 4 characters"
+                  />
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    They log in to the dealer portal with {form.phone || "their mobile number"} and this password. The login shows in Users.
+                  </span>
+                </Field>
+              )}
 
               <Field label="Initial Advance (৳)" className="sm:col-span-2">
                 <Input type="number" min="0" step="0.01" value={form.initialAdvance} onChange={set("initialAdvance")} placeholder="Amount" />

@@ -14,7 +14,7 @@ import { showToast } from "@/lib/showToast";
 
 const isPhone = (s) => /^01\d{9}$/.test(String(s).replace(/[\s-]/g, ""));
 
-const EMPTY_FORM = { name: "", phone: "", address: "", type: "retail" };
+const EMPTY_FORM = { name: "", phone: "", address: "", type: "retail", password: "" };
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
@@ -87,7 +87,9 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
   };
 
   const startEdit = (c) => {
-    setForm({ name: c.name || "", phone: c.phone || "", address: c.address || "", type: normalizeCustomerType(c.type) });
+    const type = normalizeCustomerType(c.type);
+    // a dealer / wholesaler already has a login: the password is only for changing it
+    setForm({ name: c.name || "", phone: c.phone || "", address: c.address || "", type, password: "", hadLogin: type !== "retail" });
     setTab("form");
   };
 
@@ -95,6 +97,14 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     e.preventDefault();
     if (form.name.trim().length < 2) return showToast("error", "Enter the customer's name");
     if (!isPhone(form.phone)) return showToast("error", "Phone must be 01XXXXXXXXX");
+    // a dealer, sub dealer or wholesaler gets a login; a buyer needs no password
+    const partner = normalizeCustomerType(form.type) !== "retail";
+    if (partner && !form.hadLogin && form.password.trim().length < 4) {
+      return showToast("error", "Set a password of at least 4 characters for their login");
+    }
+    if (form.password && form.password.trim().length < 4) {
+      return showToast("error", "The password needs at least 4 characters");
+    }
 
     setSaving(true);
     try {
@@ -227,6 +237,8 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
                 />
               </label>
             </div>
+
+
             <label className="block space-y-1 text-sm font-medium">
               <span>Address</span>
               <input
@@ -259,6 +271,25 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
                 ))}
               </div>
             </div>
+
+            {normalizeCustomerType(form.type) !== "retail" && (
+              <label className="block space-y-1 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm font-medium">
+                <span>
+                  Portal login password {!form.hadLogin && "*"}
+                </span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder={form.hadLogin ? "Leave blank to keep the current one" : "At least 4 characters"}
+                  className={inputClass}
+                />
+                <span className="block text-[11px] font-normal text-muted-foreground">
+                  They log in to the dealer portal with {form.phone || "their mobile number"} and this password. The login shows in Users.
+                </span>
+              </label>
+            )}
 
             <div className="flex justify-end gap-2 pt-1">
               <button
