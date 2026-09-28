@@ -55,10 +55,18 @@ const userSchema = new mongoose.Schema(
       ref: "Showroom",
 
       required: function () {
-        return this.role === "cashier";
+        return this.role === "cashier" && this.posTill !== "warehouse";
       },
 
       default: null,
+    },
+
+    // Where this login sells from, like AmarSolution's Business Branch.
+    posTill: {
+      type: String,
+      enum: ["warehouse", "showroom"],
+      default: "showroom",
+      index: true,
     },
 
     name: {

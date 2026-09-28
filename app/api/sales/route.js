@@ -59,7 +59,7 @@ export async function GET(req) {
 
     const [orders, total, sums] = await Promise.all([
       POSOrder.find(filter)
-        .select("orderNumber createdAt customerId customerName customerType phone soldBy items.qty total paidAmount dueAmount remark orderType exchange.returnedTotal showroomId")
+        .select("orderNumber createdAt customerId customerName customerType phone soldBy items.qty total paidAmount dueAmount remark orderType exchange.returnedTotal showroomId soldFrom locationName")
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -97,6 +97,7 @@ export async function GET(req) {
         itemCount: (o.items || []).reduce((sum, i) => sum + (i.qty || 0), 0),
         paymentStatus: paymentStatus(o.paidAmount, o.dueAmount),
         returned: returned.get(String(o._id)) || 0,
+        locationName: o.locationName || (o.soldFrom === "WAREHOUSE" || !o.showroomId ? "Warehouse" : "Sale Center"),
       })),
       total,
       pages: Math.max(1, Math.ceil(total / limit)),

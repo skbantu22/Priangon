@@ -257,7 +257,7 @@ export default function VariantDraft({ rows, setRows, product }) {
           </button>
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Leave a tier blank to use the product&apos;s Buyer price. Bulk fields apply one value to every row.
+          Leave a tier blank to use the product&apos;s Buyer price. Opening stock goes into the Warehouse.
         </p>
       </div>
 

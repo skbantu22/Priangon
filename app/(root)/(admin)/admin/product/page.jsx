@@ -485,7 +485,7 @@ export default function ProductsPage() {
                 <EmptyRow
                   colSpan={12}
                   title={filtered ? "No products match these filters" : "No products yet"}
-                  hint="Add a product, then its variants and stock through a purchase."
+                  hint="Add a product with opening stock (it lands in the Warehouse), or take stock in through a purchase."
                 />
               )}
 

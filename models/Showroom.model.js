@@ -19,9 +19,33 @@ const showroomSchema = new mongoose.Schema(
       trim: true,
     },
 
+    email: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    website: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    logo: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    // The one counter that sells. Stock itself stays in the warehouse.
+    isSaleCenter: {
+      type: Boolean,
+      default: false,
     },
   },
   {

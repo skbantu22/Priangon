@@ -110,6 +110,7 @@ export async function POST(request) {
       email: getUser.email,
       role: getUser.role,
       showroomId: getUser.showroomId?.toString(),
+      posTill: getUser.posTill || (getUser.showroomId ? "showroom" : "warehouse"),
 
       phone: getUser.phone,
       address: getUser.address,
@@ -140,6 +141,7 @@ export async function POST(request) {
         email: getUser.email,
         role: getUser.role,
         showroomId: getUser.showroomId,
+        posTill: getUser.posTill || (getUser.showroomId ? "showroom" : "warehouse"),
         phone: getUser.phone,
         address: getUser.address,
         city: getUser.city,

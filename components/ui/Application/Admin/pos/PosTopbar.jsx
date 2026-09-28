@@ -35,6 +35,11 @@ export default function PosTopbar({
   onRestoreHeld,
   onDeleteHeld,
   onExchange,
+  till,
+  saleCenterId,
+  saleCenterName,
+  onTillChange,
+  canSwitchTill = true,
 }) {
   const { toggleSidebar } = useSidebar();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -60,6 +65,26 @@ export default function PosTopbar({
       >
         <RiMenu4Fill className="size-5" />
       </button>
+
+      {canSwitchTill ? (
+      <select
+        value={till || "warehouse"}
+        onChange={(event) => onTillChange?.(event.target.value)}
+        title="Sell from"
+        className="h-9 max-w-[180px] truncate rounded-lg border border-white/20 bg-white/10 px-2 text-sm font-bold text-white"
+      >
+        <option value="warehouse" className="text-gray-900">
+          Warehouse
+        </option>
+        <option value={saleCenterId || "shop"} className="text-gray-900">
+          {saleCenterName || "Sale Center"}
+        </option>
+      </select>
+      ) : (
+        <span className="max-w-[180px] truncate text-sm font-bold">
+          {till === "warehouse" ? "Warehouse" : saleCenterName || "Sale Center"}
+        </span>
+      )}
 
       {/* SEARCH / BARCODE */}
       <div className="flex h-10 min-w-0 flex-1 max-w-2xl items-center overflow-hidden rounded-lg bg-white">

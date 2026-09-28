@@ -4,6 +4,7 @@ import PurchaseModel from "@/models/Purchase.model";
 import PurchaseReturn from "@/models/PurchaseReturn.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
+import { purchaseBelongsToAuth, purchaseLocationForAuth } from "@/lib/purchaseService";
 
 export async function GET(req, { params }) {
   try {
@@ -21,6 +22,14 @@ export async function GET(req, { params }) {
       : null;
 
     if (!purchase) {
+      return NextResponse.json(
+        { success: false, message: "Purchase not found" },
+        { status: 404 },
+      );
+    }
+
+    const location = await purchaseLocationForAuth(auth);
+    if (!purchaseBelongsToAuth(purchase, location, auth)) {
       return NextResponse.json(
         { success: false, message: "Purchase not found" },
         { status: 404 },

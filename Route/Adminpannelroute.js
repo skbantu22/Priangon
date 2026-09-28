@@ -118,6 +118,7 @@ export const ADMIN_REPORT_PROFIT_LOSS = "/admin/reports/profit-loss";
 
 // Settings routes
 export const ADMIN_APP_SETTINGS = "/admin/settings";
+export const ADMIN_SETTINGS_BRANCHES = "/admin/settings/branches";
 export const ADMIN_SYSTEM_SETTINGS = "/admin/settings/system";
 
 // Support routes

@@ -11,10 +11,10 @@ import {
   applyNewRates,
   applyPurchaseToStock,
   cleanRates,
-  mainStockLocation,
+  purchaseLocationForAuth,
   nextPurchaseNumber,
 } from "@/lib/purchaseService";
-import { SHOWROOM, assertLocationExists, locationName, parseLocation } from "@/lib/stockService";
+import { ensureSystemRoles } from "@/models/Role.model";
 
 const METHODS = ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"];
 
@@ -31,10 +31,11 @@ const dateOrNull = (value) => {
 
 export async function POST(req) {
   try {
+    await connectDB();
+    await ensureSystemRoles();
+
     const auth = await requirePermission("purchase.create");
     if (auth.response) return auth.response;
-
-    await connectDB();
 
     const body = await req.json();
 
@@ -142,10 +143,8 @@ export async function POST(req) {
       discountType === "percent" ? round2((subtotal * discountValue) / 100) : discountValue,
     );
 
-    // Stock In To: a branch, the warehouse, or (not chosen) the main branch
-    const location = body.stockLocation ? parseLocation(body.stockLocation) : await mainStockLocation();
-
-    if (!location || !(await assertLocationExists(location))) return fail("Choose where the goods go into stock");
+    // AmarSolution: stock goes to this login's branch, not a form field
+    const location = await purchaseLocationForAuth(auth);
 
     const createdBy = await actorFullName(auth);
 
@@ -157,8 +156,8 @@ export async function POST(req) {
       purchaseDate: dateOrNull(body.purchaseDate) || new Date(),
       dueDate: dateOrNull(body.dueDate),
       purchaseOrderId: order?._id || null,
-      showroomId: location.locationType === SHOWROOM ? location.locationId : null,
-      locationName: await locationName(location),
+      showroomId: location.showroomId || null,
+      locationName: location.name || "Warehouse",
       attachment: {
         url: String(body.attachment?.url || "").trim(),
         publicId: String(body.attachment?.publicId || "").trim(),

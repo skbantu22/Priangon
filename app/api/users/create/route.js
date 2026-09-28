@@ -58,15 +58,20 @@ export async function POST(req) {
       throw new Error("This mobile number already has a login");
     }
 
-    // single store: a cashier sells from the one store
+    // Warehouse cashier sells from warehouse; shop cashier from the sale center
     let showroomId = null;
-    if (body.role === "cashier") {
-      const store = await Showroom.findOne().sort({ createdAt: 1 }).select("_id").lean();
-      if (!store) throw new Error("Store is not set up yet");
-      showroomId = store._id;
+    const posTill = body.posTill === "warehouse" ? "warehouse" : "showroom";
+    if (body.role === "cashier" && posTill === "showroom") {
+      if (mongoose.isValidObjectId(body.showroomId)) {
+        showroomId = body.showroomId;
+      } else {
+        const store = await Showroom.findOne({ isSaleCenter: true }).sort({ createdAt: 1 }).select("_id").lean()
+          || await Showroom.findOne().sort({ createdAt: 1 }).select("_id").lean();
+        if (!store) throw new Error("Store is not set up yet");
+        showroomId = store._id;
+      }
     }
 
-    // ================= CREATE USER =================
     const user = await User.create({
       name: body.name.trim(),
       email: body.email?.trim() ? body.email.trim().toLowerCase() : standInEmail(normalizeBdMobile(body.phone)),
@@ -75,6 +80,7 @@ export async function POST(req) {
       roleId: roleDoc?._id || null,
       phone: body.phone ? normalizeBdMobile(body.phone) : "",
       showroomId,
+      posTill,
       isActive: true,
 
       // ✅ IMPORTANT FIX

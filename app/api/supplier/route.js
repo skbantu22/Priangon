@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import SupplierModel from "@/models/Supplier.model";
 import { connectDB } from "@/lib/databaseconnection";
-import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
+import { requireAnyPermission } from "@/lib/apiAuth";
+import { ensureSystemRoles } from "@/models/Role.model";
 
 export async function GET(req) {
   try {
-    const auth = await requireRoles(ADMIN_MANAGER);
-    if (auth.response) return auth.response;
-
     await connectDB();
+    await ensureSystemRoles();
+
+    const auth = await requireAnyPermission(["suppliers.view", "purchase.create"]);
+    if (auth.response) return auth.response;
 
     const { searchParams } = new URL(req.url);
 

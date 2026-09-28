@@ -137,7 +137,8 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
   // name + variant + IMEI + warranty lines for one invoice row
   const itemLines = (item) => {
     const lines = [];
-    const variant = [item.size, item.color].filter(Boolean).join(" / ");
+    const variant = [item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" / ");
+    if (item.barcode) lines.push(`Barcode: ${item.barcode}`);
     if (variant) lines.push(variant);
     if (item.imeis?.length) lines.push(`IMEI/SN: ${item.imeis.join(", ")}`);
     const w = warrantyLabel(item);

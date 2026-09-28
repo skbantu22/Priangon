@@ -45,7 +45,7 @@ const Pill = ({ value }) => (
   <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_STYLE[value] || ""}`}>{value}</span>
 );
 
-const COLUMNS = ["SL", "Date", "Invoice No", "Reference", "Supplier", "Items", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By"];
+const COLUMNS = ["SL", "Date", "Invoice No", "Reference", "Supplier", "Location", "Items", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By"];
 
 // units that came in, free ones included
 const qtyOf = (p) => p.items.reduce((sum, item) => sum + (item.quantity || 0) + (item.extraQty || 0), 0);
@@ -56,6 +56,7 @@ const exportRow = (p, index) => [
   p.purchaseNumber,
   p.referenceNo || "",
   p.supplierName,
+  p.locationName || (p.showroomId ? "Sale Center" : "Warehouse"),
   p.items.length,
   qtyOf(p),
   p.grandTotal,
@@ -299,7 +300,7 @@ export default function PurchasePage() {
                       {p.supplierName}
                     </button>
                     <p className="m-0 text-[12px] text-muted-foreground">
-                      {p.purchaseNumber} · {fmtDate(p.purchaseDate)} · {qtyOf(p)} pcs
+                      {p.purchaseNumber} · {fmtDate(p.purchaseDate)} · {p.locationName || "Warehouse"} · {qtyOf(p)} pcs
                     </p>
                     <span className="mt-1 flex gap-1">
                       <Pill value={p.status} />
@@ -328,7 +329,7 @@ export default function PurchasePage() {
           <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
               <tr className={theadRow}>
-                {["SL", "Date", "Invoice No", "Supplier", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By", "Action"].map((h) => (
+                {["SL", "Date", "Invoice No", "Supplier", "Location", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By", "Action"].map((h) => (
                   <th key={h} className={thClass}>
                     {h}
                   </th>
@@ -339,13 +340,13 @@ export default function PurchasePage() {
               {loading &&
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={13} className={tdClass}>
+                    <td colSpan={14} className={tdClass}>
                       <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-muted" />
                     </td>
                   </tr>
                 ))}
               {!loading && !rows.length && (
-                <EmptyRow colSpan={13} title={filtered ? "No purchases match these filters" : "No purchases yet"} hint="Record a purchase when goods come in from a supplier." />
+                <EmptyRow colSpan={14} title={filtered ? "No purchases match these filters" : "No purchases yet"} hint="Record a purchase when goods come in from a supplier." />
               )}
               {!loading &&
                 rows.map((p, i) => (
@@ -359,6 +360,7 @@ export default function PurchasePage() {
                       {p.referenceNo && <span className="block text-xs text-muted-foreground">Ref {p.referenceNo}</span>}
                     </td>
                     <td className={tdClass}>{p.supplierName}</td>
+                    <td className={tdClass}>{p.locationName || (p.showroomId ? "Sale Center" : "Warehouse")}</td>
                     <td className={tdClass}>
                       {qtyOf(p)}
                       <span className="block text-xs text-muted-foreground">{p.items.length} product(s)</span>
@@ -383,7 +385,7 @@ export default function PurchasePage() {
             {!loading && totals && rows.length > 0 && (
               <tfoot>
                 <tr className={totalRow}>
-                  <td colSpan={5} className={tdClass}>
+                  <td colSpan={6} className={tdClass}>
                     Total {filters.status === "all" && <span className="text-[12px] font-normal">(without cancelled)</span>}
                   </td>
                   <td className={tdClass}>{money(totals.grandTotal)}</td>

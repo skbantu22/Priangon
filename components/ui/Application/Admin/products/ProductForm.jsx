@@ -36,7 +36,8 @@ import {
 } from "@/components/ui/dialog";
 
 // categories whose items are serialised (IMEI) and carry a warranty by default
-const SERIAL_CATEGORY = /phone|mobile|watch|tablet|tab\b|earbud|airpod/i;
+const SERIAL_CATEGORY = /\b(?:phones?|mobiles?|smartphones?|smart\s?watches?|watches?|tablets?|tabs?|earbuds?|airpods?)\b/i;
+const ACCESSORY_CATEGORY = /\b(?:accessories|accessory|cases?|covers?|chargers?|cables?|straps?|protectors?|earphones?|headphones?)\b/i;
 
 const PERIODS = [1, 3, 6, 12, 18, 24, 36];
 
@@ -78,8 +79,9 @@ export const productFormValues = (product) => ({
  * wholesaler) with the margin over cost under every rate. Photos and the
  * write-up only matter for the website and sit in an optional section.
  */
-export default function ProductForm({ product, onSave, saving, footerNote }) {
+export default function ProductForm({ product, onSave, saving, footerNote, pendingProduct }) {
   const editing = !!product?._id;
+  const retryingVariants = !!pendingProduct;
 
   const form = useForm({
     resolver: zodResolver(editing ? productFormSchema.extend({ _id: z.string() }) : productFormSchema),
@@ -128,24 +130,36 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
       .catch(() => {});
   }, []);
 
-  const loadSubs = (id) => {
-    if (!id) return setSubcategories([]);
-    axios
-      .get(`/api/subcategory?category=${id}&deleteType=SD&size=1000`)
-      .then(({ data }) => setSubcategories(data?.success ? data.data : []))
-      .catch(() => setSubcategories([]));
-  };
-
   useEffect(() => {
-    loadSubs(categoryId);
+    let current = true;
+    if (!categoryId) {
+      setSubcategories([]);
+      return () => {
+        current = false;
+      };
+    }
+
+    axios
+      .get(`/api/subcategory?category=${categoryId}&deleteType=SD&size=1000`)
+      .then(({ data }) => {
+        if (current) setSubcategories(data?.success ? data.data : []);
+      })
+      .catch(() => {
+        if (current) setSubcategories([]);
+      });
+
+    return () => {
+      current = false;
+    };
   }, [categoryId]);
 
   // phones / watches: 1 year official warranty + IMEI tracking by default
-  const pickCategory = (id) => {
+  const pickCategory = (id, selectedName) => {
     setValue("category", id, { shouldValidate: true });
     setValue("subcategory", "");
     if (warrantyTouched.current) return;
-    const serial = SERIAL_CATEGORY.test(categories.find((c) => c._id === id)?.name || "");
+    const categoryName = selectedName || categories.find((c) => String(c._id) === String(id))?.name || "";
+    const serial = SERIAL_CATEGORY.test(categoryName) && !ACCESSORY_CATEGORY.test(categoryName);
     setValue("trackSerial", serial);
     setValue("warrantyType", serial ? "official" : "none");
     setValue("warrantyMonths", serial ? 12 : 0);
@@ -165,7 +179,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         const { data } = await axios.post("/api/category/create", { name, slug: slugify(name, { lower: true, strict: true }) });
         if (data?.data?._id) {
           setCategories((list) => [...list, data.data]);
-          pickCategory(data.data._id);
+          pickCategory(data.data._id, data.data.name);
         } else {
           throw new Error(data?.message || "Could not add category");
         }
@@ -215,6 +229,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
       // the photo is uploaded only now, when the product is saved
       let photoId = photo?._id || null;
       let uploadedId = null;
+      let uploadedUrl = null;
       if (photo?.file) {
         try {
           const body = new FormData();
@@ -222,6 +237,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           const { data } = await axios.post("/api/media/upload", body, { headers: { "Content-Type": "multipart/form-data" } });
           if (!data?.success) throw new Error(data?.message);
           photoId = uploadedId = String(data.media._id);
+          uploadedUrl = data.media.secure_url || data.media.url || null;
         } catch (error) {
           return showToast("error", error?.response?.data?.message || error.message || "Could not upload the photo");
         }
@@ -233,7 +249,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
 
       const mrp = Number(values.mrp) || Number(values.sellingPrice);
       const name = values.name.trim();
-      const saved = await onSave(
+      const saveResult = await onSave(
         {
           ...values,
           media: mediaIds,
@@ -247,12 +263,16 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         simpleItem,
         addingVariants ? variantPayload(variantRows) : [],
       );
+      const saved = typeof saveResult === "boolean" ? saveResult : !!saveResult?.success;
+      const productWasCreated = typeof saveResult === "object" && !!saveResult?.productCreated;
       // drop whichever photo is no longer used, from the library and the cloud
-      const unused = saved ? (oldPhotoId && oldPhotoId !== photoId ? oldPhotoId : null) : uploadedId;
+      const unused = saved
+        ? oldPhotoId && oldPhotoId !== photoId ? oldPhotoId : null
+        : productWasCreated ? null : uploadedId;
       if (unused) axios.delete("/api/media/delete", { data: { ids: [unused], deleteType: "PD" } }).catch(() => {});
-      if (saved && photo?.file) {
+      if (photo?.file && (saved || productWasCreated)) {
         URL.revokeObjectURL(photo.url);
-        setPhoto({ _id: photoId, url: photo.url });
+        setPhoto({ _id: photoId, url: uploadedUrl || photo.url });
       }
       if (saved && !editing) clear();
     },
@@ -296,18 +316,27 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
 
   return (
     <>
-      <form onSubmit={submit} noValidate>
+    <form onSubmit={submit} noValidate>
       <ListCard
         title={editing ? "Update Product" : "Add New Product"}
         actions={
-          <Link href={ADMIN_PRODUCT_SHOW} className={btn.primary}>
+          <Link
+            href={ADMIN_PRODUCT_SHOW}
+            onClick={(event) => {
+              if (retryingVariants) {
+                event.preventDefault();
+                showToast("error", "Finish saving the product variants before leaving this form.");
+              }
+            }}
+            className={btn.primary}
+          >
             <List size={14} /> Product List
           </Link>
         }
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+        <div inert={retryingVariants || undefined} className={`grid grid-cols-1 gap-4 sm:grid-cols-6 ${retryingVariants ? "opacity-60" : ""}`}>
           <Field label="Product Name" required className="sm:col-span-4">
-            <input {...register("name")} placeholder="Ex: Samsung Galaxy A55 5G 8/256" className={inputClass} autoFocus={!editing} />
+            <input {...register("name")} placeholder="Ex: Samsung Galaxy A55 5G 8/256" className={inputClass} />
             {err("name")}
           </Field>
           <Field label="Product Type" className="sm:col-span-2" hint={PRODUCT_TYPES[productType]?.hint}>
@@ -391,7 +420,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         {/* ---------- a new simple product: one line with its prices and stock ---------- */}
         {!editing && productType === "simple" ? (
           <Section title="Price List (রেট)" note="The POS charges each customer the rate of their type. An empty rate charges the Buyer price.">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            <div inert={retryingVariants || undefined} className={`grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7 ${retryingVariants ? "opacity-60" : ""}`}>
               {PRICES.map(([field, label, bn]) => (
                 <label key={field} className="block min-w-0">
                   <span className="block text-[13px] font-medium">{label}</span>
@@ -410,7 +439,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
               ))}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-lg border bg-muted/20 p-3">
                 <label htmlFor="simple-product-opening-stock" className="mb-1 block text-[13px] font-medium">
                   Opening Stock
@@ -424,6 +453,20 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
                   onChange={(e) => setSimpleItem({ ...simpleItem, stock: e.target.value })}
                   placeholder="0"
                   className={`${inputClass} text-right`}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Goes into Warehouse. Transfer to Main Shop to sell from the shop.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <label htmlFor="simple-product-stock-in-to" className="mb-1 block text-[13px] font-medium">
+                  Stock In To
+                </label>
+                <input
+                  id="simple-product-stock-in-to"
+                  value="Warehouse"
+                  readOnly
+                  className={inputClass}
                 />
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
@@ -459,7 +502,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
           </Section>
         ) : (
         <Section title="Price List (রেট)" note="The POS charges each customer the rate of their type. An empty rate charges the Buyer price.">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          <div inert={retryingVariants || undefined} className={`grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7 ${retryingVariants ? "opacity-60" : ""}`}>
             {PRICES.map(([field, label, bn]) => (
               <label key={field} className="block">
                 <span className="block text-[13px] font-medium">{label}</span>
@@ -487,7 +530,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
 
         {/* ---------- stock & warranty ---------- */}
         <Section title="Stock & Warranty">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <div inert={retryingVariants || undefined} className={`grid grid-cols-1 gap-4 sm:grid-cols-6 ${retryingVariants ? "opacity-60" : ""}`}>
             <Field label="Low Stock Alert" className="sm:col-span-2" hint="Flag the product when stock falls to this">
               <input type="number" min="0" {...register("alertQuantity")} placeholder="0" className={inputClass} />
             </Field>
@@ -543,7 +586,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         </Section>
 
         {!editing && productType === "variant" && (
-          <Section title="Generate Variants" note="Choose an attribute category, attribute, and color. Each line gets its own barcode and stock.">
+          <Section title="Generate Variants" note="Choose an attribute category, attribute, and color. Opening stock on each line goes into the Warehouse.">
             <VariantDraft
               rows={variantRows}
               setRows={setVariantRows}
@@ -560,7 +603,7 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         )}
 
         {/* ---------- photos and description, optional ---------- */}
-        <details className="mt-5 rounded-[6px] border border-[#ebeff2] dark:border-border" open={editing && media.length > 0}>
+        <details inert={retryingVariants || undefined} className="mt-5 rounded-[6px] border border-[#ebeff2] dark:border-border" open={editing && media.length > 0}>
           <summary className="cursor-pointer select-none px-4 py-2.5 text-[14px] font-semibold">
             Photo &amp; description (optional)
           </summary>
@@ -579,7 +622,13 @@ export default function ProductForm({ product, onSave, saving, footerNote }) {
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
           {footerNote && <span className="mr-auto text-[12px] text-muted-foreground">{footerNote}</span>}
           {!editing && (
-            <button type="button" onClick={clear} className={btn.warning}>
+            <button
+              type="button"
+              onClick={clear}
+              disabled={saving || retryingVariants}
+              title={retryingVariants ? "Finish saving the product variants first" : "Clear form"}
+              className={btn.warning}
+            >
               Clear
             </button>
           )}

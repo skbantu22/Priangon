@@ -7,6 +7,7 @@ import sbtMark from "@/public/assets/sbt-mark.png";
 import { usePathname } from "next/navigation";
 import { LuChevronRight } from "react-icons/lu";
 import { IoMdClose } from "react-icons/io";
+import { useQuery } from "@tanstack/react-query";
 import { useSelector, useDispatch } from "react-redux";
 
 import {
@@ -30,12 +31,48 @@ import {
 } from "@/components/ui/collapsible";
 
 import { sidebarMenu } from "@/lib/adminappsidebarmenu";
+import {
+  posShowroomsQueryOptions,
+  resolvePosTill,
+} from "@/lib/posProducts";
 import { useLanguage } from "@/hooks/useLanguage";
 import { oneLine } from "@/lib/labels";
 import { resetOrderNotification } from "@/store/reducer/notificationSlice";
 
 const menuButtonClass =
-  "h-10 gap-3 rounded-lg px-3 text-[14px] font-medium text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-primary data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-black/20 [&>svg]:size-[18px]";
+  "h-12 gap-2.5 rounded-lg px-2.5 text-[15px] font-bold text-white hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-primary data-[active=true]:font-bold data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-black/20 [&>svg]:!size-4";
+
+const ICON_TONE = {
+  Dashboard: "bg-[#ff6a1f]",
+  "POS (Sales)": "bg-[#00b293]",
+  Sales: "bg-[#4429ff]",
+  Products: "bg-[#851eec]",
+  "Dealer / Wholesaler Orders": "bg-[#0097a7]",
+  Warranty: "bg-[#e91e63]",
+  Customers: "bg-[#188ae2]",
+  Suppliers: "bg-[#f9a825]",
+  Purchases: "bg-[#5b2ee0]",
+  Inventory: "bg-[#00a38a]",
+  Employees: "bg-[#d32f2f]",
+  Expenses: "bg-[#ff8a00]",
+  Assets: "bg-[#6d4aff]",
+  Reports: "bg-[#0091ea]",
+  Settings: "bg-[#546e7a]",
+  Users: "bg-[#7b1fa2]",
+  "System Settings": "bg-[#455a64]",
+};
+
+function MenuIcon({ menu }) {
+  const Icon = menu.icon;
+  const tone = ICON_TONE[menu.title] || "bg-white/20";
+  return (
+    <span
+      className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-white shadow-md shadow-black/25 ${tone}`}
+    >
+      <Icon className="size-[22px]" />
+    </span>
+  );
+}
 
 // a link may carry a query (Colors is /admin/attributes?slot=color); the path decides
 const isPathActive = (pathname, url) => {
@@ -57,6 +94,16 @@ export default function Appsidebar() {
   const auth = useSelector((state) => state.authStore.auth);
   const user = auth?.data?.user || auth?.user;
   const role = user?.role || "customer";
+  const { data: showrooms = [] } = useQuery({
+    ...posShowroomsQueryOptions(),
+    enabled: !!user,
+  });
+  const selectedShowroomId = resolvePosTill({ showrooms, currentUser: user });
+  const selectedShowroom = showrooms.find(
+    (s) => String(s._id) === String(selectedShowroomId),
+  );
+  const isWarehouseUser = selectedShowroomId === "warehouse";
+  const branchName = isWarehouseUser ? "Warehouse" : selectedShowroom?.name || "No branch";
 
   const filteredMenu = sidebarMenu.filter((menu) => {
     if (!menu.roles) return true;
@@ -73,26 +120,32 @@ export default function Appsidebar() {
 
   return (
     <Sidebar className="z-50 border-r-0">
-      <SidebarHeader className="h-16 p-0 border-b border-sidebar-border">
-        <div className="flex h-full items-center justify-between px-4">
-          <Link href="/admin/dashboard" className="flex items-center gap-2.5">
-            <span className="relative size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-lg shadow-black/30">
-              <Image src={sbtMark} alt="SB Telecom" fill sizes="40px" className="object-contain p-0.5" priority />
-            </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-xl font-extrabold tracking-wide text-white">
-                SB <span className="text-[#e0415e]">Telecom</span>
+      <SidebarHeader className="p-0 border-b border-sidebar-border">
+        <div className="flex items-start justify-between gap-2 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <Link href="/admin/dashboard" className="flex items-center gap-2.5">
+              <span className="relative size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-lg shadow-black/30">
+                <Image src={sbtMark} alt="SB Telecom" fill sizes="40px" className="object-contain p-0.5" priority />
               </span>
-              <span className="text-[11px] text-sidebar-foreground/70">
-                Global Connectivity Solutions
+              <span className="min-w-0 flex flex-col leading-tight">
+                <span className="text-xl font-extrabold tracking-wide text-white">
+                  SB <span className="text-[#e0415e]">Telecom</span>
+                </span>
+                <span className="truncate text-[12px] font-bold text-white/90">
+                  {isWarehouseUser ? "Warehouse" : `Sale Center · ${branchName}`}
+                </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+
+            <p className="mt-2 truncate rounded-lg bg-white/10 px-2 py-1.5 text-[12px] font-bold text-white">
+              {isWarehouseUser ? "Sells warehouse stock" : "Warehouse · stock"}
+            </p>
+          </div>
 
           <button
             onClick={toggleSidebar}
             type="button"
-            className="md:hidden flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-white"
+            className="md:hidden flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-white"
           >
             <IoMdClose />
           </button>
@@ -139,8 +192,8 @@ export default function Appsidebar() {
                             isActive={subActive}
                             className={menuButtonClass}
                           >
-                            <menu.icon />
-                            <span>{oneLine(menu.title, menu.bn, language)}</span>
+                            <MenuIcon menu={menu} />
+                            <span className="min-w-0 flex-1 truncate">{oneLine(menu.title, menu.bn, language)}</span>
                             {orderBadge}
                             <LuChevronRight className="ml-auto !size-4 opacity-70 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                           </SidebarMenuButton>
@@ -153,7 +206,7 @@ export default function Appsidebar() {
                                 <SidebarMenuSubButton
                                   asChild
                                   isActive={pathname === sub.url}
-                                  className="h-8 text-[13px] text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-white"
+                                  className="h-9 text-[14px] font-bold text-white hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-accent data-[active=true]:font-bold data-[active=true]:text-white"
                                 >
                                   <Link
                                     href={sub.url}
@@ -179,8 +232,8 @@ export default function Appsidebar() {
                         className={menuButtonClass}
                       >
                         <Link href={href} onClick={() => handleNav(menu.title)}>
-                          <menu.icon />
-                          <span>{oneLine(menu.title, menu.bn, language)}</span>
+                          <MenuIcon menu={menu} />
+                          <span className="min-w-0 flex-1 truncate">{oneLine(menu.title, menu.bn, language)}</span>
                           {orderBadge}
                           {menu.soon && (
                             <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-sidebar-foreground/70">

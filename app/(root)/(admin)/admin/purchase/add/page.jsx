@@ -68,7 +68,6 @@ function AddPurchase() {
     purchaseDate: today(),
     dueDate: "",
     status: "received",
-    stockLocation: "",
     note: "",
   });
   const [attachment, setAttachment] = useState(null);
@@ -77,32 +76,30 @@ function AddPurchase() {
   const [discount, setDiscount] = useState({ type: "amount", value: "" });
   const [shippingCost, setShippingCost] = useState("");
   const [payments, setPayments] = useState([newPayment()]);
+  const [stockInTo, setStockInTo] = useState("");
 
   const [imeiRow, setImeiRow] = useState(null);
   const [imeiText, setImeiText] = useState("");
   const [saving, setSaving] = useState(false);
-
-  // Stock In To: like 360, the goods go to the main branch unless told otherwise
-  const [locations, setLocations] = useState([]);
-  const [mainLocation, setMainLocation] = useState("");
-
-  useEffect(() => {
-    axios
-      .get("/api/purchase/locations")
-      .then(({ data }) => {
-        if (!data.success) return;
-        setLocations(data.data);
-        setMainLocation(data.main);
-        setHead((h) => ({ ...h, stockLocation: h.stockLocation || data.main }));
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     axios
       .get("/api/purchase/next-number?kind=purchase")
       .then(({ data }) => data.success && setHead((h) => ({ ...h, purchaseNumber: h.purchaseNumber || data.number })))
       .catch(() => {});
+
+    const loadLocation = (attempt = 0) =>
+      axios
+        .get("/api/purchase/locations")
+        .then(({ data }) => {
+          const name = data?.data?.[0]?.name;
+          if (name) setStockInTo(name);
+          else if (attempt < 2) setTimeout(() => loadLocation(attempt + 1), 400);
+        })
+        .catch(() => {
+          if (attempt < 2) setTimeout(() => loadLocation(attempt + 1), 400);
+        });
+    loadLocation();
   }, []);
 
   // "Receive" on a purchase order opens this screen with ?po=<id>
@@ -300,16 +297,8 @@ function AddPurchase() {
               <option value="pending">Pending (goods not in yet)</option>
             </select>
           </Field>
-          <Field label="Stock In To" htmlFor="pur-location">
-            <select id="pur-location" value={head.stockLocation} onChange={setH("stockLocation")} className={inputClass}>
-              {!locations.length && <option value="">Main branch</option>}
-              {locations.map((l) => (
-                <option key={l.key} value={l.key}>
-                  {l.name}
-                  {l.key === mainLocation ? " (main)" : ""}
-                </option>
-              ))}
-            </select>
+          <Field label="Stock In To">
+            <input value={stockInTo || "Loading…"} readOnly className={inputClass} />
           </Field>
         </div>
       </ListCard>

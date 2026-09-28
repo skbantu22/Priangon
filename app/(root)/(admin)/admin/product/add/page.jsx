@@ -28,7 +28,7 @@ export default function AddProduct() {
 
         if (!data?.success || !created?._id) {
           showToast("error", data?.message || "Could not save product");
-          return false;
+          return { success: false, productCreated: false };
         }
         setPendingProduct(created);
         productWasCreated = true;
@@ -54,7 +54,7 @@ export default function AddProduct() {
         values.productType === "simple" ? "Product saved and ready to sell." : `Product saved with ${lines.length} variants.`,
       );
       router.push(ADMIN_PRODUCT_SHOW);
-      return true;
+      return { success: true, productCreated: true };
     } catch (error) {
       const message = error?.response?.data?.message || error.message;
       showToast(
@@ -63,13 +63,18 @@ export default function AddProduct() {
           ? `${message || "Could not save variants"}. The product is saved; press Save again to retry variants.`
           : message || "Could not save product",
       );
-      return false;
+      return { success: false, productCreated: productWasCreated };
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <ProductForm onSave={save} saving={saving} />
+    <ProductForm
+      onSave={save}
+      saving={saving}
+      pendingProduct={pendingProduct}
+      footerNote={pendingProduct ? "Product saved. Finish saving its variants before clearing or changing product details." : ""}
+    />
   );
 }

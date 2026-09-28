@@ -313,7 +313,7 @@ export async function GET(req) {
         monthPosOrders++;
       }
 
-      const id = order.showroomId.toString();
+      const id = order.showroomId ? order.showroomId.toString() : "none";
 
       if (!showroomSummary[id]) {
         showroomSummary[id] = {
@@ -358,7 +358,7 @@ export async function GET(req) {
         monthOnlineOrders++;
       }
 
-      const id = order.showroomId.toString();
+      const id = order.showroomId ? order.showroomId.toString() : "none";
 
       if (!showroomSummary[id]) {
         showroomSummary[id] = {

@@ -8,7 +8,6 @@ import {
   control,
   useSettingsForm,
 } from "@/components/ui/Application/Admin/settings/settingsKit";
-
 const FIELDS = ["companyName", "phone", "email", "website", "address", "logo", "tradeLicenseNo"];
 
 // Settings → Business Settings: who the shop is, printed on every invoice

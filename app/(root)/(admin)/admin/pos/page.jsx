@@ -25,6 +25,10 @@ import {
   posProductsQueryOptions,
   posShowroomsQueryOptions,
   resolvePosShowroomId,
+  resolvePosTill,
+  usePosShowroomId,
+  WAREHOUSE_TILL,
+  writePosShowroom,
 } from "@/lib/posProducts";
 import { ShoppingCart } from "lucide-react";
 import { ratesFor } from "@/lib/priceTiers";
@@ -106,6 +110,7 @@ export default function POSPage() {
   } = useSelector(selectPosSummary, shallowEqual);
 
   const searchInputRef = useRef(null);
+  const tillRef = useRef(null);
 
   // /admin/pos?partnerOrder=<id>: load a dealer's order into the cart at the
   // prices they ordered at, for the cashier to scan IMEIs and invoice it
@@ -167,7 +172,7 @@ export default function POSPage() {
   );
 
   // Showrooms rarely change: cached (and persisted), so revisits are instant
-  const { data: showrooms = [] } = useQuery({
+  const { data: showrooms = [], isFetched: showroomsFetched } = useQuery({
     ...posShowroomsQueryOptions(),
     // single store: every role needs it (it is where stock is taken from)
     enabled: !!currentUser,
@@ -175,7 +180,24 @@ export default function POSPage() {
   });
 
   // single store: everyone sells from the one store
-  const selectedShowroomId = resolvePosShowroomId({ currentUser, showrooms });
+  const pickedShowroomId = usePosShowroomId();
+  const saleCenterId = resolvePosShowroomId({ showrooms });
+  const selectedTill = resolvePosTill({
+    picked: pickedShowroomId,
+    showrooms,
+    currentUser,
+  });
+  const canSwitchTill = currentUser?.role === "admin";
+  const selectedShowroomId = selectedTill;
+  const isWarehouseTill = selectedTill === WAREHOUSE_TILL;
+  const saleCenter = showrooms.find((s) => String(s._id) === String(saleCenterId));
+
+  useEffect(() => {
+    if (tillRef.current && tillRef.current !== selectedTill) {
+      dispatch(clearCart());
+    }
+    tillRef.current = selectedTill;
+  }, [selectedTill, dispatch]);
 
   // 🚀 Debounce Search Effect (দ্রুত টাইপিংয়ে বারবার API কল হওয়া আটকাবে)
   useEffect(() => {
@@ -196,7 +218,8 @@ export default function POSPage() {
 
   const baseQuery = useInfiniteQuery({
     ...posProductsQueryOptions({ showroomId: selectedShowroomId, currentUser }),
-    enabled: !!user,
+    // wait for the store list so the first request uses the till's branch
+    enabled: !!user && showroomsFetched,
     // switching showroom keeps the old list on screen until the new one is in
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false, // 🚀 উইন্ডো ফোকাস পরিবর্তন হলে রিলোড বন্ধ
@@ -296,14 +319,15 @@ export default function POSPage() {
     (product, variant, qty = 1) => {
       if (!variant) return;
 
-      if (variant.stock <= 0) {
+      const available = Number(variant.showroomStock ?? variant.stock ?? 0);
+      if (available <= 0) {
         showToast("error", "❌ Out of stock! This item cannot be added.");
         return;
       }
 
       const existing = cart.find((i) => i.variantId === variant._id);
 
-      if (existing && existing.qty + qty > variant.stock) {
+      if (existing && existing.qty + qty > available) {
         showToast("error", "Not enough stock ❌");
         return;
       }
@@ -314,6 +338,7 @@ export default function POSPage() {
           productId: product._id,
           variantId: variant._id,
           name: product.name,
+          barcode: variant.barcode || "",
           color: variant.color,
           size: variant.size,
           price: variant.sellingPrice,
@@ -358,12 +383,7 @@ export default function POSPage() {
       return;
     }
 
-    const showroomId = selectedShowroomId || currentUser?.showroomId;
-
-    if (!showroomId) {
-      showToast("error", "Store is still loading, try again in a moment");
-      return;
-    }
+    const showroomId = isWarehouseTill ? WAREHOUSE_TILL : saleCenterId || "";
 
     try {
       setCheckoutLoading(true);
@@ -373,6 +393,7 @@ export default function POSPage() {
         variantId: i.variantId,
         productName: i.name || "Unknown Product",
         image: i.image || "",
+        barcode: i.barcode || "",
         color: i.color || "",
         size: i.size || "",
         qty: Number(i.qty),
@@ -420,6 +441,7 @@ export default function POSPage() {
 
       const payload = {
         showroomId,
+        soldFrom: isWarehouseTill ? "WAREHOUSE" : "SHOWROOM",
         createdBy: currentUser?._id,
         orderType: isExchange ? "exchange" : "pos",
         customerName: dataClean.customerName || "Walk-in Customer",
@@ -768,6 +790,11 @@ export default function POSPage() {
         onRestoreHeld={restoreHeldSale}
         onDeleteHeld={deleteHeldSale}
         onExchange={openExchange}
+        till={selectedTill}
+        saleCenterId={saleCenterId}
+        saleCenterName={saleCenter?.name || "Main Shop"}
+        onTillChange={canSwitchTill ? writePosShowroom : undefined}
+        canSwitchTill={canSwitchTill}
       />
 
       {/* Main: products on the left, current sale on the right */}

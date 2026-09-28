@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import ShowroomStock from "@/models/ShowroomStock";
 import { returnedImeiCounts } from "@/lib/saleReturnService";
 import Posorder from "@/models/posorder.model";
 import { connectDB } from "@/lib/databaseconnection";
@@ -11,6 +10,8 @@ import ProductVariant from "@/models/ProductVariant.model ";
 import { warrantyExpiryDate } from "@/lib/warranty";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 import { longNumber } from "@/lib/documentNumber";
+import { onHandAt, deductAtLocation } from "@/lib/posShelf";
+import { resolveLockedTill } from "@/lib/posTillAuth";
 /* =========================
    GET ORDER
 ========================= */
@@ -81,6 +82,7 @@ export async function POST(req) {
       deliveryCharge,
       remark,
       showroomId,
+      soldFrom: soldFromRaw,
       createdBy,
       soldBy,
       customerName,
@@ -95,12 +97,16 @@ export async function POST(req) {
        VALIDATION
     ========================= */
     if (!items?.length) throw new Error("Cart is empty");
-    if (!showroomId) throw new Error("Showroom required");
 
-    /* =========================
-       🛡️ WARRANTY + IMEI
-       (warranty terms come from the product, never from the client)
-    ========================= */
+    const till = await resolveLockedTill(
+      auth,
+      String(soldFromRaw || "").toUpperCase() === "WAREHOUSE" ? "warehouse" : showroomId,
+    );
+
+    if (!till.isWarehouse && !till.orderShowroomId) {
+      throw new Error("Choose Warehouse or the sale center");
+    }
+
     const productDocs = await Product.find({
       _id: { $in: items.map((i) => i.productId) },
     })
@@ -190,20 +196,16 @@ export async function POST(req) {
 
     // stock is checked before an invoice number is taken, so a rejected sale
     // leaves no gap (it is checked again, atomically, when stock is taken)
-    const stockDocs = await ShowroomStock.find({
-      showroomId,
-      variantId: { $in: items.map((i) => i.variantId) },
-    })
-      .select("variantId stock")
-      .lean();
-    const stockLeft = new Map(stockDocs.map((s) => [String(s.variantId), Number(s.stock) || 0]));
     for (const item of items) {
       const label = [item.productName, item.size, item.color].filter(Boolean).join(" · ");
-      if (!stockLeft.has(String(item.variantId))) {
-        throw new Error(`${label} is not stocked here. Remove it from the cart and add it again.`);
-      }
-      if (stockLeft.get(String(item.variantId)) < Number(item.qty)) {
-        throw new Error(`${label}: only ${Math.max(0, stockLeft.get(String(item.variantId)))} left in stock`);
+      const available = await onHandAt({
+        locationType: till.locationType,
+        locationId: till.locationId,
+        productId: item.productId,
+        variantId: item.variantId,
+      });
+      if (available < Number(item.qty)) {
+        throw new Error(`${label}: only ${Math.max(0, available)} left in stock`);
       }
     }
 
@@ -269,44 +271,16 @@ export async function POST(req) {
     ========================= */
 
     for (const item of items) {
-      const stockDoc = await ShowroomStock.findOne({
-        showroomId,
+      const label = [item.productName, item.size, item.color].filter(Boolean).join(" · ");
+      await deductAtLocation({
+        session,
+        locationType: till.locationType,
+        locationId: till.locationId,
         productId: item.productId,
         variantId: item.variantId,
-      }).session(session);
-
-      const label = [item.productName, item.size, item.color]
-        .filter(Boolean)
-        .join(" · ");
-      if (!stockDoc) {
-        // usually a cart kept from before the catalogue / branch changed
-        throw new Error(
-          `${label} is not stocked at this branch. Remove it from the cart and add it again.`,
-        );
-      }
-      const available = Number(stockDoc.stock ?? stockDoc.showroomStock ?? 0);
-      if (available < Number(item.qty)) {
-        throw new Error(`${label}: only ${Math.max(0, available)} left in stock`);
-      }
-
-      const update =
-        stockDoc.stock !== undefined
-          ? { stock: -item.qty }
-          : { showroomStock: -item.qty };
-
-      await ShowroomStock.updateOne(
-        {
-          showroomId,
-          productId: item.productId,
-          variantId: item.variantId,
-        },
-        {
-          $inc: update,
-        },
-        {
-          session,
-        },
-      );
+        qty: item.qty,
+        label,
+      });
     }
 
     /* =========================
@@ -343,7 +317,9 @@ export async function POST(req) {
 
       saleDate,
 
-      showroomId,
+      showroomId: till.orderShowroomId,
+      soldFrom: till.soldFrom,
+      locationName: till.locationName,
 
       userId: createdBy || null,
 

@@ -3,17 +3,25 @@ import mongoose from "mongoose";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
+import { purchaseLocationForAuth } from "@/lib/purchaseService";
+import { ensureSystemRoles } from "@/models/Role.model";
 
 export async function GET(req) {
   try {
+    await connectDB();
+    await ensureSystemRoles();
+
     const auth = await requirePermission("purchase.view");
     if (auth.response) return auth.response;
-
-    await connectDB();
 
     const { searchParams } = new URL(req.url);
 
     const filter = { deletedAt: null };
+
+    const location = await purchaseLocationForAuth(auth);
+    if (auth.role !== "admin") {
+      filter.showroomId = location.showroomId || null;
+    }
 
     const status = searchParams.get("status");
     if (status && status !== "all") filter.status = status;

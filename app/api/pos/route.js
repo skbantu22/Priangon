@@ -2,9 +2,12 @@ import { connectDB } from "@/lib/databaseconnection";
 import VatGroupModel from "@/models/VatGroup.model";
 import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
+import WarehouseStock from "@/models/WarehouseStock.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import Media from "@/models/Media.model";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { stockMapAt } from "@/lib/posShelf";
+import { resolveLockedTill } from "@/lib/posTillAuth";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -23,15 +26,16 @@ export async function GET(req) {
     const limit = 20;
     const skip = (page - 1) * limit;
 
-    const showroomId = searchParams.get("showroomId");
+    const till = await resolveLockedTill(auth, searchParams.get("showroomId"));
+    const showroomId = till.showroomId;
     const categoryId = searchParams.get("categoryId");
     const brand = (searchParams.get("brand") || "").trim();
     const sort = searchParams.get("sort") || "latest";
     const q = (searchParams.get("q") || "").trim();
 
-    const hasShowroom = !!showroomId && showroomId !== "all";
+    const isWarehouse = till.isWarehouse;
+    const hasShowroom = !isWarehouse && !!showroomId;
 
-    // Independent look-ups go out together, so one round-trip to the DB
     const [matchedVariants, showroomProductIds] = await Promise.all([
       q
         ? ProductVariant.find({
@@ -43,10 +47,14 @@ export async function GET(req) {
             .select("product")
             .lean()
         : null,
-      hasShowroom ? ShowroomStock.distinct("productId", { showroomId }) : null,
+      isWarehouse
+        ? WarehouseStock.distinct("productId", { stock: { $gt: 0 } })
+        : hasShowroom
+          ? ShowroomStock.distinct("productId", { showroomId, stock: { $gt: 0 } })
+          : null,
     ]);
 
-    if (hasShowroom && !showroomProductIds.length) {
+    if ((hasShowroom || isWarehouse) && !showroomProductIds.length) {
       return Response.json({
         success: true,
         items: [],
@@ -79,7 +87,7 @@ export async function GET(req) {
       ];
     }
 
-    if (hasShowroom) {
+    if (hasShowroom || isWarehouse) {
       query._id = { $in: showroomProductIds };
     }
 
@@ -119,35 +127,22 @@ export async function GET(req) {
       mediaIds.push(...(product.media || []));
     }
 
-    const stockQuery = {
-      variantId: { $in: variantIds },
-    };
-
-    // showroom filter
-    if (hasShowroom) {
-      stockQuery.showroomId = showroomId;
-    }
-
-    const [variants, mediaDocs, stocks] = await Promise.all([
+    const [variants, mediaDocs, stockMap] = await Promise.all([
       ProductVariant.find({ _id: { $in: variantIds } })
         .select("color size sku barcode mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice media")
         .lean(),
       Media.find({ _id: { $in: mediaIds } })
         .select("secure_url")
         .lean(),
-      ShowroomStock.find(stockQuery).select("variantId stock").lean(),
+      stockMapAt({
+        locationType: isWarehouse ? "WAREHOUSE" : "SHOWROOM",
+        locationId: hasShowroom ? showroomId : null,
+        variantIds,
+      }),
     ]);
 
     const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
     const mediaMap = new Map(mediaDocs.map((m) => [m._id.toString(), m]));
-
-    const stockMap = new Map();
-
-    for (const stock of stocks) {
-      const key = stock.variantId.toString();
-
-      stockMap.set(key, (stockMap.get(key) || 0) + Number(stock.stock || 0));
-    }
 
     // VAT / SD groups (Settings → VAT Settings) by id
     const vatGroupIds = [...new Set(products.map((p) => p.vatGroup).filter(Boolean).map(String))];
@@ -200,7 +195,6 @@ export async function GET(req) {
             subDealerPrice: variant.subDealerPrice,
             wholesalerPrice: variant.wholesalerPrice,
 
-            // showroom wise stock (or all showroom total)
             showroomStock: stockMap.get(variant._id.toString()) ?? 0,
 
             // variant media holds either a Media doc or a plain image URL

@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
 import POSOrder from "@/models/posorder.model";
 import ShowroomStock from "@/models/ShowroomStock";
+import WarehouseStock from "@/models/WarehouseStock.model";
 import WarrantyClaim from "@/models/WarrantyClaim.model";
 import PartnerOrder from "@/models/PartnerOrder.model";
 
@@ -267,6 +268,20 @@ export async function GET(req) {
     const stockMatch = showroom ? { showroomId: showroom } : {};
     const stockAgg = ShowroomStock.aggregate([
       { $match: stockMatch },
+      // All Branch is the mother view: warehouse stock plus every showroom shelf
+      ...(!showroom
+        ? [
+            {
+              $unionWith: {
+                coll: WarehouseStock.collection.name,
+                pipeline: [
+                  { $match: { stock: { $gt: 0 } } },
+                  { $project: { variantId: 1, productId: 1, stock: 1 } },
+                ],
+              },
+            },
+          ]
+        : []),
       { $group: { _id: "$variantId", productId: { $first: "$productId" }, stock: { $sum: "$stock" } } },
       {
         $lookup: {

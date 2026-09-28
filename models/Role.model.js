@@ -72,6 +72,17 @@ export const ensureSystemRoles = async () => {
       existing.permissions = permissions;
       await existing.save();
     }
+
+    // Shop logins need to purchase into their own branch, like AmarSolution
+    if (systemKey === "cashier") {
+      const extra = ["purchase.view", "purchase.create", "purchase.receive", "suppliers.view"].filter(
+        (key) => !existing.permissions.includes(key),
+      );
+      if (extra.length) {
+        existing.permissions.push(...extra);
+        await existing.save();
+      }
+    }
   }
 };
 

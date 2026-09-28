@@ -3,9 +3,10 @@ import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
 import WarehouseStock from "@/models/WarehouseStock.model";
-import { actorFullName, requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
+import { actorFullName, requirePermission } from "@/lib/apiAuth";
 import { applyStockChange } from "@/lib/stockService";
 import { mainStockLocation } from "@/lib/purchaseService";
+import { onHand } from "@/lib/posShelf";
 
 // SKU generator
 const generateSKU = (productId) => {
@@ -19,7 +20,7 @@ const generateBarcode = () => {
 };
 
 export async function POST(request) {
-  const auth = await requireRoles(STAFF_ROLES);
+  const auth = await requirePermission("products.create");
   if (auth.response) return auth.response;
 
   console.log("🔥 VARIANT CREATE API HIT");
@@ -60,6 +61,26 @@ export async function POST(request) {
         await ProductModel.findByIdAndUpdate(productId, {
           $addToSet: { variants: existingVariant._id },
         });
+        // The first attempt can save the variant and then fail before the
+        // shelf row is written. A retry used to skip that quantity, so the
+        // POS kept saying out of stock. Place it only when nothing is on hand,
+        // so a second Save does not double the stock.
+        const stock = Math.max(0, Number(item.stock || 0));
+        if (stock > 0 && (await onHand({ productId, variantId: existingVariant._id })) <= 0) {
+          location ??= await mainStockLocation();
+          createdBy ??= await actorFullName(auth);
+          await applyStockChange({
+            locationType: location.locationType,
+            locationId: location.locationId,
+            productId,
+            variantId: existingVariant._id,
+            delta: stock,
+            type: "OPENING",
+            note: "Opening stock",
+            createdBy,
+            productName: `${item.color || ""} ${item.size || ""}`.trim() || "item",
+          });
+        }
         continue;
       }
       const stock = Math.max(0, Number(item.stock || 0));
@@ -106,8 +127,7 @@ export async function POST(request) {
         reservedStock: 0,
       });
 
-      // opening stock goes where the POS sells from (the main store), not
-      // the warehouse, or the POS would not see it
+      // opening stock goes into the warehouse, same as a purchase
       if (stock > 0) {
         location ??= await mainStockLocation();
         createdBy ??= await actorFullName(auth);

@@ -546,7 +546,12 @@ export default function CartSidebar({
                         {item.name}
                       </p>
                       <p className="flex items-center gap-1 truncate text-[11px] text-gray-500">
-                        {[item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" · ")}
+                        {[
+                          item.barcode ? `Barcode: ${item.barcode}` : "",
+                          [item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" · "),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                         {warrantyLabel(item) && (
                           <ShieldCheck
                             className="size-3 shrink-0 text-emerald-600"

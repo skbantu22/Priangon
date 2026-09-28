@@ -17,8 +17,22 @@ const POSOrderSchema = new mongoose.Schema(
     showroomId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Showroom",
-      required: true,
+      default: null,
       index: true,
+    },
+
+    // Where this sale was taken: warehouse stock, or the sale-center shelf.
+    soldFrom: {
+      type: String,
+      enum: ["WAREHOUSE", "SHOWROOM"],
+      default: "SHOWROOM",
+      index: true,
+    },
+
+    locationName: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     userId: {
@@ -52,6 +66,7 @@ const POSOrderSchema = new mongoose.Schema(
         },
 
         image: String,
+        barcode: String,
         color: String,
         size: String,
 

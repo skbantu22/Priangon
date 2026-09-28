@@ -253,6 +253,18 @@
   text-decoration: none !important;
 }
 
+.trip-dot {
+  animation: trip-dot 1.15s ease-in-out infinite;
+}
+@keyframes trip-dot {
+  0% {
+    left: 0;
+  }
+  100% {
+    left: calc(100% - 14px);
+  }
+}
+
 @layer utilities {
   @keyframes click-pop {
     0% {

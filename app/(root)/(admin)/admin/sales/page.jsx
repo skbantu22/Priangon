@@ -45,7 +45,7 @@ const fmt = (v) => {
   return `${d.toLocaleDateString("en-GB")} ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
 };
 
-const COLUMNS = ["Sl", "Date", "Invoice No", "Items", "Customer", "Phone", "Type", "Sale By", "Total", "Paid", "Due", "Returned", "Payment Status", "Remark"];
+const COLUMNS = ["Sl", "Date", "Invoice No", "Location", "Items", "Customer", "Phone", "Type", "Sale By", "Total", "Paid", "Due", "Returned", "Payment Status", "Remark"];
 
 export default function SalesPage() {
   return (
@@ -133,6 +133,7 @@ function SaleList() {
         i + 1,
         fmt(r.createdAt),
         r.orderNumber,
+        r.locationName || "Sale Center",
         r.itemCount,
         r.customerName,
         r.phone || "",
@@ -145,7 +146,7 @@ function SaleList() {
         r.paymentStatus,
         r.remark || "",
       ]);
-      await handle(body, ["", "", "Total", result.summary.items, "", "", "", "", result.summary.total, result.summary.paid, result.summary.due, "", "", ""]);
+      await handle(body, ["", "", "Total", "", result.summary.items, "", "", "", "", result.summary.total, result.summary.paid, result.summary.due, "", "", ""]);
     } catch (error) {
       showToast("error", error.message || "Could not export");
     } finally {
@@ -268,12 +269,12 @@ function SaleList() {
             {!result &&
               [1, 2, 3].map((n) => (
                 <tr key={n}>
-                  <td colSpan={15} className={tdClass}>
+                  <td colSpan={16} className={tdClass}>
                     <div className="h-4 animate-pulse bg-slate-100 dark:bg-muted" />
                   </td>
                 </tr>
               ))}
-            {result && !rows.length && <EmptyRow colSpan={15} title="No sales found" hint="Change the date range or make a sale from the POS." />}
+            {result && !rows.length && <EmptyRow colSpan={16} title="No sales found" hint="Change the date range or make a sale from the POS." />}
             {rows.map((row, i) => (
               <tr key={row._id} className="hover:bg-[#f5f7f9] dark:hover:bg-muted/50">
                 <td className={tdClass}>{result.from + i}</td>
@@ -284,6 +285,7 @@ function SaleList() {
                   </a>
                   {row.orderType === "exchange" && <span className="block text-[11px] text-[#7a33cb]">Exchange</span>}
                 </td>
+                <td className={tdClass}>{row.locationName || "Sale Center"}</td>
                 <td className={tdClass}>{row.itemCount}</td>
                 <td className={tdClass}>{row.customerName}</td>
                 <td className={tdClass}>{row.phone}</td>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
-import { applyNewRates, applyPurchaseToStock } from "@/lib/purchaseService";
+import { applyNewRates, applyPurchaseToStock, purchaseBelongsToAuth, purchaseLocationForAuth } from "@/lib/purchaseService";
 
 export async function POST(req, { params }) {
   try {
@@ -33,6 +33,14 @@ export async function POST(req, { params }) {
       return NextResponse.json(
         { success: false, message: "A cancelled purchase cannot be received" },
         { status: 409 },
+      );
+    }
+
+    const location = await purchaseLocationForAuth(auth);
+    if (!purchaseBelongsToAuth(purchase, location, auth)) {
+      return NextResponse.json(
+        { success: false, message: "You do not have access to this" },
+        { status: 403 },
       );
     }
 

@@ -62,7 +62,7 @@ export function useItemRows() {
 
       const next = [...current];
 
-      next[index] = { ...next[index], quantity: next[index].quantity + 1 };
+      next[index] = { ...next[index], quantity: Number(next[index].quantity) + 1 };
 
       return next;
     });

@@ -11,7 +11,8 @@ import {
   posCategoriesQueryOptions,
   posProductsQueryOptions,
   posShowroomsQueryOptions,
-  resolvePosShowroomId,
+  resolvePosTill,
+  WAREHOUSE_TILL,
 } from "@/lib/posProducts";
 
 // Warms the POS cache as soon as a POS user is known (right after login, or on
@@ -41,19 +42,29 @@ export default function PosPrefetch() {
     if (currentUser.role === "admin") {
       const showroomsOptions = posShowroomsQueryOptions();
       const cached = queryClient.getQueryData(showroomsOptions.queryKey);
-      // remembered / cached showroom known: no need to wait for the showroom list
-      const guess = resolvePosShowroomId({ currentUser, showrooms: cached || [] });
+      const guess = resolvePosTill({ showrooms: cached || [] });
       if (guess) prefetchProducts(guess);
+      prefetchProducts(WAREHOUSE_TILL);
 
       queryClient
         .fetchQuery(showroomsOptions)
         .then((showrooms) => {
-          const id = resolvePosShowroomId({ currentUser, showrooms });
+          const id = resolvePosTill({ showrooms });
           if (id && id !== guess) prefetchProducts(id);
         })
         .catch(() => {});
     } else {
-      prefetchProducts("");
+      const showroomsOptions = posShowroomsQueryOptions();
+      queryClient
+        .fetchQuery(showroomsOptions)
+        .then((showrooms) => {
+          prefetchProducts(resolvePosTill({ showrooms, currentUser }));
+        })
+        .catch(() => {
+          prefetchProducts(
+            currentUser.posTill === "warehouse" ? WAREHOUSE_TILL : "",
+          );
+        });
     }
 
     queryClient.prefetchQuery(posCategoriesQueryOptions());
