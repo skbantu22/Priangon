@@ -44,6 +44,7 @@ import {
   selectPosSummary,
 } from "@/store/reducer/posCartSlice";
 import PosFooter from "@/components/ui/Application/Admin/PosFooter";
+import BranchSwitchScreen from "@/components/ui/Application/Admin/BranchSwitchScreen";
 
 // pages (20 products each) that are loaded in the background without scrolling
 const MAX_EAGER_PAGES = 20;
@@ -97,6 +98,7 @@ export default function POSPage() {
   const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
 
   // Parked carts (F3), restored from the top bar
+  const [trip, setTrip] = useState(null);
   const [heldSales, setHeldSales] = useState([]);
   useEffect(() => setHeldSales(readHeldSales()), []);
 
@@ -187,7 +189,7 @@ export default function POSPage() {
     showrooms,
     currentUser,
   });
-  const canSwitchTill = currentUser?.role === "admin";
+  const canSwitchTill = !!currentUser;
   const selectedShowroomId = selectedTill;
   const isWarehouseTill = selectedTill === WAREHOUSE_TILL;
   const saleCenter = showrooms.find((s) => String(s._id) === String(saleCenterId));
@@ -777,10 +779,20 @@ export default function POSPage() {
   }, []);
 
   const activeShowroomId = selectedShowroomId || currentUser?.showroomId;
+  const tillLabel = (id) =>
+    !id || id === WAREHOUSE_TILL ? "Warehouse" : saleCenter?.name || "Sale Center";
+  const switchTill = (id) => {
+    if (!id || id === "shop" || String(id) === String(selectedTill)) return;
+    setTrip({ from: tillLabel(selectedTill), to: tillLabel(id) });
+    writePosShowroom(String(id));
+  };
 
   return (
     // h-dvh: on phones h-screen runs under the browser bar and hides the bottom
     <div className="flex h-dvh flex-col bg-background">
+      {trip && (
+        <BranchSwitchScreen from={trip.from} to={trip.to} onDone={() => setTrip(null)} />
+      )}
       <PosTopbar
         search={search}
         setSearch={setSearch}
@@ -791,9 +803,9 @@ export default function POSPage() {
         onDeleteHeld={deleteHeldSale}
         onExchange={openExchange}
         till={selectedTill}
-        saleCenterId={saleCenterId}
+        branches={showrooms.filter((branch) => branch?._id && branch.isActive !== false)}
         saleCenterName={saleCenter?.name || "Main Shop"}
-        onTillChange={canSwitchTill ? writePosShowroom : undefined}
+        onTillChange={canSwitchTill ? switchTill : undefined}
         canSwitchTill={canSwitchTill}
       />
 

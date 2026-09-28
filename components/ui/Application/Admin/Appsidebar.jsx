@@ -34,6 +34,7 @@ import { sidebarMenu } from "@/lib/adminappsidebarmenu";
 import {
   posShowroomsQueryOptions,
   resolvePosTill,
+  usePosShowroomId,
 } from "@/lib/posProducts";
 import { useLanguage } from "@/hooks/useLanguage";
 import { oneLine } from "@/lib/labels";
@@ -98,7 +99,12 @@ export default function Appsidebar() {
     ...posShowroomsQueryOptions(),
     enabled: !!user,
   });
-  const selectedShowroomId = resolvePosTill({ showrooms, currentUser: user });
+  const pickedShowroomId = usePosShowroomId();
+  const selectedShowroomId = resolvePosTill({
+    picked: pickedShowroomId,
+    showrooms,
+    currentUser: user,
+  });
   const selectedShowroom = showrooms.find(
     (s) => String(s._id) === String(selectedShowroomId),
   );

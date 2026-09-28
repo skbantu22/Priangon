@@ -24,9 +24,12 @@ import {
 } from "recharts";
 import {
   Store,
-  TrendingUp,
+  User,
+  Package,
+  ChartColumnIncreasing,
+  ArchiveRestore,
   Wallet,
-  UserRoundX,
+  HandCoins,
   Smartphone,
   CalendarRange,
   Boxes,
@@ -90,30 +93,6 @@ function CountUp({ value, format = (n) => Math.round(n).toLocaleString("en-US") 
   return <motion.span>{text}</motion.span>;
 }
 
-function ShopCard({ saleCenter }) {
-  return (
-    <motion.div
-      variants={tileItem}
-      whileHover={{ y: -2 }}
-      transition={{ type: "spring", stiffness: 320, damping: 22 }}
-      style={{ background: TONES.orange[0] }}
-      className="flex h-full items-center gap-3.5 p-[18px]"
-    >
-      <span
-        style={{ background: TONES.orange[1] }}
-        className="flex size-[58px] shrink-0 items-center justify-center text-white"
-      >
-        <Store className="size-7" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-semibold text-[#343a40]">Sale Center</p>
-        <p className="mt-1 truncate text-base font-bold text-[#1a1a1a]">{saleCenter || "Not set"}</p>
-        <p className="mt-0.5 text-xs text-[#6c757d]">Warehouse keeps the stock</p>
-      </div>
-    </motion.div>
-  );
-}
-
 function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
   const body = (
     <motion.div
@@ -125,7 +104,7 @@ function Kpi({ icon: Icon, tone, value, label, sub, href, children }) {
     >
       <span
         style={{ background: TONES[tone][1] }}
-        className="flex size-[58px] shrink-0 items-center justify-center text-white"
+        className="flex size-[52px] shrink-0 items-center justify-center rounded-xl text-white"
       >
         <Icon className="size-7" />
       </span>
@@ -167,7 +146,7 @@ function Empty({ children = "No data for this period" }) {
 
 function ListHead({ cols }) {
   return (
-    <div className="flex items-center gap-3 bg-[#00801a] px-3 py-2 text-[13px] font-bold leading-none text-white">
+    <div className="flex items-center gap-3 bg-[#00801a] px-3 py-2 text-[13px] font-semibold text-white">
       {cols}
     </div>
   );
@@ -191,8 +170,9 @@ export default function Dashboard() {
   const [from, setFrom] = useState(isoDay(new Date(today.getTime() - 29 * 864e5)));
   const [to, setTo] = useState(isoDay(today));
   const [limit, setLimit] = useState(10);
+  // This only filters the figures on this page. It does not switch the shop.
+  const [branchId, setBranchId] = useState("");
   const { data: branches = [] } = useQuery(posShowroomsQueryOptions());
-  const saleCenter = branches.find((b) => b.isSaleCenter)?.name || "";
 
   const params = new URLSearchParams({
     chart,
@@ -200,6 +180,7 @@ export default function Dashboard() {
     from,
     to,
     limit: String(limit),
+    ...(branchId ? { showroomId: branchId } : {}),
   });
 
   const { data, isLoading, isFetching, isError } = useQuery({
@@ -271,17 +252,36 @@ export default function Dashboard() {
         animate="show"
         className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <ShopCard saleCenter={saleCenter} />
+        <Kpi icon={Store} tone="orange" label="">
+          <p className="text-xl font-bold text-gray-900 dark:text-white">Select Branch</p>
+          <select
+            value={branchId}
+            onChange={(e) => setBranchId(e.target.value)}
+            className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-white/10 dark:bg-card"
+          >
+            <option value="">All Branch</option>
+            {branches.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Kpi>
         <Kpi
-          icon={Store}
-          tone="orange"
-          value={<CountUp value={k.pendingDealerOrders ?? 0} />}
-          label="New Dealer Orders"
-          sub="Waiting to be invoiced"
-          href="/admin/partner-orders"
+          icon={User}
+          tone="indigo"
+          value={<CountUp value={k.customersDue} format={money} />}
+          label="Customers Due"
+          sub={`${k.dueCustomers} customers owe money`}
         />
         <Kpi
-          icon={TrendingUp}
+          icon={Package}
+          tone="violet"
+          value={<CountUp value={k.suppliersDue} format={money} />}
+          label="Suppliers Due"
+        />
+        <Kpi
+          icon={ChartColumnIncreasing}
           tone="emerald"
           value={<CountUp value={k.todaySales} format={money} />}
           label="Today's Sales"
@@ -289,18 +289,32 @@ export default function Dashboard() {
           href="/admin/sales"
         />
         <Kpi
+          icon={ArchiveRestore}
+          tone="rose"
+          value={<CountUp value={k.todayReturns} format={money} />}
+          label="Today's Sale Return"
+        />
+        <Kpi
           icon={Wallet}
+          tone="red"
+          value={<CountUp value={k.todayExpense} format={money} />}
+          label="Today's Expense"
+          href="/admin/expenses"
+        />
+        <Kpi
+          icon={HandCoins}
           tone="amber"
           value={<CountUp value={k.todayReceived} format={money} />}
           label="Today's Money Received"
           sub={k.todayDueAdded > 0 ? `${money(k.todayDueAdded)} added to due today` : "No new due today"}
         />
         <Kpi
-          icon={UserRoundX}
-          tone="indigo"
-          value={<CountUp value={k.customersDue} format={money} />}
-          label="Customers Due"
-          sub={`${k.dueCustomers} customers owe money`}
+          icon={Store}
+          tone="orange"
+          value={<CountUp value={k.pendingDealerOrders ?? 0} />}
+          label="New Dealer Orders"
+          sub="Waiting to be invoiced"
+          href="/admin/partner-orders"
         />
         <Kpi
           icon={Smartphone}
@@ -450,8 +464,8 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-sm font-bold text-muted-foreground">Total</span>
-                  <span className="text-xl font-bold tabular-nums">{compact(catTotal)}</span>
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="text-lg font-bold tabular-nums">{compact(catTotal)}</span>
                 </div>
               </div>
               {/* legend with values: identity never by color alone */}
@@ -459,8 +473,8 @@ export default function Dashboard() {
                 {data.topCategories.map((c, i) => (
                   <li key={c.name} className="flex items-center gap-2">
                     <span className="size-3 shrink-0 rounded-sm" style={{ background: SERIES[i] }} />
-                    <span className="min-w-0 flex-1 truncate text-base font-extrabold text-gray-900 dark:text-gray-100">{c.name}</span>
-                    <span className="font-bold tabular-nums text-gray-900 dark:text-white">{money(c.revenue)}</span>
+                    <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200">{c.name}</span>
+                    <span className="tabular-nums text-gray-900 dark:text-white">{money(c.revenue)}</span>
                     <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
                       {Math.round((c.revenue / catTotal) * 100)}%
                     </span>
@@ -516,7 +530,7 @@ export default function Dashboard() {
                     <Image src={s.image || "/placeholder.png"} alt="" fill sizes="44px" className="object-contain" unoptimized={skipOptimize(s.image)} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-lg font-extrabold leading-snug">{s.name}</p>
+                    <p className="truncate text-sm font-medium">{s.name}</p>
                     <p className="truncate text-xs text-muted-foreground">{s.variant}</p>
                   </div>
                   <span
@@ -589,9 +603,9 @@ export default function Dashboard() {
                   <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-gray-50">
                     <Image src={p.image || "/placeholder.png"} alt="" fill sizes="36px" className="object-contain" unoptimized={skipOptimize(p.image)} />
                   </div>
-                  <span className="line-clamp-2 min-w-0 flex-1 text-lg font-extrabold leading-snug">{p.name}</span>
-                  <span className="w-10 text-right text-sm font-bold tabular-nums sm:w-14">{p.qty}</span>
-                  <span className="w-20 text-right text-sm font-bold tabular-nums sm:w-28">{money(p.revenue)}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-sm">{p.name}</span>
+                  <span className="w-10 text-right text-sm tabular-nums sm:w-14">{p.qty}</span>
+                  <span className="w-20 text-right text-sm font-semibold tabular-nums sm:w-28">{money(p.revenue)}</span>
                 </li>
               ))}
             </ul>
@@ -617,14 +631,14 @@ export default function Dashboard() {
                 <li key={c._id} className="flex items-center gap-3 px-3 py-2">
                   <span className="w-6 text-center text-sm text-muted-foreground">{i + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-lg font-extrabold leading-snug">{c.name}</p>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="line-clamp-2 text-sm">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">
                       {c._id}
                       {c.due > 0 && <span className="text-red-600"> · due {money(c.due)}</span>}
                     </p>
                   </div>
-                  <span className="w-10 text-right text-sm font-bold tabular-nums sm:w-16">{c.orders}</span>
-                  <span className="w-20 text-right text-sm font-bold tabular-nums sm:w-28">{money(c.spent)}</span>
+                  <span className="w-10 text-right text-sm tabular-nums sm:w-16">{c.orders}</span>
+                  <span className="w-20 text-right text-sm font-semibold tabular-nums sm:w-28">{money(c.spent)}</span>
                 </li>
               ))}
             </ul>
@@ -648,7 +662,7 @@ export default function Dashboard() {
                         {i + 1}
                       </span>
                       <Icon className="size-4 text-muted-foreground" />
-                      <span className="flex-1 text-lg font-extrabold leading-snug">
+                      <span className="flex-1 text-sm">
                         {p.option || p.type}
                         {p.option && <span className="text-muted-foreground"> ({p.type})</span>}
                       </span>
@@ -688,8 +702,8 @@ export default function Dashboard() {
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-lg font-extrabold leading-snug">{c.name}</p>
-                    <p className="text-sm font-medium text-muted-foreground">{c.phone}</p>
+                    <p className="line-clamp-2 text-sm">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone}</p>
                   </div>
                   <span className="rounded-md bg-red-100 px-2.5 py-1 text-sm font-bold tabular-nums text-red-600 dark:bg-red-500/15 dark:text-red-400">
                     {Math.round(c.due).toLocaleString()}
@@ -716,11 +730,11 @@ export default function Dashboard() {
             ].map(([label, n, color]) => (
               <div key={label} className="border border-[#f0f2f5] bg-white dark:bg-white/5 py-3 dark:bg-white/5">
                 <p className={`text-xl font-bold tabular-nums ${color}`}>{n}</p>
-                <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
               </div>
             ))}
           </div>
-          <p className="mb-2 mt-4 text-sm font-bold">Warranty ending in 30 days</p>
+          <p className="mb-2 mt-4 text-sm font-semibold">Warranty ending in 30 days</p>
           {data.expiring.length === 0 ? (
             <p className="text-sm text-muted-foreground">None</p>
           ) : (
@@ -728,7 +742,7 @@ export default function Dashboard() {
               {data.expiring.map((e) => (
                 <li key={`${e.orderNumber}-${e.imei}`} className="border border-[#f0f2f5] bg-white dark:bg-white/5 px-3 py-2 text-sm dark:bg-white/5">
                   <div className="flex justify-between gap-2">
-                    <span className="truncate text-lg font-extrabold leading-snug">{e.productName}</span>
+                    <span className="truncate font-medium">{e.productName}</span>
                     <span className="shrink-0 text-xs text-amber-700 dark:text-amber-400">{fmtDate(e.expiry)}</span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">

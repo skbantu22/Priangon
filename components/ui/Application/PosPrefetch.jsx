@@ -11,6 +11,7 @@ import {
   posCategoriesQueryOptions,
   posProductsQueryOptions,
   posShowroomsQueryOptions,
+  readPosShowroom,
   resolvePosTill,
   WAREHOUSE_TILL,
 } from "@/lib/posProducts";
@@ -39,33 +40,27 @@ export default function PosPrefetch() {
       }
     };
 
-    if (currentUser.role === "admin") {
-      const showroomsOptions = posShowroomsQueryOptions();
-      const cached = queryClient.getQueryData(showroomsOptions.queryKey);
-      const guess = resolvePosTill({ showrooms: cached || [] });
-      if (guess) prefetchProducts(guess);
-      prefetchProducts(WAREHOUSE_TILL);
+    const showroomsOptions = posShowroomsQueryOptions();
+    const picked = readPosShowroom();
+    const cached = queryClient.getQueryData(showroomsOptions.queryKey);
+    const guess = resolvePosTill({
+      picked,
+      showrooms: cached || [],
+      currentUser,
+    });
+    if (guess) prefetchProducts(guess);
 
-      queryClient
-        .fetchQuery(showroomsOptions)
-        .then((showrooms) => {
-          const id = resolvePosTill({ showrooms });
-          if (id && id !== guess) prefetchProducts(id);
-        })
-        .catch(() => {});
-    } else {
-      const showroomsOptions = posShowroomsQueryOptions();
-      queryClient
-        .fetchQuery(showroomsOptions)
-        .then((showrooms) => {
-          prefetchProducts(resolvePosTill({ showrooms, currentUser }));
-        })
-        .catch(() => {
-          prefetchProducts(
-            currentUser.posTill === "warehouse" ? WAREHOUSE_TILL : "",
-          );
-        });
-    }
+    queryClient
+      .fetchQuery(showroomsOptions)
+      .then((showrooms) => {
+        const id = resolvePosTill({ picked, showrooms, currentUser });
+        if (id && id !== guess) prefetchProducts(id);
+      })
+      .catch(() => {
+        prefetchProducts(
+          currentUser.posTill === "warehouse" ? WAREHOUSE_TILL : guess || WAREHOUSE_TILL,
+        );
+      });
 
     queryClient.prefetchQuery(posCategoriesQueryOptions());
     queryClient.prefetchQuery(posBrandsQueryOptions());

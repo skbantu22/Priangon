@@ -45,8 +45,8 @@ export default function Layout({ children }) {
                 {children}
               </main>
             ) : (
-              <main className="flex-1 min-w-0">
-                <div className="pt-20 md:px-8 px-5 min-h-[calc(100vh-40px)] pb-10">
+              <main className="min-w-0 flex-1 overflow-x-hidden">
+                <div className="min-h-[calc(100vh-40px)] px-3 pb-10 pt-20 sm:px-5 md:px-8">
                   <Topbar />
                   {children}
                 </div>

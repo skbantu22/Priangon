@@ -7,6 +7,9 @@ import ShowroomStock from "@/models/ShowroomStock";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import WarrantyClaim from "@/models/WarrantyClaim.model";
 import PartnerOrder from "@/models/PartnerOrder.model";
+import ExpenseModel from "@/models/Expense.model";
+import SaleReturn from "@/models/SaleReturn.model";
+import PurchaseModel from "@/models/Purchase.model";
 
 const TZ = "Asia/Dhaka";
 const TZ_OFFSET_MS = 6 * 60 * 60 * 1000; // Dhaka is UTC+6, no DST
@@ -44,7 +47,8 @@ export async function GET(req) {
     await connectDB();
 
     const sp = new URL(req.url).searchParams;
-    const showroomId = sp.get("showroomId");
+    const scope = sp.get("showroomId") || "";
+    const isWarehouse = scope === "warehouse";
     const chart = ["daily", "monthly", "yearly"].includes(sp.get("chart"))
       ? sp.get("chart")
       : "daily";
@@ -83,10 +87,15 @@ export async function GET(req) {
     }
 
     const showroom =
-      showroomId && mongoose.isValidObjectId(showroomId)
-        ? new mongoose.Types.ObjectId(showroomId)
+      !isWarehouse && mongoose.isValidObjectId(scope)
+        ? new mongoose.Types.ObjectId(scope)
         : null;
-    const base = { status: "completed", ...(showroom && { showroomId: showroom }) };
+    // empty scope is both sell systems. Warehouse sales have no showroom.
+    const base = {
+      status: "completed",
+      ...(isWarehouse && { $or: [{ soldFrom: "WAREHOUSE" }, { showroomId: null }] }),
+      ...(showroom && { showroomId: showroom }),
+    };
     const saleDate = { $ifNull: ["$saleDate", "$createdAt"] };
     const between = (a, b) => ({
       ...base,
@@ -266,22 +275,7 @@ export async function GET(req) {
 
     // ---- stock (value, low stock) ----
     const stockMatch = showroom ? { showroomId: showroom } : {};
-    const stockAgg = ShowroomStock.aggregate([
-      { $match: stockMatch },
-      // All Branch is the mother view: warehouse stock plus every showroom shelf
-      ...(!showroom
-        ? [
-            {
-              $unionWith: {
-                coll: WarehouseStock.collection.name,
-                pipeline: [
-                  { $match: { stock: { $gt: 0 } } },
-                  { $project: { variantId: 1, productId: 1, stock: 1 } },
-                ],
-              },
-            },
-          ]
-        : []),
+    const stockTail = [
       { $group: { _id: "$variantId", productId: { $first: "$productId" }, stock: { $sum: "$stock" } } },
       {
         $lookup: {
@@ -328,20 +322,54 @@ export async function GET(req) {
           ],
         },
       },
-    ]);
+    ];
+    const stockAgg = isWarehouse
+      ? WarehouseStock.aggregate([{ $match: {} }, ...stockTail])
+      : ShowroomStock.aggregate([
+          { $match: stockMatch },
+          // Both systems: warehouse stock plus every showroom shelf
+          ...(!showroom
+            ? [
+                {
+                  $unionWith: {
+                    coll: WarehouseStock.collection.name,
+                    pipeline: [
+                      { $match: { stock: { $gt: 0 } } },
+                      { $project: { variantId: 1, productId: 1, stock: 1 } },
+                    ],
+                  },
+                },
+              ]
+            : []),
+          ...stockTail,
+        ]);
 
     // ---- warranty claims ----
-    const claimMatch = showroom ? { showroomId: showroom } : {};
+    const claimMatch = isWarehouse
+      ? { showroomId: null }
+      : showroom
+        ? { showroomId: showroom }
+        : {};
     const claimAgg = WarrantyClaim.aggregate([
       { $match: claimMatch },
       { $group: { _id: "$status", n: { $sum: 1 } } },
     ]);
-    // the three reads are independent: run them together (one DB round trip instead of three)
-    const [[orderFacets], [stockFacets], claimCounts] = await Promise.all([
-      orderAgg,
-      stockAgg,
-      claimAgg,
+    const place = showroom ? { showroomId: showroom } : {};
+    const todayWindow = { $gte: today, $lt: tomorrow };
+    const returnAgg = SaleReturn.aggregate([
+      { $match: { deletedAt: null, ...place, returnDate: todayWindow } },
+      { $group: { _id: null, total: sumOf("$total") } },
     ]);
+    const expenseAgg = ExpenseModel.aggregate([
+      { $match: { deletedAt: null, ...place, expenseDate: todayWindow } },
+      { $group: { _id: null, total: sumOf("$amount") } },
+    ]);
+    const supplierAgg = PurchaseModel.aggregate([
+      { $match: { deletedAt: null, ...place, dueAmount: { $gt: 0 } } },
+      { $group: { _id: null, total: sumOf("$dueAmount") } },
+    ]);
+    const [[orderFacets], [stockFacets], claimCounts, [returns], [expenses], [suppliers]] =
+      await Promise.all([orderAgg, stockAgg, claimAgg, returnAgg, expenseAgg, supplierAgg]);
     const claims = Object.fromEntries(claimCounts.map((c) => [c._id, c.n]));
 
     // ---- shape the response ----
@@ -398,6 +426,9 @@ export async function GET(req) {
         monthOrders: orderFacets.month[0]?.orders || 0,
         customersDue: dues.reduce((s, d) => s + d.due, 0),
         dueCustomers: dues.length,
+        suppliersDue: suppliers?.total || 0,
+        todayReturns: returns?.total || 0,
+        todayExpense: expenses?.total || 0,
         stockValue: sv.value || 0,
         stockUnits: sv.units || 0,
         lowStockCount: stockFacets?.low?.length || 0,

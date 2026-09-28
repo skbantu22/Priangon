@@ -21,7 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import UserDropDown from "../UserDropDown";
+import { IoPersonCircleOutline } from "react-icons/io5";
+import ProfilePanel from "../ProfilePanel";
 
 const topButton =
   "flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-white/90 hover:bg-white/10 hover:text-white transition";
@@ -36,13 +37,14 @@ export default function PosTopbar({
   onDeleteHeld,
   onExchange,
   till,
-  saleCenterId,
+  branches = [],
   saleCenterName,
   onTillChange,
   canSwitchTill = true,
 }) {
   const { toggleSidebar } = useSidebar();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -68,21 +70,20 @@ export default function PosTopbar({
 
       {canSwitchTill ? (
       <select
-        value={till || "warehouse"}
+        value={till || ""}
         onChange={(event) => onTillChange?.(event.target.value)}
-        title="Sell from"
-        className="h-9 max-w-[180px] truncate rounded-lg border border-white/20 bg-white/10 px-2 text-sm font-bold text-white"
+        title="Branch"
+        className="h-9 max-w-[200px] truncate rounded-lg bg-white px-2 text-sm font-bold text-gray-900"
       >
-        <option value="warehouse" className="text-gray-900">
-          Warehouse
-        </option>
-        <option value={saleCenterId || "shop"} className="text-gray-900">
-          {saleCenterName || "Sale Center"}
-        </option>
+        {branches.map((branch) => (
+          <option key={branch._id} value={String(branch._id)}>
+            {branch.name}
+          </option>
+        ))}
       </select>
       ) : (
         <span className="max-w-[180px] truncate text-sm font-bold">
-          {till === "warehouse" ? "Warehouse" : saleCenterName || "Sale Center"}
+          {saleCenterName || "Branch"}
         </span>
       )}
 
@@ -201,7 +202,15 @@ export default function PosTopbar({
           )}
         </button>
 
-        <UserDropDown showDetails />
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          aria-label="Account"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        >
+          <IoPersonCircleOutline className="size-7" />
+        </button>
+        <ProfilePanel open={profileOpen} onOpenChange={setProfileOpen} />
       </div>
     </header>
   );

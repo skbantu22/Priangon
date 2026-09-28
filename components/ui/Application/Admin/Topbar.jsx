@@ -11,6 +11,7 @@ import SearchModel from "./SearchModel";
 import AdminMobileSearch from "./AdminMobileSearch";
 import NotificationBell from "./NotificationBell";
 import { useSidebar } from "@/components/ui/sidebar";
+import StoreSwitch from "./StoreSwitch";
 
 const Topbar = () => {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -34,7 +35,7 @@ const Topbar = () => {
           <RiMenu4Fill className="size-5" />
         </button>
 
-        <span className="md:hidden text-lg font-extrabold">
+        <span className="hidden text-lg font-extrabold sm:inline md:hidden">
           SB <span className="text-[#f06a8a]">Telecom</span>
         </span>
 
@@ -56,6 +57,7 @@ const Topbar = () => {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">
+        <StoreSwitch />
         <Link
           href="/admin/pos"
           className="hidden sm:flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-white/10"

@@ -216,7 +216,7 @@ function SaleList() {
           value={draft.search}
           onChange={(e) => setDraft({ ...draft, search: e.target.value })}
           placeholder="Search by invoice, customer, phone, IMEI, product..."
-          className={`${inputClass} min-w-[220px] flex-1`}
+          className={`${inputClass} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[220px]`}
         />
         <button type="submit" className={btn.info}>
           Search
@@ -254,7 +254,46 @@ function SaleList() {
         )}
       </div>
 
-      <div className="mt-3 overflow-x-auto">
+      <div className="mt-3 space-y-2.5 md:hidden">
+        {!result && [1, 2, 3].map((n) => <div key={n} className="h-[96px] animate-pulse rounded-[6px] bg-slate-100 dark:bg-muted" />)}
+        {result && !rows.length && (
+          <div className="rounded-[6px] border border-dashed border-[#d4dae0] px-4 py-8 text-center text-[15px] font-medium text-[#495057]">
+            No sales found
+          </div>
+        )}
+        {rows.map((row) => (
+          <article key={row._id} className="rounded-[6px] border border-[#ebeff2] bg-white p-3 dark:border-border dark:bg-card">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <a href={`/admin/print/${row._id}`} target="_blank" rel="noreferrer" className="text-[15px] font-semibold text-[#188ae2]">
+                  {row.orderNumber}
+                </a>
+                <p className="m-0 truncate text-[12px] text-muted-foreground">
+                  {row.customerName} · {row.phone} · {fmt(row.createdAt)}
+                </p>
+                <span className={`mt-1 inline-block px-[8px] py-[2px] text-[12px] font-semibold ${STATUS[row.paymentStatus] || ""}`}>
+                  {row.paymentStatus}
+                </span>
+              </div>
+              <ActionMenu items={actions(row)} />
+            </div>
+            <dl className="mt-2 grid grid-cols-3 gap-1.5 text-[13px]">
+              {[
+                ["Total", row.total, ""],
+                ["Paid", row.paidAmount, ""],
+                ["Due", row.dueAmount, row.dueAmount > 0 ? "text-[#ff5b5b]" : ""],
+              ].map(([label, value, tone]) => (
+                <div key={label} className="rounded-[4px] bg-[#f7f9fb] px-2 py-1.5 dark:bg-muted">
+                  <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                  <dd className={`m-0 font-semibold tabular-nums ${tone}`}>{money(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-3 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
           <thead>
             <tr className={theadRow}>
