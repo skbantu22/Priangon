@@ -7,11 +7,13 @@ import axios from "axios";
 
 import ProductForm from "@/components/ui/Application/Admin/products/ProductForm";
 import { ADMIN_PRODUCT_SHOW } from "@/Route/Adminpannelroute";
+import { readPosShowroom, useOpeningStockTill } from "@/lib/posProducts";
 import { showToast } from "@/lib/showToast";
 
 export default function AddProduct() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const till = useOpeningStockTill();
   const [saving, setSaving] = useState(false);
   // Keep the newly created product while its variants are being saved. If
   // that request fails, the user can retry without creating a duplicate.
@@ -41,7 +43,12 @@ export default function AddProduct() {
           ? [{ color: "Default", size: "Standard", barcode: simpleItem.barcode, stock: Number(simpleItem.stock) || 0 }]
           : variants;
       if (lines.length) {
-        const { data } = await axios.post("/api/product-variant/create", { productId: created._id, variants: lines });
+        const branchId = readPosShowroom() || till.id;
+        const { data } = await axios.post("/api/product-variant/create", {
+          productId: created._id,
+          location: branchId,
+          variants: lines,
+        });
         if (!data?.success) throw new Error(data?.message || "Could not save variants");
       }
 

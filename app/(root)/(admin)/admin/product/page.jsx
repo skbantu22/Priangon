@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -9,7 +9,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { Plus } from "lucide-react";
 
 import { ADMIN_PRODUCT_ADD, ADMIN_PRODUCT_EDIT } from "@/Route/Adminpannelroute";
-import { posCategoriesQueryOptions, posShowroomsQueryOptions } from "@/lib/posProducts";
+import { posCategoriesQueryOptions, posShowroomsQueryOptions, useOpeningStockTill } from "@/lib/posProducts";
 import { skipOptimize } from "@/lib/imageSrc";
 import { showToast } from "@/lib/showToast";
 import {
@@ -121,6 +121,14 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
+  const till = useOpeningStockTill();
+
+  useEffect(() => {
+    const location = till.id || "warehouse";
+    setDraft((current) => ({ ...current, location }));
+    setFilters((current) => ({ ...current, location }));
+    setPage(1);
+  }, [till.id]);
 
   const params = (extra) => ({
     ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== "")),
@@ -485,7 +493,7 @@ export default function ProductsPage() {
                 <EmptyRow
                   colSpan={12}
                   title={filtered ? "No products match these filters" : "No products yet"}
-                  hint="Add a product with opening stock (it lands in the Warehouse), or take stock in through a purchase."
+                  hint="Add a product with opening stock. It lands on the branch selected at the top, and that branch's POS can sell it."
                 />
               )}
 

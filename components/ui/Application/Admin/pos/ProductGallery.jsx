@@ -296,6 +296,7 @@ export default function ProductGallery({
   setSelectedBrand,
   sort,
   setSort,
+  emptyHint = "No products found",
 }) {
   const typingTimeout = useRef(null);
   const focusLock = useRef(false);
@@ -587,7 +588,7 @@ export default function ProductGallery({
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 py-20 text-gray-400">
               <PackageSearch className="size-10" />
-              <p className="text-sm">No products found</p>
+              <p className="max-w-sm text-center text-sm">{emptyHint}</p>
             </div>
           )}
         </div>

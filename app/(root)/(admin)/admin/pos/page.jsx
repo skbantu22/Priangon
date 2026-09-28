@@ -385,7 +385,7 @@ export default function POSPage() {
       return;
     }
 
-    const showroomId = isWarehouseTill ? WAREHOUSE_TILL : saleCenterId || "";
+    const showroomId = selectedTill || WAREHOUSE_TILL;
 
     try {
       setCheckoutLoading(true);
@@ -780,7 +780,9 @@ export default function POSPage() {
 
   const activeShowroomId = selectedShowroomId || currentUser?.showroomId;
   const tillLabel = (id) =>
-    !id || id === WAREHOUSE_TILL ? "Warehouse" : saleCenter?.name || "Sale Center";
+    !id || id === WAREHOUSE_TILL
+      ? "Warehouse"
+      : showrooms.find((branch) => String(branch._id) === String(id))?.name || "Branch";
   const switchTill = (id) => {
     if (!id || id === "shop" || String(id) === String(selectedTill)) return;
     setTrip({ from: tillLabel(selectedTill), to: tillLabel(id) });

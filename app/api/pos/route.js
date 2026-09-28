@@ -36,33 +36,16 @@ export async function GET(req) {
     const isWarehouse = till.isWarehouse;
     const hasShowroom = !isWarehouse && !!showroomId;
 
-    const [matchedVariants, showroomProductIds] = await Promise.all([
-      q
-        ? ProductVariant.find({
-            $or: [
-              { barcode: { $regex: escapeRegex(q), $options: "i" } },
-              { sku: { $regex: escapeRegex(q), $options: "i" } },
-            ],
-          })
-            .select("product")
-            .lean()
-        : null,
-      isWarehouse
-        ? WarehouseStock.distinct("productId", { stock: { $gt: 0 } })
-        : hasShowroom
-          ? ShowroomStock.distinct("productId", { showroomId, stock: { $gt: 0 } })
-          : null,
-    ]);
-
-    if ((hasShowroom || isWarehouse) && !showroomProductIds.length) {
-      return Response.json({
-        success: true,
-        items: [],
-        page,
-        limit,
-        hasMore: false,
-      });
-    }
+    const matchedVariants = q
+      ? await ProductVariant.find({
+          $or: [
+            { barcode: { $regex: escapeRegex(q), $options: "i" } },
+            { sku: { $regex: escapeRegex(q), $options: "i" } },
+          ],
+        })
+          .select("product")
+          .lean()
+      : null;
 
     const query = {
       deletedAt: null,
@@ -87,9 +70,8 @@ export async function GET(req) {
       ];
     }
 
-    if (hasShowroom || isWarehouse) {
-      query._id = { $in: showroomProductIds };
-    }
+    // Every product stays on the grid. Stock below is only this branch's
+    // number, so another branch shows the same product at 0.
 
     // No populate: variant and media ids are already on the product,
     // so they are fetched below in parallel with the stock

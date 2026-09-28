@@ -20,7 +20,7 @@ import { productFormSchema, mobileFieldsFromProduct } from "@/lib/productFormSch
 import { tierPricesFromProduct } from "@/lib/priceTiers";
 import { PRODUCT_TYPES, extraFieldsFromProduct } from "@/lib/productExtraFields";
 import { WARRANTY_TYPES, formatWarrantyPeriod } from "@/lib/warranty";
-import { posBrandsQueryOptions } from "@/lib/posProducts";
+import { posBrandsQueryOptions, useOpeningStockTill } from "@/lib/posProducts";
 import { useProductLookups } from "@/hooks/useProductLookups";
 import { showToast } from "@/lib/showToast";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export const productFormValues = (product) => ({
 export default function ProductForm({ product, onSave, saving, footerNote, pendingProduct }) {
   const editing = !!product?._id;
   const retryingVariants = !!pendingProduct;
+  const till = useOpeningStockTill();
 
   const form = useForm({
     resolver: zodResolver(editing ? productFormSchema.extend({ _id: z.string() }) : productFormSchema),
@@ -455,7 +456,7 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
                   className={`${inputClass} text-right`}
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Goes into Warehouse. Transfer to Main Shop to sell from the shop.
+                  Goes into {till.name}. It shows on that branch&apos;s POS.
                 </p>
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
@@ -464,7 +465,7 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
                 </label>
                 <input
                   id="simple-product-stock-in-to"
-                  value="Warehouse"
+                  value={till.name}
                   readOnly
                   className={inputClass}
                 />

@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
 import { ratesFor } from "@/lib/priceTiers";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { showToast } from "@/lib/showToast";
 
 const money = (n) => Number(n || 0).toLocaleString("en-BD");
@@ -34,6 +35,7 @@ let tempId = 0;
  * line (they follow the product's price list, scaled for a dearer variant).
  */
 export default function VariantList({ product }) {
+  const till = useOpeningStockTill();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -142,6 +144,7 @@ export default function VariantList({ product }) {
       if (fresh.length) {
         await axios.post("/api/product-variant/create", {
           productId: product._id,
+          location: till.id,
           variants: fresh.map((r) => ({ ...pick(r), stock: Number(r.stock) || 0 })),
         });
       }

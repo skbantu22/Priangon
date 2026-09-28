@@ -36,7 +36,12 @@ export async function GET(req) {
     }
     if (q.get("exchange") === "1") filter.orderType = "exchange";
     if (mongoose.isValidObjectId(q.get("customerId"))) filter.customerId = new mongoose.Types.ObjectId(q.get("customerId"));
-    if (mongoose.isValidObjectId(q.get("showroomId"))) filter.showroomId = new mongoose.Types.ObjectId(q.get("showroomId"));
+    const branch = q.get("showroomId") || "";
+    if (branch === "warehouse") {
+      filter.$and = [{ $or: [{ soldFrom: "WAREHOUSE" }, { showroomId: null }] }];
+    } else if (mongoose.isValidObjectId(branch)) {
+      filter.showroomId = new mongoose.Types.ObjectId(branch);
+    }
     if (q.get("soldBy")) filter.soldBy = q.get("soldBy");
     Object.assign(filter, PAYMENT[q.get("paymentStatus")] || {});
 

@@ -7,6 +7,7 @@ import axios from "axios";
 import { ClipboardList, List, Minus, Plus, Trash2, X } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { ADMIN_PURCHASE_SHOW, ADMIN_PURCHASE_VIEW } from "@/Route/Adminpannelroute";
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass, totalRowClass } from "@/components/ui/Application/Admin/listKit";
 import { PAYMENT_METHODS, money } from "@/components/ui/Application/Admin/supplier/supplierKit";
@@ -60,6 +61,7 @@ function AddPurchase() {
   const router = useRouter();
   const params = useSearchParams();
   const [suppliers, reloadSuppliers] = useSuppliers();
+  const till = useOpeningStockTill();
 
   const [head, setHead] = useState({
     supplierId: "",
@@ -88,19 +90,11 @@ function AddPurchase() {
       .then(({ data }) => data.success && setHead((h) => ({ ...h, purchaseNumber: h.purchaseNumber || data.number })))
       .catch(() => {});
 
-    const loadLocation = (attempt = 0) =>
-      axios
-        .get("/api/purchase/locations")
-        .then(({ data }) => {
-          const name = data?.data?.[0]?.name;
-          if (name) setStockInTo(name);
-          else if (attempt < 2) setTimeout(() => loadLocation(attempt + 1), 400);
-        })
-        .catch(() => {
-          if (attempt < 2) setTimeout(() => loadLocation(attempt + 1), 400);
-        });
-    loadLocation();
   }, []);
+
+  useEffect(() => {
+    setStockInTo(till.name);
+  }, [till.name]);
 
   // "Receive" on a purchase order opens this screen with ?po=<id>
   useEffect(() => {
@@ -213,6 +207,7 @@ function AddPurchase() {
     try {
       const { data } = await axios.post("/api/purchase/create", {
         ...head,
+        showroomId: till.id,
         purchaseNumber: head.purchaseNumber,
         purchaseOrderId: order?._id || null,
         attachment,

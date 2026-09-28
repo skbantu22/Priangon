@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { posShowroomsQueryOptions, usePosShowroomId, writePosShowroom } from "@/lib/posProducts";
+import { WAREHOUSE_TILL, posShowroomsQueryOptions, usePosShowroomId, writePosShowroom } from "@/lib/posProducts";
 import BranchSwitchScreen from "./BranchSwitchScreen";
 
 export default function StoreSwitch({ variant = "bar" }) {
@@ -10,7 +10,7 @@ export default function StoreSwitch({ variant = "bar" }) {
   const { data: showrooms = [] } = useQuery(posShowroomsQueryOptions());
   const branches = showrooms.filter((s) => s?._id && s.isActive !== false);
   const selected = branches.find((s) => String(s._id) === String(picked));
-  const value = selected ? String(selected._id) : "";
+  const value = selected ? String(selected._id) : WAREHOUSE_TILL;
   const [trip, setTrip] = useState(null);
   const closeTrip = useCallback(() => setTrip(null), []);
 
@@ -18,8 +18,8 @@ export default function StoreSwitch({ variant = "bar" }) {
     if (next === value) return;
     const to = branches.find((s) => String(s._id) === next);
     setTrip({
-      from: selected?.name || "All Branches",
-      to: to?.name || "All Branches",
+      from: selected?.name || "Warehouse",
+      to: to?.name || "Warehouse",
     });
     writePosShowroom(next);
   };
@@ -39,7 +39,7 @@ export default function StoreSwitch({ variant = "bar" }) {
         aria-label="Branch"
         className={selectClass}
       >
-        <option value="">All Branches</option>
+        <option value={WAREHOUSE_TILL}>Warehouse</option>
         {branches.map((branch) => (
           <option key={branch._id} value={String(branch._id)}>
             {branch.name}

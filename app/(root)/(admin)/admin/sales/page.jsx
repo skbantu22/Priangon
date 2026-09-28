@@ -7,6 +7,7 @@ import axios from "axios";
 import { ShoppingCart } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { ADMIN_SALE_RETURN_ADD } from "@/Route/Adminpannelroute";
 import {
   ActionMenu,
@@ -68,6 +69,7 @@ function SaleList() {
   const [result, setResult] = useState(null);
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
+  const till = useOpeningStockTill();
 
   const query = (extra) => ({
     ...(tab === "exchange" ? { exchange: 1 } : tab && { customerType: tab }),
@@ -82,6 +84,7 @@ function SaleList() {
       ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
       page,
       limit,
+      showroomId: till.id,
     };
     axios
       .get("/api/sales", { params })
@@ -96,7 +99,7 @@ function SaleList() {
     return () => {
       cancelled = true;
     };
-  }, [tab, filters, page, limit, version]);
+  }, [tab, filters, page, limit, version, till.id]);
 
   const rows = result?.data || [];
   const title = TABS.find(([k]) => k === tab)?.[1] || "Sale List";

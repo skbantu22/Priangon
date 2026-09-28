@@ -2,11 +2,10 @@ import { connectDB } from "@/lib/databaseconnection";
 import { catchError, response } from "@/lib/helperfunction";
 import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
-import WarehouseStock from "@/models/WarehouseStock.model";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
 import { applyStockChange } from "@/lib/stockService";
-import { mainStockLocation } from "@/lib/purchaseService";
-import { onHand } from "@/lib/posShelf";
+import { locationForTill } from "@/lib/purchaseService";
+import { onHandAt } from "@/lib/posShelf";
 
 // SKU generator
 const generateSKU = (productId) => {
@@ -18,6 +17,14 @@ const generateSKU = (productId) => {
 const generateBarcode = () => {
   return String(Math.floor(10000000 + Math.random() * 90000000));
 };
+
+// Opening stock stays on the branch that is open. A showroom is never
+// rewritten to the warehouse.
+async function openingLocation(requested) {
+  const location = await locationForTill(requested);
+  if (!location) throw new Error("Select the branch this stock belongs to");
+  return location;
+}
 
 export async function POST(request) {
   const auth = await requirePermission("products.create");
@@ -66,8 +73,13 @@ export async function POST(request) {
         // POS kept saying out of stock. Place it only when nothing is on hand,
         // so a second Save does not double the stock.
         const stock = Math.max(0, Number(item.stock || 0));
-        if (stock > 0 && (await onHand({ productId, variantId: existingVariant._id })) <= 0) {
-          location ??= await mainStockLocation();
+        location ??= await openingLocation(payload.location || payload.showroomId);
+        if (stock > 0 && (await onHandAt({
+          locationType: location.locationType,
+          locationId: location.locationId,
+          productId,
+          variantId: existingVariant._id,
+        })) <= 0) {
           createdBy ??= await actorFullName(auth);
           await applyStockChange({
             locationType: location.locationType,
@@ -111,7 +123,7 @@ export async function POST(request) {
 
         priceSource: "PRODUCT",
 
-        stock,
+        stock: 0,
         sold: 0,
 
         media: item.media || [],
@@ -120,16 +132,10 @@ export async function POST(request) {
         isActive: item.isActive ?? true,
       });
 
-      await WarehouseStock.create({
-        productId,
-        variantId: variant._id,
-        stock: 0,
-        reservedStock: 0,
-      });
-
-      // opening stock goes into the warehouse, same as a purchase
+      // Opening qty goes only onto the selected branch. A showroom does not
+      // get a warehouse row, so other branches cannot sell it.
       if (stock > 0) {
-        location ??= await mainStockLocation();
+        location ??= await openingLocation(payload.location || payload.showroomId);
         createdBy ??= await actorFullName(auth);
         await applyStockChange({
           locationType: location.locationType,

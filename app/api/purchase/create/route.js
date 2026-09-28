@@ -11,7 +11,7 @@ import {
   applyNewRates,
   applyPurchaseToStock,
   cleanRates,
-  purchaseLocationForAuth,
+  locationForTill,
   nextPurchaseNumber,
 } from "@/lib/purchaseService";
 import { ensureSystemRoles } from "@/models/Role.model";
@@ -143,8 +143,9 @@ export async function POST(req) {
       discountType === "percent" ? round2((subtotal * discountValue) / 100) : discountValue,
     );
 
-    // AmarSolution: stock goes to this login's branch, not a form field
-    const location = await purchaseLocationForAuth(auth);
+    // The open branch owns this purchase. A missing branch is not the warehouse.
+    const location = await locationForTill(body.showroomId);
+    if (!location) return fail("Select the branch this purchase belongs to");
 
     const createdBy = await actorFullName(auth);
 
