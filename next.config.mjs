@@ -1,5 +1,14 @@
+import path from "path";
+import { fileURLToPath } from "url";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // VPS e /root/package-lock.json thakle Next wrong root dhore nite pare; ei app folder lock kore dewa.
+  turbopack: {
+    root: projectRoot,
+  },
   experimental: {
     // One build worker instead of one per CPU. "Collecting page data" loads
     // every route in each worker, and with this many routes a small VPS runs
