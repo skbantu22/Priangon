@@ -1,14 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronRight, X } from "lucide-react";
-
-const money = (n) => `৳${Number(n || 0).toLocaleString("en-BD")}`;
-const amount = (n) =>
-  Number(n || 0).toLocaleString("en-BD", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
 export default function ExchangeModal({
   isOpen,
@@ -118,56 +110,41 @@ export default function ExchangeModal({
   // ==========================================
   // SEARCH INVOICE (Trimmed spaces & Toast added)
   // ==========================================
-  const searchOrder = async (invoiceQuery) => {
-    const cleanOrderNumber = String(invoiceQuery ?? orderNumber).trim();
+  const searchOrder = async () => {
+    const cleanOrderNumber = orderNumber.trim();
     if (!cleanOrderNumber) {
       showToast("Please enter a valid invoice number!", "error");
-      return false;
+      return;
     }
 
     setLoading(true);
     try {
-      const shopQuery =
-        showroomId && /^[a-f\d]{24}$/i.test(String(showroomId))
-          ? `&showroomId=${encodeURIComponent(showroomId)}`
-          : "";
       const res = await fetch(
-        `/api/showroom-orders?orderNumber=${encodeURIComponent(cleanOrderNumber)}${shopQuery}`,
+        `/api/showroom-orders?orderNumber=${encodeURIComponent(cleanOrderNumber)}`,
       );
 
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Server HTML Error Response:", errorText);
         showToast(`Failed to load invoice (${res.status})`, "error");
-        return false;
+        return;
       }
 
       const data = await res.json();
 
-      if (data?.success === false) {
-        showToast(data.message || "Invoice not found!", "error");
-        setOriginalOrder(null);
-        return false;
-      }
-
       if (data?.order) {
         setOriginalOrder(data.order);
-        setOrderNumber(cleanOrderNumber);
-        setReturnedItems([]);
         showToast("Invoice loaded successfully!");
-        return true;
+      } else {
+        showToast("Invoice not found!", "error");
+        setOriginalOrder(null);
       }
-
-      showToast("Invoice not found!", "error");
-      setOriginalOrder(null);
-      return false;
     } catch (err) {
       console.error("Order Search Error:", err);
       showToast(
         "An unexpected error occurred while looking up invoice.",
         "error",
       );
-      return false;
     } finally {
       setLoading(false);
     }
@@ -176,13 +153,12 @@ export default function ExchangeModal({
   // ==========================================
   // SEARCH PRODUCTS
   // ==========================================
-  const searchProducts = async (query) => {
-    const term = String(query ?? search).trim();
-    if (!term) return;
+  const searchProducts = async () => {
+    if (!search.trim()) return;
 
     try {
       const res = await fetch(
-        `/api/pos/stock-search?showroomId=${showroomId}&q=${encodeURIComponent(term)}`,
+        `/api/pos/stock-search?showroomId=${showroomId}&q=${encodeURIComponent(search.trim())}`,
       );
 
       if (!res.ok) {
@@ -199,52 +175,6 @@ export default function ExchangeModal({
       console.error("Search error:", err);
       setProducts([]);
     }
-  };
-
-  const matchInvoiceLine = (item, term) => {
-    const q = term.toLowerCase();
-    const name = String(item.name || item.productName || "").toLowerCase();
-    const sku = String(item.sku || item.barcode || "").toLowerCase();
-    return name.includes(q) || sku.includes(q) || sku === q;
-  };
-
-  const handleUnifiedSearch = async () => {
-    const term = search.trim();
-    if (!term) {
-      showToast("Enter invoice, product name, SKU, or barcode", "error");
-      return;
-    }
-
-    if (originalOrder) {
-      const line = (originalOrder.items || []).find((item) =>
-        matchInvoiceLine(item, term),
-      );
-      if (line) {
-        toggleReturnItem(line);
-        setSearch("");
-        setProducts([]);
-        return;
-      }
-    } else {
-      const loaded = await searchOrder(term);
-      if (loaded) {
-        setSearch("");
-        setProducts([]);
-        return;
-      }
-    }
-
-    await searchProducts(term);
-  };
-
-  const clearExchange = () => {
-    setOriginalOrder(null);
-    setReturnedItems([]);
-    setNewItems([]);
-    setOrderNumber("");
-    setSearch("");
-    setProducts([]);
-    setReason("");
   };
 
   // ==========================================
@@ -404,19 +334,9 @@ export default function ExchangeModal({
       return;
     }
 
-    const payable = difference > 0 ? difference : 0;
-    const refundAmount = difference < 0 ? Math.abs(difference) : 0;
-
     onOpenCheckout({
       isExchangeMode: true,
-      total: payable > 0 ? payable : 0,
-      exchangeSummary: {
-        returnedTotal,
-        newTotal,
-        difference,
-        refundAmount,
-        extraPaid: payable,
-      },
+      total: difference,
       exchangeData: {
         originalOrderId: originalOrder._id,
         reason: reason.trim() || "Size/Color Exchange",
@@ -449,292 +369,341 @@ export default function ExchangeModal({
     onClose();
   };
 
-  const exchangeProductQty = returnedItems.reduce(
-    (sum, i) => sum + (Number(i.qty) || 0),
-    0,
-  );
-  const invoiceLabel =
-    originalOrder?.orderNumber || orderNumber.trim() || "—";
-
-  const summaryRows = [
-    ["Exchange Product", exchangeProductQty],
-    ["Exchange Total", amount(returnedTotal)],
-    ["Cart Total", amount(newTotal)],
-    ["Difference", amount(difference)],
-    ["Invoice No", invoiceLabel],
-  ];
-
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-3"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Exchange Details"
-    >
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm">
+      {/* Toast Notification Popup */}
       {toast.show && (
         <div
-          className={`fixed left-3 right-3 top-3 z-[10001] rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg sm:left-auto sm:right-4 sm:top-4 sm:max-w-sm ${
+          className={`absolute top-6 right-6 z-[10000] px-4 py-2.5 shadow-lg text-white font-medium text-xs flex items-center gap-2 transition-all ${
             toast.type === "error" ? "bg-red-600" : "bg-green-600"
           }`}
         >
-          {toast.message}
+          <span>{toast.type === "error" ? "❌" : "✅"}</span>
+          <span>{toast.message}</span>
         </div>
       )}
 
-      <div className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[92dvh] sm:rounded-lg">
-        <div className="flex shrink-0 flex-col gap-2 border-b border-gray-200 px-3 py-2.5 sm:flex-row sm:items-center sm:px-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-gray-900 sm:text-lg">
-              Exchange Details
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-auto flex size-10 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 sm:hidden"
-              aria-label="Close"
-            >
-              <X className="size-5" />
-            </button>
-          </div>
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleUnifiedSearch()}
-              className="h-10 w-full min-w-0 rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-blue-600 sm:h-11 sm:text-base"
-              placeholder="Enter Invoice No Product name / SKU / Scan bar code"
-            />
-            <button
-              type="button"
-              onClick={handleUnifiedSearch}
-              disabled={loading}
-              className="hidden h-10 shrink-0 rounded-md bg-blue-800 px-3 text-xs font-bold text-white sm:inline-flex sm:h-11"
-            >
-              {loading ? "…" : "Search"}
-            </button>
-          </div>
+      <div className="bg-white w-full max-w-7xl shadow-2xl rounded-none flex flex-col max-h-[92vh]">
+        {/* HEADER */}
+        <div className="bg-orange-500 text-white p-4 text-center font-bold text-xl flex-shrink-0 relative">
+          🔄 Showroom Product Exchange Terminal
           <button
             type="button"
             onClick={onClose}
-            className="hidden size-10 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 sm:flex"
-            aria-label="Close"
+            className="absolute right-4 top-4 hover:text-gray-200 transition text-lg"
           >
-            <X className="size-5" />
+            ✕
           </button>
         </div>
 
-        {products.length > 0 && (
-          <ul className="max-h-32 shrink-0 overflow-y-auto border-b border-gray-100 bg-slate-50 px-3 py-2">
-            {products.map((stockItem, i) => {
-              const coreProduct = stockItem.productId || {};
-              const variantData = stockItem.variantId || {};
-              const currentStock =
-                variantData.showroomStock ||
-                variantData.stock ||
-                stockItem.stock ||
-                0;
-              const price =
-                variantData.sellingPrice || variantData.price || 0;
+        {/* BODY CONTAINER */}
+        <div className="flex-1 overflow-y-auto grid grid-cols-12 gap-0">
+          {/* ================= LEFT SIDEBAR: FETCH INVOICE (3/12 COLS) ================= */}
+          <div className="col-span-3 p-4 border-r border-gray-200 bg-gray-50/50 space-y-4">
+            <div className="text-xs font-bold uppercase text-gray-500 tracking-wider">
+              Locate Document
+            </div>
+            <div className="flex gap-1">
+              <input
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchOrder()}
+                className="flex-1 border p-2 text-sm rounded-none focus:outline-orange-500"
+                placeholder="Invoice No (e.g. INV-00068)"
+              />
+              <button
+                type="button"
+                onClick={searchOrder}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 font-medium text-sm transition"
+              >
+                {loading ? "..." : "Load"}
+              </button>
+            </div>
 
-              return (
-                <li
-                  key={i}
-                  className="flex items-center gap-2 border-b border-gray-100 py-2 last:border-0"
-                >
-                  <div className="min-w-0 flex-1 text-sm">
-                    <p className="truncate font-semibold">
-                      {coreProduct.name || "Product"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Stock {currentStock} · {money(price)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={Number(currentStock) <= 0}
-                    onClick={() => {
-                      addToCart(stockItem);
-                      setProducts([]);
-                      setSearch("");
-                    }}
-                    className="shrink-0 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white disabled:bg-gray-300"
-                  >
-                    Add
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-          <aside className="shrink-0 border-b border-gray-200 bg-slate-50 lg:w-56 lg:border-b-0 lg:border-r xl:w-64">
-            <table className="w-full text-sm">
-              <tbody>
-                {summaryRows.map(([label, value]) => (
-                  <tr key={label} className="border-b border-gray-200/80">
-                    <td className="bg-sky-50/80 px-3 py-2.5 font-semibold text-gray-800">
-                      {label}
-                    </td>
-                    <td className="bg-white px-3 py-2.5 text-right font-bold text-gray-900">
-                      {value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
             {originalOrder && (
-              <p className="px-3 py-2 text-xs text-gray-500">
-                This shop only · return stock comes back · new items must be in
-                stock here
-              </p>
-            )}
-          </aside>
-
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-              <table className="w-full min-w-0 text-sm">
-                <thead className="sticky top-0 z-[1] bg-blue-800 text-white">
-                  <tr>
-                    <th className="px-2 py-2.5 text-left font-semibold sm:px-3">
-                      Product Name
-                    </th>
-                    <th className="w-14 px-1 py-2.5 text-center font-semibold sm:w-16">
-                      Qty
-                    </th>
-                    <th className="w-16 px-1 py-2.5 text-right font-semibold sm:w-20">
-                      Price
-                    </th>
-                    <th className="w-16 px-1 py-2.5 text-right font-semibold sm:w-20">
-                      Total
-                    </th>
-                    <th className="w-14 px-1 py-2.5 text-center font-semibold sm:w-16">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {returnedItems.length === 0 && newItems.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-3 py-10 text-center text-gray-400"
+              <div className="border border-gray-200 bg-white p-3 space-y-2">
+                <div className="font-bold text-xs border-b pb-1 text-gray-700 uppercase">
+                  Customer:{" "}
+                  <span className="text-blue-600">
+                    {originalOrder.customerName || "Guest"}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-gray-500 mb-1">
+                  Select Items Being Returned:
+                </div>
+                <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                  {(originalOrder.items || []).map((item, i) => {
+                    const uniqueId =
+                      item.variantId?._id || item.variantId || item._id;
+                    const isChecked = returnedItems.some(
+                      (r) => r.variantId === uniqueId,
+                    );
+                    return (
+                      <label
+                        key={i}
+                        className={`flex items-start gap-2 p-2 border cursor-pointer select-none transition ${
+                          isChecked
+                            ? "border-orange-500 bg-orange-50/40"
+                            : "border-gray-100 hover:bg-gray-50"
+                        }`}
                       >
-                        Load invoice, pick return items, then add new products
-                        from search
-                      </td>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleReturnItem(item)}
+                          className="mt-0.5 accent-orange-600"
+                        />
+                        <div className="text-xs flex-1">
+                          <div className="font-medium text-gray-900">
+                            {item.name || item.productName}
+                          </div>
+                          <div className="text-gray-500">
+                            Bought Qty: {item.qty} x{" "}
+                            {item.price || item.sellingPrice} TK
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-gray-900">
+                          {item.subtotal || item.price * item.qty}৳
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ================= MIDDLE PANEL: RETURN CART SUMMARY (4/12 COLS) ================= */}
+          <div className="col-span-4 p-4 border-r border-gray-200 flex flex-col bg-white">
+            <div className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">
+              1. Items Coming In (Returns)
+            </div>
+
+            <div className="flex-1 space-y-2 overflow-y-auto border border-dashed border-gray-200 p-2 bg-gray-50/30">
+              {returnedItems.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-gray-400 italic">
+                  No items checked for return yet
+                </div>
+              ) : (
+                returnedItems.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center bg-red-50 border border-red-200 p-2.5 text-xs"
+                  >
+                    <div className="flex-1">
+                      <div className="font-semibold text-red-900">
+                        {item.name}
+                      </div>
+                      <div className="text-gray-500">
+                        Unit Cost: {item.price} TK
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-gray-500">Qty:</span>
+                      <input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) =>
+                          updateReturnQty(item.variantId, e.target.value)
+                        }
+                        max={item.maxQty}
+                        min="1"
+                        className="w-12 border p-0.5 text-center font-bold bg-white"
+                      />
+                      <div className="text-right font-bold text-red-700 w-16">
+                        -{item.subtotal} ৳
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-3 bg-red-50 p-3 border border-red-200 font-bold text-red-700 text-sm flex justify-between">
+              <span>Total Return Value:</span>
+              <span>{returnedTotal.toLocaleString()} TK</span>
+            </div>
+          </div>
+
+          {/* ================= RIGHT PANEL: CART SYSTEM FOR NEW PRODUCTS (5/12 COLS) ================= */}
+          <div className="col-span-5 p-4 flex flex-col bg-white">
+            <div className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2">
+              2. Items Going Out (New Purchase Cart)
+            </div>
+
+            {/* Stock Search Header Bar */}
+            <div className="flex gap-1 mb-3">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchProducts()}
+                className="flex-1 border p-2 text-sm rounded-none focus:outline-green-500"
+                placeholder="Search catalog or barcode..."
+              />
+              <button
+                type="button"
+                onClick={searchProducts}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 font-medium text-sm transition"
+              >
+                Find
+              </button>
+            </div>
+
+            {/* Dropdown Catalog Results Design Style */}
+            {products.length > 0 && (
+              <div className="max-h-40 overflow-y-auto border border-gray-200 bg-white shadow-lg p-2 mb-3 space-y-1">
+                {products.map((stockItem, i) => {
+                  const coreProduct = stockItem.productId || {};
+                  const variantData = stockItem.variantId || {};
+                  const currentStock =
+                    variantData.showroomStock ||
+                    variantData.stock ||
+                    stockItem.stock ||
+                    0;
+
+                  return (
+                    <div
+                      key={i}
+                      className="p-1.5 border-b border-gray-100 last:border-0 flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-bold text-xs text-gray-800">
+                          {coreProduct.name || "Catalog Product"}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          Color: {variantData.color || "N/A"} | Size:{" "}
+                          {variantData.size || "Free"} | Stock:{" "}
+                          <span className="font-bold text-green-600">
+                            {currentStock}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addToCart(stockItem)}
+                        className="bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white transition text-[11px] font-medium px-2 py-1 text-blue-700"
+                      >
+                        + Add (
+                        {variantData.sellingPrice || variantData.price || 0}৳)
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Current Shopping Cart Table List */}
+            <div className="flex-1 overflow-y-auto border border-gray-200 min-h-[180px]">
+              {newItems.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-gray-400 italic">
+                  Cart is currently empty. Add new items above.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-100 border-b font-semibold text-gray-600">
+                      <th className="p-2">Product Description</th>
+                      <th className="p-2 text-center w-20">Qty</th>
+                      <th className="p-2 text-right w-24">Subtotal</th>
+                      <th className="p-2 text-center w-10"></th>
                     </tr>
-                  ) : (
-                    <>
-                      {returnedItems.map((item, i) => (
-                        <tr
-                          key={`ret-${item.variantId}-${i}`}
-                          className="border-b border-gray-100 bg-red-50/40"
-                        >
-                          <td className="px-2 py-2 sm:px-3">
-                            <span className="font-medium text-gray-900">
-                              {item.name}
-                            </span>
-                            <span className="ml-1 text-[10px] font-bold uppercase text-red-600">
-                              Return
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              value={item.qty}
-                              onChange={(e) =>
-                                updateReturnQty(item.variantId, e.target.value)
-                              }
-                              max={item.maxQty}
-                              min="1"
-                              className="mx-auto h-8 w-12 rounded border bg-white text-center text-xs font-bold"
-                            />
-                          </td>
-                          <td className="px-1 py-2 text-right text-xs sm:text-sm">
-                            {amount(item.price)}
-                          </td>
-                          <td className="px-1 py-2 text-right text-xs font-bold sm:text-sm">
-                            {amount(item.subtotal)}
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => toggleReturnItem({ variantId: item.variantId, ...item })}
-                              className="text-xs font-bold text-red-600 hover:underline"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {newItems.map((item, i) => (
-                        <tr
-                          key={`new-${item.variantId}-${i}`}
-                          className="border-b border-gray-100"
-                        >
-                          <td className="px-2 py-2 sm:px-3">
-                            <span className="font-medium text-gray-900">
-                              {item.name}
-                            </span>
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <input
-                              type="number"
-                              value={item.qty}
-                              onChange={(e) =>
-                                updateCartQty(i, e.target.value)
-                              }
-                              max={item.maxStock}
-                              min="1"
-                              className="mx-auto h-8 w-12 rounded border bg-white text-center text-xs font-bold"
-                            />
-                          </td>
-                          <td className="px-1 py-2 text-right text-xs sm:text-sm">
-                            {amount(item.price)}
-                          </td>
-                          <td className="px-1 py-2 text-right text-xs font-bold sm:text-sm">
-                            {amount(item.subtotal)}
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeCartItem(i)}
-                              className="text-xs font-bold text-red-600 hover:underline"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {newItems.map((item, i) => (
+                      <tr key={i} className="border-b hover:bg-gray-50/50">
+                        <td className="p-2">
+                          <div className="font-medium text-gray-900">
+                            {item.name}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            {item.color} / {item.size} @ {item.price} TK
+                          </div>
+                        </td>
+                        <td className="p-2 text-center">
+                          <input
+                            type="number"
+                            value={item.qty}
+                            onChange={(e) => updateCartQty(i, e.target.value)}
+                            className="w-14 border p-1 text-center font-bold text-sm rounded-none"
+                            max={item.maxStock}
+                            min="1"
+                          />
+                        </td>
+                        <td className="p-2 text-right font-bold text-gray-900">
+                          {item.subtotal.toLocaleString()}৳
+                        </td>
+                        <td className="p-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeCartItem(i)}
+                            className="text-red-500 font-bold hover:text-red-700"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Right Summary Row Elements */}
+            <div className="mt-3 space-y-2">
+              <div className="bg-green-50 p-3 border border-green-200 font-bold text-green-700 text-sm flex justify-between">
+                <span>Total Outward Value (New Cart):</span>
+                <span>{newTotal.toLocaleString()} TK</span>
+              </div>
+
+              <div
+                className={`p-3 font-bold text-sm flex justify-between border ${
+                  difference >= 0
+                    ? "bg-orange-50 border-orange-200 text-orange-700"
+                    : "bg-purple-50 border-purple-200 text-purple-700"
+                }`}
+              >
+                <span>Net Difference adjustment:</span>
+                <span>
+                  {difference >= 0
+                    ? `+${difference.toLocaleString()}`
+                    : `${difference.toLocaleString()}`}{" "}
+                  TK
+                </span>
+              </div>
+
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                className="w-full border p-2 text-xs resize-none rounded-none focus:outline-orange-500"
+                placeholder="Reason for Exchange (e.g. Size didn't fit client properly)..."
+              />
             </div>
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-gray-200 p-2 sm:p-3">
+        {/* FOOTER ACTIONS BAR */}
+        <div className="flex justify-between p-4 border-t bg-gray-50 flex-shrink-0">
           <button
             type="button"
-            onClick={clearExchange}
-            className="flex min-h-12 items-center justify-center rounded-md bg-rose-500 text-sm font-bold text-white hover:bg-rose-600"
+            onClick={onClose}
+            className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-2.5 font-bold rounded-none transition"
           >
-            Clear Exchange
+            Close Window
           </button>
+
           <button
             type="button"
             onClick={handleProceedToExchangeCheckout}
             disabled={returnedItems.length === 0 || newItems.length === 0}
-            className={`flex min-h-12 items-center justify-center gap-1 rounded-md text-sm font-bold text-white ${
+            className={`px-10 py-2.5 font-bold rounded-none transition text-white ${
               returnedItems.length === 0 || newItems.length === 0
-                ? "cursor-not-allowed bg-gray-300 text-gray-500"
-                : "bg-emerald-600 hover:bg-emerald-700"
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-orange-600 hover:bg-orange-700"
             }`}
           >
-            Continue
-            <ChevronRight className="size-5" />
+            Proceed to Payment / Refund ➔
           </button>
         </div>
       </div>

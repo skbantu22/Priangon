@@ -1,33 +1,43 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { skipOptimize } from "@/lib/imageSrc";
 import { useDispatch, useSelector } from "react-redux";
 import {
   ShoppingBag,
   Trash2,
   X,
+  CheckCircle2,
+  Pause,
   Printer,
+  Maximize2,
+  Minimize2,
+  User,
+  Search,
   Banknote,
   CreditCard,
   Smartphone,
   HandCoins,
+  UserPlus,
+  ShieldCheck,
+  ArrowLeft,
   Minus,
   Plus,
-  ScanBarcode,
-  ArrowLeftRight,
-  Pencil,
 } from "lucide-react";
-import PosCustomerPicker from "./PosCustomerPicker";
 import {
   setDiscount,
   setVat,
+  setCustomer,
+  clearCustomer,
   updateQty,
   setItemImeis,
   selectPosSummary,
 } from "@/store/reducer/posCartSlice";
 import { showToast } from "@/lib/showToast";
-import { normalizeCustomerType } from "@/lib/priceTiers";
-import { isValidSerial } from "@/lib/warranty";
+import { CUSTOMER_TYPES, normalizeCustomerType } from "@/lib/priceTiers";
+import CustomerModal from "./CustomerModal";
+import { isValidSerial, warrantyLabel } from "@/lib/warranty";
 
 // IMEI / serial inputs, one per unit, for phones and other tracked items
 function ImeiInputs({ item }) {
@@ -72,7 +82,7 @@ function ImeiInputs({ item }) {
 }
 
 const money = (n) =>
-  `TK ${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  `৳${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
 const METHODS = [
   { key: "Cash", icon: Banknote },
@@ -85,20 +95,230 @@ const MOBILE_BANKING = ["bKash", "Nagad", "Rocket", "Upay"];
 
 const isPhone = (s) => /^01\d{9}$/.test(String(s).trim());
 
+// ---------------------------------------------------------------------------
+// Customer picker: search existing customers, or type a new name / phone
+// ---------------------------------------------------------------------------
+function CustomerPicker() {
+  const dispatch = useDispatch();
+  const customer = useSelector((state) => state.posCart?.customer);
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  // full customer modal: search, add new, set dealer / wholesaler type
+  const [modalOpen, setModalOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/customer/search?q=${encodeURIComponent(q)}`,
+          { signal: controller.signal },
+        );
+        const data = await res.json();
+        setResults(data.customers || []);
+        setOpen(true);
+      } catch {
+        // aborted or offline: keep the old list
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  useEffect(() => {
+    const close = (e) => {
+      if (!boxRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const pick = (c) => {
+    dispatch(
+      setCustomer({
+        _id: c._id || null,
+        name: c.name || "",
+        phone: c.phone || "",
+        address: c.address || "",
+        // dealer / wholesaler... : the cart switches to that rate
+        type: normalizeCustomerType(c.type),
+      }),
+    );
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+  };
+
+  const inputClass =
+    "h-8 min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 text-[12px] outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
+
+  return (
+    <div ref={boxRef} className="relative">
+      {customer ? (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-1.5">
+          <div className="flex gap-1.5">
+            <input
+              value={customer.name}
+              onChange={(e) =>
+                dispatch(setCustomer({ ...customer, name: e.target.value }))
+              }
+              placeholder="Customer name"
+              className={inputClass}
+            />
+            <input
+              value={customer.phone}
+              onChange={(e) =>
+                dispatch(
+                  setCustomer({ ...customer, _id: null, phone: e.target.value }),
+                )
+              }
+              placeholder="01XXXXXXXXX"
+              inputMode="tel"
+              className={`${inputClass} max-w-32`}
+            />
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              title="Change customer"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-primary hover:bg-primary/10"
+            >
+              <Search className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch(clearCustomer())}
+              title="Walk-in customer"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <select
+              value={normalizeCustomerType(customer.type)}
+              onChange={(e) =>
+                dispatch(setCustomer({ ...customer, type: e.target.value }))
+              }
+              title="Customer type: sets the rate"
+              className="h-7 rounded-md border border-gray-200 bg-white px-1.5 text-[11px] font-medium outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+            >
+              {Object.entries(CUSTOMER_TYPES).map(([key, t]) => (
+                <option key={key} value={key}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            {normalizeCustomerType(customer.type) !== "retail" && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                {CUSTOMER_TYPES[normalizeCustomerType(customer.type)].short} rate applied
+              </span>
+            )}
+            {customer._id && (
+              <span className="ml-auto text-[11px] text-primary">
+                Existing customer
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <label className="flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary dark:border-white/10 dark:bg-transparent">
+          <User className="size-4 text-primary" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => results.length && setOpen(true)}
+            placeholder="Customer (optional): name / phone"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setModalOpen(true);
+            }}
+            title="Find or add customer"
+            className="-mr-2 flex h-7 items-center gap-1 rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20"
+          >
+            <Search className="size-3.5" /> Find / Add
+          </button>
+        </label>
+      )}
+
+      <CustomerModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onPick={pick}
+        initialQuery={customer ? "" : query}
+      />
+
+      {open && !customer && query.trim().length >= 2 && (
+        <div className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-card">
+          {results.map((c) => (
+            <button
+              key={c._id}
+              type="button"
+              onClick={() => pick(c)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-primary/5"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-medium">
+                  {c.name}
+                </span>
+                <span className="text-[11px] text-gray-500">{c.phone}</span>
+              </span>
+              <span className="shrink-0 text-right text-[11px] text-gray-400">
+                {normalizeCustomerType(c.type) !== "retail" && (
+                  <span className="block font-semibold text-emerald-600">
+                    {CUSTOMER_TYPES[normalizeCustomerType(c.type)].short}
+                  </span>
+                )}
+                {c.totalOrders || 0} orders
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              pick(
+                isPhone(query)
+                  ? { name: "", phone: query.trim() }
+                  : { name: query.trim(), phone: "" },
+              )
+            }
+            className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-[13px] font-medium text-primary hover:bg-primary/5 dark:border-white/10"
+          >
+            <UserPlus className="size-4" />
+            Add “{query.trim()}” as new customer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 export default function CartSidebar({
   expanded,
   setExpanded,
+  mobileOpen = false,
+  onMobileClose,
   cart = [],
   products = [],
-  search = "",
-  setSearch,
-  inputRef,
-  onSearchKeyDown,
   removeCartItem,
   onComplete,
+  onHold,
   onClear,
   onPrint,
-  onExchange,
   canPrint = false,
   checkoutLoading = false,
 }) {
@@ -232,72 +452,65 @@ export default function CartSidebar({
   const inputBox =
     "h-9 rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
 
-  const itemCount = cart.length;
-  const afterDiscount = total;
-
-  const summaryRow = (label, value, extra = null) => (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-gray-700">{label}</span>
-      <span className="flex items-center gap-1 font-semibold tabular-nums text-gray-900">
-        {value}
-        {extra}
-      </span>
-    </div>
-  );
-
   return (
     <aside
-      className={`flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#e8e8e8] ${
-        expanded ? "md:flex-1" : ""
-      }`}
+      className={`h-full min-h-0 flex-col overflow-y-auto bg-white dark:bg-card lg:static lg:z-auto lg:flex lg:border-l lg:border-gray-200 lg:dark:border-white/10 ${
+        mobileOpen ? "fixed inset-0 z-50 flex" : "hidden"
+      } ${expanded ? "lg:flex-1" : "w-full shrink-0 lg:w-[480px] xl:w-[560px] 2xl:w-[640px]"}`}
     >
-      <div className="hidden shrink-0 items-center gap-2 bg-white px-3 py-2 md:flex">
+      {/* ================= HEADER ================= */}
+      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <button
           type="button"
-          onClick={onExchange}
-          title="Exchange (F6)"
-          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#3b82f6] text-white shadow-sm hover:brightness-110"
+          onClick={onMobileClose}
+          className="-ml-1 flex size-9 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden dark:text-gray-300 dark:hover:bg-white/10"
+          aria-label="Back to products"
         >
-          <ArrowLeftRight className="size-5" />
+          <ArrowLeft className="size-5" />
         </button>
-        <input
-          type="checkbox"
-          className="size-4 shrink-0 rounded border-gray-300 accent-[#2563eb]"
-          aria-label="Scan mode"
-        />
-        <label className="flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-md border border-gray-300 bg-white focus-within:border-primary">
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => setSearch?.(e.target.value)}
-            onKeyDown={onSearchKeyDown}
-            placeholder="Enter Product Name / Scan Barcode / SKU"
-            className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none"
-          />
-          <span className="flex h-full w-11 shrink-0 items-center justify-center border-l border-gray-200 bg-gray-50 text-gray-600">
-            <ScanBarcode className="size-5" />
-          </span>
-        </label>
-        <div className="min-w-[11rem] shrink-0">
-          <PosCustomerPicker amarGuest />
-        </div>
-      </div>
+        <ShoppingBag className="size-5 text-primary" strokeWidth={2.5} />
+        <h2 className="text-base font-bold text-gray-900 dark:text-white">
+          Current Sale
+          {cart.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              {cart.length}
+            </span>
+          )}
+        </h2>
 
-      <div className="mx-2 mb-2 flex min-h-[120px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:mx-3 md:min-h-0">
-        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_52px_72px_56px_28px] items-center gap-1 bg-[#1e3a5f] px-2 py-1.5 text-[11px] font-semibold text-white sm:grid-cols-[minmax(0,1fr)_56px_80px_64px_32px] sm:px-3">
-          <span>Name</span>
-          <span className="text-right">Price</span>
-          <span className="text-center">Qty</span>
-          <span className="text-right">Total</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            title={expanded ? "Show products" : "Expand cart"}
+            className="hidden size-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 lg:flex dark:hover:bg-white/10"
+          >
+            {expanded ? (
+              <Minimize2 className="size-4" />
+            ) : (
+              <Maximize2 className="size-4" />
+            )}
+          </button>
           <button
             type="button"
             onClick={onClear}
             disabled={!cart.length}
-            title="Clear cart"
-            className="flex items-center justify-center disabled:opacity-40"
+            className="flex h-8 items-center gap-1 rounded-lg bg-red-50 px-2.5 text-[12px] font-medium text-red-600 hover:bg-red-100 disabled:opacity-40 dark:bg-red-500/10"
           >
-            <Trash2 className="size-4" />
+            <Trash2 className="size-3.5" /> Clear All
           </button>
+        </div>
+      </div>
+
+      {/* ================= ITEMS ================= */}
+      <div className="mx-3 flex min-h-[220px] flex-1 flex-col lg:min-h-[260px] overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
+        <div className="hidden shrink-0 grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 lg:grid dark:bg-white/5 dark:text-gray-300">
+          <span>#</span>
+          <span>Product</span>
+          <span className="text-center">Qty</span>
+          <span className="text-right">Price</span>
+          <span className="text-right">Total</span>
+          <span />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -313,71 +526,117 @@ export default function CartSidebar({
               return (
                 <div
                   key={id || idx}
-                  className="grid grid-cols-[minmax(0,1fr)_52px_72px_56px_28px] items-center gap-1 border-t border-gray-100 px-2 py-2 text-[12px] first:border-t-0 sm:grid-cols-[minmax(0,1fr)_56px_80px_64px_32px] sm:px-3 dark:border-white/10"
+                  className="grid grid-cols-[18px_minmax(0,1fr)_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-2 first:border-t-0 lg:grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] lg:py-1 dark:border-white/10"
                 >
-                  <div className="min-w-0">
-                    <p
-                      className="line-clamp-2 font-semibold leading-snug text-gray-900 dark:text-gray-100"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </p>
-                    {item.barcode ? (
-                      <p className="truncate text-[10px] text-gray-500">
-                        Barcode: {item.barcode}
+                  <span className="text-[12px] text-gray-500">{idx + 1}</span>
+
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-gray-50">
+                      <Image
+                        src={item.image || "/placeholder.png"}
+                        alt={item.name || ""}
+                        fill
+                        sizes="36px"
+                        className="object-contain"
+                        unoptimized={skipOptimize(item.image)}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words text-[13px] font-semibold leading-snug text-gray-900 dark:text-gray-100" title={item.name}>
+                        {item.name}
                       </p>
-                    ) : null}
+                      <p className="flex items-center gap-1 truncate text-[11px] text-gray-500">
+                        {[
+                          item.barcode ? `Barcode: ${item.barcode}` : "",
+                          [item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" · "),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        {warrantyLabel(item) && (
+                          <ShieldCheck
+                            className="size-3 shrink-0 text-emerald-600"
+                            aria-label={warrantyLabel(item)}
+                          >
+                            <title>{warrantyLabel(item)}</title>
+                          </ShieldCheck>
+                        )}
+                      </p>
+                    </div>
                   </div>
 
-                  {(() => {
-                    const price = Number(item.price) || 0;
-                    const qty = Number(item.qty) || 0;
-                    return (
-                      <>
-                        <span className="text-right font-medium tabular-nums">
-                          {Math.round(price)}
-                        </span>
-                        <div className="flex h-7 items-center justify-center gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() => changeQty(item, (Number(item.qty) || 1) - 1)}
-                            disabled={(Number(item.qty) || 1) <= 1}
-                            aria-label="One less"
-                            className="flex size-7 items-center justify-center rounded-sm bg-[#e11d48] text-white disabled:opacity-40"
-                          >
-                            <Minus className="size-3" strokeWidth={3} />
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.qty}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => changeQty(item, e.target.value)}
-                            className="h-7 w-8 rounded-sm border border-gray-200 bg-white text-center text-[11px] font-bold outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => changeQty(item, (Number(item.qty) || 1) + 1)}
-                            aria-label="One more"
-                            className="flex size-7 items-center justify-center rounded-sm bg-[#16a34a] text-white"
-                          >
-                            <Plus className="size-3" strokeWidth={3} />
-                          </button>
-                        </div>
-                        <span className="text-right font-bold tabular-nums">
-                          {Math.round(price * qty)}
-                        </span>
-                      </>
-                    );
-                  })()}
+                  {/* On a phone these drop to their own line under the
+                      name, so the product gets the full width; on a wide
+                      screen `contents` puts them back in their columns. */}
+                  <div className="col-span-3 col-start-1 flex items-center justify-between gap-2 pl-11 lg:contents">
+                    <div className="flex h-7 items-center rounded-md border border-gray-200 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => changeQty(item, (Number(item.qty) || 1) - 1)}
+                        disabled={(Number(item.qty) || 1) <= 1}
+                        aria-label="One less"
+                        className="flex size-7 items-center justify-center rounded-l-md text-gray-600 disabled:opacity-30 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+                      >
+                        <Minus className="size-3.5" strokeWidth={3} />
+                      </button>
+
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.qty}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => changeQty(item, e.target.value)}
+                        className="h-7 w-9 border-x border-gray-200 bg-white text-center text-[12px] font-semibold outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => changeQty(item, (Number(item.qty) || 1) + 1)}
+                        aria-label="One more"
+                        className="flex size-7 items-center justify-center rounded-r-md text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+                      >
+                        <Plus className="size-3.5" strokeWidth={3} />
+                      </button>
+                    </div>
+
+                    {/* A dealer / sub dealer / wholesaler rate shows under the
+                        normal (Buyer) price, struck through, so the counter
+                        can see the discount the customer type gets */}
+                    {(() => {
+                      const normal = Number(item.rates?.sellingPrice) || 0;
+                      const price = Number(item.price) || 0;
+                      const qty = Number(item.qty) || 0;
+                      const tiered = normal > price;
+                      return (
+                        <>
+                          <span className="text-right text-[12px] leading-tight text-gray-700 dark:text-gray-300">
+                            {tiered && (
+                              <span className="block text-[10.5px] text-gray-400 line-through" title="Normal price">
+                                {money(normal)}
+                              </span>
+                            )}
+                            <span className={tiered ? "font-semibold text-emerald-700 dark:text-emerald-400" : ""}>{money(price)}</span>
+                          </span>
+
+                          <span className="text-right text-[12px] font-bold leading-tight text-gray-900 dark:text-white">
+                            {tiered && (
+                              <span className="block text-[10.5px] font-normal text-gray-400 line-through">
+                                {money(normal * qty)}
+                              </span>
+                            )}
+                            {money(price * qty)}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => removeCartItem?.(id)}
                     title="Remove"
-                    className="flex size-7 items-center justify-center rounded bg-red-500 text-white"
+                    className="flex size-5.5 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-500/10"
                   >
-                    <X className="size-3.5" strokeWidth={3} />
+                    <X className="size-3" strokeWidth={3} />
                   </button>
 
                   {item.trackSerial && <ImeiInputs item={item} />}
@@ -388,51 +647,91 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2 px-2 pb-2 pt-1 sm:px-3 md:pb-3">
-        <div className="rounded-md bg-[#f5f0e6] p-2.5 text-[11px] sm:text-[12px]">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <div className="space-y-1">
-              {summaryRow("Items", itemCount)}
-              {summaryRow("Quantity", totalQty)}
-              {summaryRow(
-                `Total Vat (${vatValue || 0}%)`,
-                money(vat),
-              )}
-            </div>
-            <div className="space-y-1">
-              {summaryRow("Total", money(subtotal))}
-              {summaryRow(
-                "Discount",
-                money(discount),
-                <span className="inline-flex items-center gap-0.5">
-                  <Pencil className="size-3 text-gray-500" />
-                  <input
-                    type="number"
-                    min="0"
-                    value={discountValue}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) =>
-                      dispatch(
-                        setDiscount({
-                          type: discountType,
-                          value: Number(e.target.value) || 0,
-                        }),
-                      )
-                    }
-                    className={`${inputBox} h-6 w-12 px-1 text-[11px]`}
-                  />
-                </span>,
-              )}
-              {summaryRow("After Discount Price", money(afterDiscount))}
-            </div>
+      <div className="shrink-0 space-y-2 px-3 pt-2">
+        {/* ================= CUSTOMER ================= */}
+        <CustomerPicker />
+
+        {/* ================= SUMMARY ================= */}
+        <div className="space-y-1 text-[12px]">
+          <div className="flex justify-between text-gray-600 dark:text-gray-300">
+            <span>
+              Subtotal ({totalQty} items)
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {money(subtotal)}
+            </span>
           </div>
-          <div className="mt-2 flex items-center justify-between border-t border-[#e8dcc8] pt-2 font-bold text-gray-900">
-            <span>Payable</span>
-            <span className="text-[15px] tabular-nums">{money(total)}</span>
+
+          <div className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+            <span>Discount</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                value={discountValue}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) =>
+                  dispatch(
+                    setDiscount({
+                      type: discountType,
+                      value: Number(e.target.value) || 0,
+                    }),
+                  )
+                }
+                className={`${inputBox} h-7 w-16`}
+              />
+              <select
+                value={discountType}
+                onChange={(e) =>
+                  dispatch(
+                    setDiscount({ type: e.target.value, value: discountValue }),
+                  )
+                }
+                className={`${inputBox} h-7 w-12 px-1`}
+              >
+                <option value="percent">%</option>
+                <option value="fixed">৳</option>
+              </select>
+            </div>
+            <span className="w-20 text-right font-semibold text-gray-900 dark:text-white">
+              {money(discount)}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 text-gray-600 dark:text-gray-300">
+            <span className="flex items-center gap-1.5">
+              VAT
+              <select
+                value={vatValue}
+                onChange={(e) =>
+                  dispatch(
+                    setVat({ type: "percent", value: Number(e.target.value) }),
+                  )
+                }
+                className="rounded border border-gray-200 bg-transparent px-1 py-0.5 text-[12px] outline-none dark:border-white/10"
+              >
+                <option value={0}>0%</option>
+                <option value={5}>5%</option>
+                <option value={7.5}>7.5%</option>
+                <option value={15}>15%</option>
+              </select>
+            </span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {money(vat)}
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-1.5 md:hidden">
+        {/* ================= TOTAL ================= */}
+        <div className="flex items-center justify-between rounded-lg bg-primary/10 px-3 py-1.5">
+          <span className="text-sm font-bold text-primary">Total Amount</span>
+          <span className="text-xl font-extrabold leading-none text-primary">
+            {money(total)}
+          </span>
+        </div>
+
+        {/* ================= PAYMENT METHOD ================= */}
+        <div className="grid grid-cols-4 gap-1.5">
           {METHODS.map(({ key, icon: Icon }) => (
             <button
               key={key}
@@ -469,7 +768,7 @@ export default function CartSidebar({
           </div>
         )}
 
-        <div className="grid grid-cols-2 items-center gap-2 text-[11px] md:hidden">
+        <div className="grid grid-cols-2 items-center gap-2 text-[11px]">
           <label className="block">
             <span className="text-gray-600 dark:text-gray-300">
               {method === "Due" ? "Paid Now" : "Received"}
@@ -501,17 +800,38 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="hidden shrink-0 justify-end gap-1.5 border-t border-gray-100 bg-white px-3 py-2 max-md:flex">
+      {/* ================= ACTIONS (always visible at the bottom) ================= */}
+      <div className="sticky bottom-0 z-10 mt-auto flex shrink-0 gap-1.5 border-t border-gray-100 bg-white px-3 py-2 shadow-[0_-6px_16px_-10px_rgba(0,0,0,0.25)] dark:border-white/10 dark:bg-card">
         <button
           type="button"
-          onClick={onPrint}
-          disabled={!canPrint}
-          title={canPrint ? "Print last invoice (F4)" : "No sale completed yet"}
-          className="flex h-11 w-14 flex-col items-center justify-center rounded-lg bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+          onClick={complete}
+          disabled={checkoutLoading || cart.length === 0}
+          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-semibold text-white shadow-lg shadow-primary/30 transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
         >
-          <Printer className="size-4" />
-          Print
+          <CheckCircle2 className="size-5" />
+          {checkoutLoading ? "Processing..." : "Complete Sale (F2)"}
         </button>
+
+          <button
+            type="button"
+            onClick={onHold}
+            disabled={cart.length === 0}
+            title="Save & Hold (F3)"
+            className="flex h-11 w-14 flex-col items-center justify-center rounded-lg bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+          >
+            <Pause className="size-4" strokeWidth={3} />
+            Hold
+          </button>
+          <button
+            type="button"
+            onClick={onPrint}
+            disabled={!canPrint}
+            title={canPrint ? "Print last invoice (F4)" : "No sale completed yet"}
+            className="flex h-11 w-14 flex-col items-center justify-center rounded-lg bg-primary/10 text-[10px] font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+          >
+            <Printer className="size-4" />
+            Print
+          </button>
       </div>
     </aside>
   );

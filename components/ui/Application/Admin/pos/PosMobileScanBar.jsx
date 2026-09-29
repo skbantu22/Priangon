@@ -10,11 +10,6 @@ export default function PosMobileScanBar({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <input
-        type="checkbox"
-        className="size-4 shrink-0 rounded border-gray-300 accent-[#2563eb]"
-        aria-label="Scan mode"
-      />
       <label className="flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-md border border-gray-300 bg-white focus-within:border-primary">
         <input
           ref={inputRef}

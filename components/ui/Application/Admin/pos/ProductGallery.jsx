@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { skipOptimize } from "@/lib/imageSrc";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
   PackageSearch,
@@ -174,18 +173,10 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
   const handleAdd = (e) => {
     e.stopPropagation();
     const inStock = variants.filter((v) => variantStock(v) > 0);
-    if (inStock.length === 1) {
+    // a single variant goes straight in, otherwise let the cashier pick
+    if (variants.length === 1 && inStock.length === 1) {
       addToCart(rawProduct, inStock[0], 1);
-    } else if (inStock.length > 1) {
-      setOpenProduct(item);
-    }
-  };
-
-  const handleCardClick = () => {
-    const inStock = variants.filter((v) => variantStock(v) > 0);
-    if (inStock.length === 1) {
-      addToCart(rawProduct, inStock[0], 1);
-    } else if (inStock.length > 1) {
+    } else {
       setOpenProduct(item);
     }
   };
@@ -241,31 +232,46 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
     );
   }
 
-  const multiVariant = variants.filter((v) => variantStock(v) > 0).length > 1;
-
   return (
     <div
-      onClick={handleCardClick}
-      className="group relative flex cursor-pointer flex-col rounded border border-gray-200 bg-white p-1.5 text-center transition hover:shadow-sm max-md:p-1 sm:p-2 sm:text-left"
+      onClick={() => setOpenProduct(item)}
+      className="group relative flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 dark:border-white/10 dark:bg-card"
     >
-      {multiVariant && (
-        <span className="absolute right-1 top-1 z-10 rounded bg-primary/15 px-1 py-0.5 text-[9px] font-semibold text-primary sm:right-2 sm:top-2 sm:text-[10px]">
-          {variants.filter((v) => variantStock(v) > 0).length} opt
+      {variants.length > 1 && (
+        <span className="absolute right-2 top-2 z-10 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+          {variants.length} options
         </span>
       )}
 
       {image("aspect-square w-full", "(max-width: 1280px) 25vw, 15vw")}
 
+      {warrantyText && (
+        <span className="absolute left-2 top-2 z-10 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+          🛡 {warrantyText}
+        </span>
+      )}
+
+      {brand && (
+        <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          {brand}
+        </p>
+      )}
       <h3
         title={name}
-        className="mt-1 line-clamp-2 min-h-[2rem] text-[10px] font-semibold leading-tight text-gray-900 max-md:min-h-[2.25rem] sm:min-h-10 sm:text-[14px] sm:leading-5 dark:text-gray-100"
+        className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-gray-900 dark:text-gray-100 ${brand ? "" : "mt-2"}`}
       >
         {name}
       </h3>
 
-      <p className="mt-0.5 text-[11px] font-semibold text-red-600 sm:text-[12px]">
-        ({stock})
-      </p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          {price}
+          <p className={`mt-0.5 text-[12px] font-medium ${labelClass}`}>
+            {label}
+          </p>
+        </div>
+        <AddButton disabled={stock <= 0} onClick={handleAdd} />
+      </div>
     </div>
   );
 }
@@ -289,8 +295,6 @@ export default function ProductGallery({
   brands = [],
   selectedBrand,
   setSelectedBrand,
-  selectedSubCategoryId = "",
-  setSelectedSubCategoryId,
   sort,
   setSort,
   emptyHint = "No products found",
@@ -401,70 +405,11 @@ export default function ProductGallery({
     }`;
 
   const selectClass =
-    "h-9 min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 text-[12px] text-gray-700 outline-none focus:border-primary";
-
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["pos-subcategories", selectedCategoryId],
-    queryFn: async () => {
-      if (!selectedCategoryId) return [];
-      const res = await fetch(
-        `/api/subcategory?category=${selectedCategoryId}&deleteType=SD&size=500`,
-      );
-      const data = await res.json();
-      return data.data || data.subcategories || [];
-    },
-    enabled: !!selectedCategoryId,
-    staleTime: 1000 * 60 * 5,
-  });
-
-  useEffect(() => {
-    setSelectedSubCategoryId?.("");
-  }, [selectedCategoryId, setSelectedSubCategoryId]);
+    "h-10 min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none focus:border-primary dark:border-white/10 dark:bg-card dark:text-gray-200";
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden bg-[#e8e8e8] p-2 max-md:gap-1 md:gap-2 md:p-3">
-      <div className="hidden shrink-0 grid-cols-3 gap-2 md:grid">
-        <select
-          value={selectedBrand}
-          onChange={(e) => setSelectedBrand(e.target.value)}
-          className={selectClass}
-        >
-          <option value="">Brand</option>
-          {brands.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedCategoryId}
-          onChange={(e) => setSelectedCategoryId(e.target.value)}
-          className={selectClass}
-        >
-          <option value="">Category</option>
-          {categories.map((cat) => (
-            <option key={cat._id} value={cat._id}>
-              {cat.name || cat.title}
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedSubCategoryId}
-          onChange={(e) => setSelectedSubCategoryId?.(e.target.value)}
-          disabled={!selectedCategoryId}
-          className={selectClass}
-        >
-          <option value="">Sub Category</option>
-          {subcategories.map((sub) => (
-            <option key={sub._id} value={sub._id}>
-              {sub.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Category chips hidden on phone POS (AmarSolution-style) */}
-      <div className="hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-4">
+      {/* ---------------- CATEGORY CHIPS ---------------- */}
       <ScrollRow label="categories">
         <button
           type="button"
@@ -507,16 +452,74 @@ export default function ProductGallery({
             ))}
         </ScrollRow>
       )}
-      </div>
 
       {/* ---------------- PRODUCTS PANEL ---------------- */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white md:border md:border-gray-200">
+      <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
+        {/* filter bar */}
+        <div className="grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]">
+          <label className="col-span-2 hidden h-10 items-center gap-2 sm:flex rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
+            <Search className="size-4 text-gray-400" />
+            <input
+              value={localFilter}
+              onChange={(e) => setLocalFilter(e.target.value)}
+              placeholder="Search products..."
+              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+            />
+          </label>
+
+          <select
+            value={selectedCategoryId}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat._id}>
+                {cat.name || cat.title}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className={selectClass}
+          >
+            <option value="latest">Latest</option>
+            <option value="oldest">Oldest</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name">Name (A–Z)</option>
+          </select>
+
+          <div className="flex h-10 overflow-hidden rounded-lg border border-gray-200 dark:border-white/10">
+            {[
+              ["grid", LayoutGrid],
+              ["list", List],
+            ].map(([key, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                title={key === "grid" ? "Grid view" : "List view"}
+                className={`flex w-10 items-center justify-center ${
+                  view === key
+                    ? "bg-primary text-white"
+                    : "bg-white text-gray-400 hover:text-primary dark:bg-card"
+                }`}
+              >
+                <Icon className="size-4" />
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto scroll-smooth p-2 md:p-3"
+          className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-2 pb-24 sm:px-3 lg:pb-3"
         >
           {loading ? (
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-2.5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
@@ -540,7 +543,7 @@ export default function ProductGallery({
               <div
                 className={
                   view === "grid"
-                    ? "grid grid-cols-3 gap-2 md:grid-cols-4 md:gap-2.5"
+                    ? "grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3"
                     : "flex flex-col gap-2"
                 }
               >
@@ -565,12 +568,18 @@ export default function ProductGallery({
                     Loading more products...
                   </p>
                 ) : hasNextPage ? (
-                  <p className="text-xs text-gray-400">Scroll for more</p>
-                ) : visibleProducts.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => fetchNextPage()}
+                    className="text-xs text-gray-400 hover:text-primary"
+                  >
+                    Scroll down or click to load more
+                  </button>
+                ) : (
                   <p className="text-xs text-gray-400">
                     {visibleProducts.length} products · all loaded
                   </p>
-                ) : null}
+                )}
               </div>
             </>
           ) : (

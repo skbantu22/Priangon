@@ -7,6 +7,7 @@ import ProductGallery, {
 } from "@/components/ui/Application/Admin/pos/ProductGallery";
 import CartSidebar from "@/components/ui/Application/Admin/pos/CartSidebar";
 import VariantModal from "@/components/ui/Application/Admin/pos/VariantModal";
+import PosTopbar from "@/components/ui/Application/Admin/pos/PosTopbar";
 import CheckoutModal from "@/components/ui/Application/Admin/pos/CheckoutModal";
 import ExchangeModal from "@/components/ui/Application/Admin/pos/ExchangeModal";
 import { shallowEqual, useDispatch, useSelector } from "react-redux";
@@ -27,10 +28,8 @@ import {
   WAREHOUSE_TILL,
   writePosShowroom,
 } from "@/lib/posProducts";
+import { ShoppingCart } from "lucide-react";
 import { ratesFor } from "@/lib/priceTiers";
-import { cartLineTitle } from "@/lib/posVariantLabel";
-import PosMobileScanBar from "@/components/ui/Application/Admin/pos/PosMobileScanBar";
-import PosCustomerPicker from "@/components/ui/Application/Admin/pos/PosCustomerPicker";
 
 import {
   addToCart as addToCartAction,
@@ -42,19 +41,11 @@ import {
   setVat as setVatAction,
   selectPosSummary,
 } from "@/store/reducer/posCartSlice";
-import PosBottomActionBar from "@/components/ui/Application/Admin/pos/PosBottomActionBar";
+import PosFooter from "@/components/ui/Application/Admin/PosFooter";
 import BranchSwitchScreen from "@/components/ui/Application/Admin/BranchSwitchScreen";
-import HoldNoteDialog from "@/components/ui/Application/Admin/pos/HoldNoteDialog";
-import PosConfirmDialog from "@/components/ui/Application/Admin/pos/PosConfirmDialog";
-import {
-  buildHoldEntry,
-  heldSalesForShop,
-  readAllHeldSales,
-  writeAllHeldSales,
-} from "@/lib/posHeldSales";
 
-// First page only; more load when the product panel is scrolled
-const MAX_EAGER_PAGES = 1;
+// pages (20 products each) that are loaded in the background without scrolling
+const MAX_EAGER_PAGES = 20;
 
 const inThisShop = (items) =>
   (items || [])
@@ -70,6 +61,25 @@ const inThisShop = (items) =>
     })
     .filter((product) => product.totalStock > 0);
 
+// Held (parked) sales live only on this device, like a paper slip at the till
+const HELD_SALES_KEY = "pos-held-sales";
+
+const readHeldSales = () => {
+  try {
+    return JSON.parse(localStorage.getItem(HELD_SALES_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const writeHeldSales = (list) => {
+  try {
+    localStorage.setItem(HELD_SALES_KEY, JSON.stringify(list));
+  } catch {
+    // storage full or blocked: the in-memory list still works for this session
+  }
+};
+
 export default function POSPage() {
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
@@ -77,12 +87,13 @@ export default function POSPage() {
   const cart = useSelector((state) => state.posCart.cart);
   const user = useSelector((state) => state.authStore.auth);
   const [cartExpanded, setCartExpanded] = useState(false);
+  // phones: the cart opens full screen over the products
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   // Core States
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(""); // 🚀 Debounce Search State
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
-  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState("");
   const [sort, setSort] = useState("latest");
   const [lastOrderId, setLastOrderId] = useState(null);
   // bumped after each sale so the cart panel resets its payment inputs
@@ -100,10 +111,8 @@ export default function POSPage() {
 
   // Parked carts (F3), restored from the top bar
   const [trip, setTrip] = useState(null);
-  const [allHeldSales, setAllHeldSales] = useState([]);
-  const [holdNoteOpen, setHoldNoteOpen] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState(null);
-  useEffect(() => setAllHeldSales(readAllHeldSales()), []);
+  const [heldSales, setHeldSales] = useState([]);
+  useEffect(() => setHeldSales(readHeldSales()), []);
 
   // Discount / VAT are edited in the cart panel and kept in Redux
   const posCartState = useSelector((state) => state.posCart);
@@ -194,11 +203,6 @@ export default function POSPage() {
   const canSwitchTill = currentUser?.role === "admin";
   const selectedShowroomId = selectedTill;
 
-  const heldSales = useMemo(
-    () => heldSalesForShop(allHeldSales, selectedShowroomId),
-    [allHeldSales, selectedShowroomId],
-  );
-
   useEffect(() => {
     if (tillRef.current && tillRef.current !== selectedTill) {
       dispatch(clearCart());
@@ -259,7 +263,6 @@ export default function POSPage() {
   const listFilters = {
     search,
     categoryId: selectedCategoryId,
-    subcategoryId: selectedSubCategoryId,
     brand: selectedBrand,
     sort,
   };
@@ -273,7 +276,7 @@ export default function POSPage() {
   const localProducts = useMemo(
     () => filterPosProducts(allProducts, listFilters),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allProducts, search, selectedCategoryId, selectedSubCategoryId, selectedBrand, sort],
+    [allProducts, search, selectedCategoryId, selectedBrand, sort],
   );
 
   // Only when the shop has more products than the eager load holds does a
@@ -345,7 +348,7 @@ export default function POSPage() {
           _id: `${product._id}-${variant._id}`,
           productId: product._id,
           variantId: variant._id,
-          name: cartLineTitle(product.name, variant),
+          name: product.name,
           barcode: variant.barcode || "",
           color: variant.color,
           size: variant.size,
@@ -434,7 +437,7 @@ export default function POSPage() {
         0,
       );
 
-      const finalBillAmount = isExchange ? Number(total) : Number(total);
+      const finalBillAmount = isExchange ? exchangeNewTotal : Number(total);
 
       const formattedPayments =
         dataClean.payments?.length > 0
@@ -555,6 +558,7 @@ export default function POSPage() {
       });
 
       setSaleKey((k) => k + 1);
+      setMobileCartOpen(false);
 
       // a dealer order was loaded into this sale: mark it invoiced
       if (!isExchange && partnerOrderRef.current && resData.order?._id) {
@@ -674,41 +678,14 @@ export default function POSPage() {
 
   const handleClearCart = () => {
     if (!cart.length) return;
-    setConfirmDialog({
-      title: "Clear cart?",
-      description: "All items will be removed from this sale.",
-      confirmLabel: "Clear",
-      destructive: true,
-      onConfirm: () => dispatch(clearCart()),
-    });
-  };
-
-  const saveAllHeldSales = (list) => {
-    setAllHeldSales(list);
-    writeAllHeldSales(list);
-  };
-
-  const commitHold = (label = "") => {
-    if (!/^[a-f\d]{24}$/i.test(String(selectedShowroomId || ""))) {
-      showToast("error", "Choose a branch first");
-      return;
+    if (confirm("Are you sure you want to clear the cart?")) {
+      dispatch(clearCart());
     }
+  };
 
-    const entry = buildHoldEntry({
-      showroomId: selectedShowroomId,
-      cart,
-      total,
-      discountType: posCartState.discountType,
-      discountValue: posCartState.discountValue,
-      vatType: posCartState.vatType,
-      vatValue: posCartState.vatValue,
-      customer: posCartState.customer,
-      label,
-    });
-
-    saveAllHeldSales([entry, ...allHeldSales]);
-    dispatch(clearCart());
-    showToast("success", "Sale put on hold");
+  const saveHeldSales = (list) => {
+    setHeldSales(list);
+    writeHeldSales(list);
   };
 
   const holdSale = () => {
@@ -717,62 +694,43 @@ export default function POSPage() {
       return;
     }
 
-    const customer = posCartState.customer;
-    const hasCustomer =
-      customer &&
-      (customer._id ||
-        String(customer.name || "").trim() ||
-        String(customer.phone || "").trim());
-
-    if (!hasCustomer) {
-      setHoldNoteOpen(true);
-      return;
-    }
-
-    commitHold("");
+    saveHeldSales([
+      {
+        id: Date.now().toString(36),
+        createdAt: new Date().toISOString(),
+        cart,
+        total,
+        discountType: posCartState.discountType,
+        discountValue: posCartState.discountValue,
+        vatType: posCartState.vatType,
+        vatValue: posCartState.vatValue,
+        customer: posCartState.customer,
+      },
+      ...heldSales,
+    ]);
+    dispatch(clearCart());
+    showToast("success", "Sale put on hold");
   };
 
   const restoreHeldSale = (id) => {
-    const held = allHeldSales.find((h) => h.id === id);
+    const held = heldSales.find((h) => h.id === id);
     if (!held) return;
 
-    const applyRestore = () => {
-      dispatch(clearCart());
-      dispatch(setCart(held.cart));
-      dispatch(
-        setDiscountAction({ type: held.discountType, value: held.discountValue }),
-      );
-      dispatch(setVatAction({ type: held.vatType, value: held.vatValue }));
-      if (held.customer) dispatch(setCustomer(held.customer));
-      else dispatch(setCustomer(null));
-      saveAllHeldSales(allHeldSales.filter((h) => h.id !== id));
-      showToast("success", "Held sale recalled");
-    };
-
-    if (cart.length) {
-      setConfirmDialog({
-        title: "Replace current cart?",
-        description:
-          "The items in your cart will be replaced by this held sale.",
-        confirmLabel: "Recall",
-        onConfirm: applyRestore,
-      });
+    if (cart.length && !confirm("Replace the current cart with this held sale?"))
       return;
-    }
 
-    applyRestore();
+    dispatch(clearCart());
+    dispatch(setCart(held.cart));
+    dispatch(
+      setDiscountAction({ type: held.discountType, value: held.discountValue }),
+    );
+    dispatch(setVatAction({ type: held.vatType, value: held.vatValue }));
+    if (held.customer) dispatch(setCustomer(held.customer));
+    saveHeldSales(heldSales.filter((h) => h.id !== id));
   };
 
-  const deleteHeldSale = (id) => {
-    setConfirmDialog({
-      title: "Delete held sale?",
-      description: "This parked cart will be removed. Stock was never deducted.",
-      confirmLabel: "Delete",
-      destructive: true,
-      onConfirm: () =>
-        saveAllHeldSales(allHeldSales.filter((h) => h.id !== id)),
-    });
-  };
+  const deleteHeldSale = (id) =>
+    saveHeldSales(heldSales.filter((h) => h.id !== id));
 
   // Barcode scanners end with Enter: add the exact match right away
   const handleSearchKeyDown = (e) => {
@@ -847,90 +805,101 @@ export default function POSPage() {
 
   return (
     // h-dvh: on phones h-screen runs under the browser bar and hides the bottom
-    <div className="flex h-dvh flex-col overflow-x-hidden bg-[#e8e8e8]">
+    <div className="flex h-dvh flex-col bg-background">
       {trip && (
         <BranchSwitchScreen from={trip.from} to={trip.to} onDone={() => setTrip(null)} />
       )}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
-        {!cartExpanded && (
-          <div className="order-1 flex min-h-0 min-w-0 shrink-0 flex-col max-md:max-h-[min(42vh,340px)] md:min-h-0 md:w-1/2 md:max-h-none md:flex-1 md:overflow-hidden">
-            <ProductGallery
-              key={selectedShowroomId || "shop"}
-              products={products}
-              loading={isLoading}
-              isError={isError}
-              onRetry={() => refetch()}
-              emptyHint={
-                search.trim() || selectedCategoryId || selectedBrand
-                  ? "No products found"
-                  : "No products in this shop"
-              }
-              search={search}
-              setSearch={setSearch}
-              setOpenProduct={setOpenProduct}
-              addToCart={addToCart}
-              inputRef={searchInputRef}
-              fetchNextPage={fetchNextPage}
-              hasNextPage={hasNextPage}
-              isFetchingNextPage={isFetchingNextPage}
-              categories={categories}
-              selectedCategoryId={selectedCategoryId}
-              setSelectedCategoryId={setSelectedCategoryId}
-              selectedSubCategoryId={selectedSubCategoryId}
-              setSelectedSubCategoryId={setSelectedSubCategoryId}
-              brands={brands}
-              selectedBrand={selectedBrand}
-              setSelectedBrand={setSelectedBrand}
-              sort={sort}
-              setSort={setSort}
-            />
-          </div>
-        )}
-
-        <div className="order-2 shrink-0 space-y-2 border-b border-gray-200 bg-white px-2 py-2 md:hidden dark:border-white/10 dark:bg-card">
-          <PosMobileScanBar
-            search={search}
-            setSearch={setSearch}
-            inputRef={searchInputRef}
-            onSearchKeyDown={handleSearchKeyDown}
-          />
-          <PosCustomerPicker amarMobile />
-        </div>
-
-        <div className="order-3 flex min-h-0 min-w-0 flex-1 flex-col md:order-2 md:w-1/2 md:shrink-0 md:overflow-hidden md:border-l md:border-gray-300">
-          <CartSidebar
-            key={saleKey}
-            products={products}
-            expanded={cartExpanded}
-            setExpanded={setCartExpanded}
-            cart={cart}
-            search={search}
-            setSearch={setSearch}
-            inputRef={searchInputRef}
-            onSearchKeyDown={handleSearchKeyDown}
-            removeCartItem={removeCartItem}
-            onComplete={(paymentData) => handleCheckout(paymentData)}
-            onClear={handleClearCart}
-            onPrint={printLastInvoice}
-            onExchange={openExchange}
-            canPrint={!!lastOrderId}
-            checkoutLoading={checkoutLoading}
-          />
-        </div>
-      </div>
-
-      <PosBottomActionBar
-        total={total}
-        onExchange={openExchange}
-        onHold={holdSale}
-        onClear={handleClearCart}
-        onPayment={() => window.dispatchEvent(new Event("pos:complete-sale"))}
-        cartEmpty={cart.length === 0}
-        checkoutLoading={checkoutLoading}
+      <PosTopbar
+        search={search}
+        setSearch={setSearch}
+        inputRef={searchInputRef}
+        onSearchKeyDown={handleSearchKeyDown}
         heldSales={heldSales}
         onRestoreHeld={restoreHeldSale}
         onDeleteHeld={deleteHeldSale}
+        onExchange={openExchange}
+        till={selectedTill}
+        branches={showrooms.filter((branch) => branch?._id && branch.isActive !== false)}
+        saleCenterName={tillLabel(selectedTill)}
+        onTillChange={canSwitchTill ? switchTill : undefined}
+        canSwitchTill={canSwitchTill}
       />
+
+      {/* Main: products on the left, current sale on the right */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {!cartExpanded && (
+          <ProductGallery
+            key={selectedShowroomId || "shop"}
+            products={products}
+            loading={isLoading}
+            isError={isError}
+            onRetry={() => refetch()}
+            emptyHint={
+              search.trim() || selectedCategoryId || selectedBrand
+                ? "No products found"
+                : "No products in this shop"
+            }
+            search={search}
+            setSearch={setSearch}
+            setOpenProduct={setOpenProduct}
+            addToCart={addToCart}
+            inputRef={searchInputRef}
+            fetchNextPage={fetchNextPage}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            setSelectedCategoryId={setSelectedCategoryId}
+            brands={brands}
+            selectedBrand={selectedBrand}
+            setSelectedBrand={setSelectedBrand}
+            sort={sort}
+            setSort={setSort}
+          />
+        )}
+
+        <CartSidebar
+          key={saleKey}
+          products={products}
+          expanded={cartExpanded}
+          setExpanded={setCartExpanded}
+          cart={cart}
+          mobileOpen={mobileCartOpen}
+          onMobileClose={() => setMobileCartOpen(false)}
+          removeCartItem={removeCartItem}
+          onComplete={(paymentData) => handleCheckout(paymentData)}
+          onHold={holdSale}
+          onClear={handleClearCart}
+          onPrint={printLastInvoice}
+          canPrint={!!lastOrderId}
+          checkoutLoading={checkoutLoading}
+        />
+      </div>
+
+      {/* phones: cart summary bar, opens the cart */}
+      {cart.length > 0 && !mobileCartOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileCartOpen(true)}
+          className="fixed inset-x-3 bottom-12 z-40 flex h-14 items-center gap-3 rounded-2xl bg-primary px-4 text-white shadow-xl shadow-primary/40 lg:hidden"
+        >
+          <span className="relative">
+            <ShoppingCart className="size-6" />
+            <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-gray-900">
+              {cart.reduce((n, i) => n + (Number(i.qty) || 0), 0)}
+            </span>
+          </span>
+          <span className="text-left text-sm leading-tight">
+            <span className="block font-semibold">View Cart</span>
+            <span className="text-xs text-white/80">{cart.length} products</span>
+          </span>
+          <span className="ml-auto text-lg font-bold">
+            ৳{Number(total || 0).toLocaleString("en-BD")}
+          </span>
+        </button>
+      )}
+
+      <PosFooter />
 
       {openProduct && (
         <VariantModal
@@ -950,7 +919,6 @@ export default function POSPage() {
         total={isExchangeMode ? localExchangeTotal : total}
         cashierName={currentUser?.name}
         isExchangeMode={isExchangeMode}
-        exchangeSummary={exchangePayloadCache?.exchangeSummary}
         cart={cart}
         onCheckout={(modalFormData) => {
           const finalPayload = isExchangeMode
@@ -983,27 +951,14 @@ export default function POSPage() {
           setIsExchangeMode(true);
           setLocalExchangeTotal(checkoutPayload?.total ?? 0);
           setExchangePayloadCache(checkoutPayload);
+
+          if (checkoutPayload?.exchangeData) {
+            handleExchange(checkoutPayload.exchangeData);
+          }
+
           setIsExchangeOpen(false);
           setIsCheckoutOpen(true);
         }}
-      />
-
-      <HoldNoteDialog
-        open={holdNoteOpen}
-        onOpenChange={setHoldNoteOpen}
-        onSave={(note) => commitHold(note)}
-      />
-
-      <PosConfirmDialog
-        open={!!confirmDialog}
-        onOpenChange={(open) => {
-          if (!open) setConfirmDialog(null);
-        }}
-        title={confirmDialog?.title || ""}
-        description={confirmDialog?.description}
-        confirmLabel={confirmDialog?.confirmLabel}
-        destructive={confirmDialog?.destructive}
-        onConfirm={confirmDialog?.onConfirm}
       />
     </div>
   );
