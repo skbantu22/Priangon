@@ -49,11 +49,11 @@ export default function Layout({ children }) {
         ) : (
         <div className="admin-theme bg-background">
           <SidebarProvider>
-            <Appsidebar />
+            {!isPos && <Appsidebar />}
 
             {isPos ? (
-              // POS has its own top bar and fills the screen
-              <main className="flex-1 min-w-0 h-dvh overflow-hidden">
+              // POS fills the viewport; no admin sidebar or top chrome
+              <main className="h-dvh min-w-0 w-full flex-1 overflow-hidden">
                 {children}
               </main>
             ) : (

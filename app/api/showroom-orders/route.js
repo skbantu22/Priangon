@@ -24,6 +24,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const orderNumber = searchParams.get("orderNumber");
+    const showroomId = searchParams.get("showroomId");
 
     if (!orderNumber) {
       return NextResponse.json(
@@ -43,6 +44,20 @@ export async function GET(req) {
     if (!order) {
       return NextResponse.json(
         { success: false, message: "Order not found" },
+        { status: 404 },
+      );
+    }
+
+    if (
+      showroomId &&
+      /^[a-f\d]{24}$/i.test(showroomId) &&
+      String(order.showroomId || "") !== String(showroomId)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This invoice belongs to another shop. Switch branch or use the correct invoice.",
+        },
         { status: 404 },
       );
     }

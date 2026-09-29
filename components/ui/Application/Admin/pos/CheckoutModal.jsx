@@ -9,6 +9,7 @@ export default function CheckoutModal({
   cart = [], // Defaults to safe array mapping
   isExchangeMode = false,
   exchangeData = null,
+  exchangeSummary = null,
 }) {
   const [payments, setPayments] = useState([
     { type: "Cash", option: "", amount: total },
@@ -82,7 +83,9 @@ export default function CheckoutModal({
 
   if (!isOpen) return null;
 
-  const totalPayable = total + parseFloat(deliveryCharge || 0);
+  const totalPayable =
+    (isExchangeMode ? Math.max(0, Number(total)) : Number(total)) +
+    parseFloat(deliveryCharge || 0);
   const totalReceived = payments.reduce(
     (sum, p) => sum + parseFloat(p.amount || 0),
     0,
@@ -104,18 +107,44 @@ export default function CheckoutModal({
     setPayments(updated);
   };
 
+  const canComplete =
+    isExchangeMode && totalPayable <= 0 ? true : balanceDue <= 0;
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-      <div className="bg-white w-full max-w-5xl shadow-2xl rounded-none flex flex-col max-h-[90vh]">
-        {/* Top Total Bar */}
-        <div className="bg-gray-600 text-white p-4 text-center font-bold text-xl flex-shrink-0">
-          Total Amount: {totalPayable.toLocaleString()} TK
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4">
+      <div className="flex max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-none sm:max-h-[90vh]">
+        <div className="shrink-0 bg-gray-600 p-4 text-center text-base font-bold text-white sm:text-xl">
+          {isExchangeMode && totalPayable <= 0
+            ? "Confirm refund / even exchange"
+            : `Collect: ${totalPayable.toLocaleString()} TK`}
         </div>
 
-        {/* Form Body Context */}
-        <div className="flex flex-1 overflow-y-auto">
-          {/* Left Column: Payment Details Sidebar */}
-          <div className="w-1/3 p-6 border-r space-y-4 bg-gray-50/50">
+        {isExchangeMode && exchangeSummary && (
+          <div className="shrink-0 space-y-1 border-b bg-orange-50 px-4 py-3 text-sm">
+            <div className="flex justify-between">
+              <span>Old total (returns)</span>
+              <span>{Number(exchangeSummary.returnedTotal || 0).toLocaleString()} TK</span>
+            </div>
+            <div className="flex justify-between">
+              <span>New total</span>
+              <span>{Number(exchangeSummary.newTotal || 0).toLocaleString()} TK</span>
+            </div>
+            <div className="flex justify-between font-bold text-orange-800">
+              <span>Difference</span>
+              <span>
+                {Number(exchangeSummary.difference || 0).toLocaleString()} TK
+                {exchangeSummary.refundAmount > 0
+                  ? ` (refund ${Number(exchangeSummary.refundAmount).toLocaleString()})`
+                  : exchangeSummary.extraPaid > 0
+                    ? ` (pay ${Number(exchangeSummary.extraPaid).toLocaleString()})`
+                    : ""}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row">
+          <div className="space-y-4 border-b bg-gray-50/50 p-4 lg:w-1/3 lg:border-b-0 lg:border-r lg:p-6">
             <div className="text-sm font-bold border-b pb-2 mb-4">
               Payment Details
             </div>
@@ -184,20 +213,19 @@ export default function CheckoutModal({
             </div>
           </div>
 
-          {/* Right Column: Transaction Form */}
-          <div className="w-2/3 p-6 space-y-4">
-            <div className="grid grid-cols-4 gap-4 text-xs font-bold border-b pb-2 uppercase">
+          <div className="space-y-4 p-4 lg:w-2/3 lg:p-6">
+            <div className="hidden text-xs font-bold uppercase lg:grid lg:grid-cols-4 lg:gap-4 lg:border-b lg:pb-2">
               <div>Payment Type</div>
               <div>Option (Ref)</div>
               <div>Amount</div>
               <div>Action</div>
             </div>
 
-            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+            <div className="max-h-[220px] space-y-3 overflow-y-auto pr-1">
               {payments.map((p, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-4 gap-4 items-center"
+                  className="space-y-2 rounded-lg border border-gray-200 p-3 lg:grid lg:grid-cols-4 lg:items-center lg:gap-4 lg:space-y-0 lg:border-0 lg:p-0"
                 >
                   <select
                     value={p.type}
@@ -287,15 +315,15 @@ export default function CheckoutModal({
         </div>
 
         {/* Bottom Footer Actions */}
-        <div className="p-4 border-t flex justify-between bg-gray-50 flex-shrink-0">
+        <div className="flex shrink-0 flex-col gap-2 border-t bg-gray-50 p-3 sm:flex-row sm:justify-between sm:p-4">
           <button
             onClick={onClose}
-            className="bg-red-600 text-white px-10 py-3 font-bold rounded-none hover:bg-red-700 transition"
+            className="min-h-12 rounded-xl bg-red-600 px-8 py-3 text-sm font-bold text-white hover:bg-red-700"
           >
-            Cancel [Esc]
+            Cancel
           </button>
           <button
-            disabled={balanceDue > 0}
+            disabled={!canComplete}
             onClick={() => {
               onCheckout({
                 soldBy,
@@ -314,15 +342,17 @@ export default function CheckoutModal({
               });
               resetForm();
             }}
-            className={`px-12 py-3 font-bold rounded-none transition ${
-              balanceDue > 0
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+            className={`min-h-12 rounded-xl px-8 py-3 text-sm font-bold transition ${
+              !canComplete
+                ? "cursor-not-allowed bg-gray-300 text-gray-500"
                 : "bg-green-600 text-white hover:bg-green-700"
             }`}
           >
-            {balanceDue > 0
+            {!canComplete
               ? `Due: ${balanceDue.toFixed(2)} TK`
-              : "Complete Checkout"}
+              : isExchangeMode
+                ? "Save exchange"
+                : "Complete Checkout"}
           </button>
         </div>
       </div>
