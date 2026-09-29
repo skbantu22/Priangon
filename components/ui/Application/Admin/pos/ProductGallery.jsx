@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
+import BrandLogo from "./BrandLogo";
 import { formatWarrantyPeriod } from "@/lib/warranty";
 import { POS_DEMO_BRAND_NAMES } from "@/lib/posDemoBrands";
 
@@ -450,7 +451,7 @@ export default function ProductGallery({
             className={chip(selectedBrand === b)}
             title={b}
           >
-            <span className="whitespace-nowrap font-medium">{b}</span>
+            <BrandLogo brand={b} />
           </button>
         ))}
       </ScrollRow>
