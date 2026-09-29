@@ -2,7 +2,7 @@ import { connectDB } from "@/lib/databaseconnection";
 import Product from "@/models/Product.model";
 import BrandModel from "@/models/Brand.model";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
-import { ensurePosDemoBrands } from "@/lib/posDemoBrands";
+import { ensurePosDemoBrands, POS_DEMO_BRAND_NAMES } from "@/lib/posDemoBrands";
 
 // Brands for the POS filter: live product brands + catalog brands (incl. demo names).
 export async function GET() {
@@ -33,7 +33,10 @@ export async function GET() {
 
     merged.sort((a, b) => a.localeCompare(b));
 
-    return Response.json({ success: true, brands: merged, addedDemo });
+    const brands =
+      merged.length > 0 ? merged : [...POS_DEMO_BRAND_NAMES].sort((a, b) => a.localeCompare(b));
+
+    return Response.json({ success: true, brands, addedDemo });
   } catch (error) {
     console.error(error);
     return Response.json({ success: false, brands: [] }, { status: 500 });

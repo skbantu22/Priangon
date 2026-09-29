@@ -10,8 +10,8 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
-import BrandLogo from "./BrandLogo";
 import { formatWarrantyPeriod } from "@/lib/warranty";
+import { POS_DEMO_BRAND_NAMES } from "@/lib/posDemoBrands";
 
 const LOW_STOCK = 5;
 
@@ -308,6 +308,9 @@ export default function ProductGallery({
   const [localFilter, setLocalFilter] = useState("");
   const [view, setView] = useState("grid");
 
+  const brandChips =
+    brands.length > 0 ? brands : POS_DEMO_BRAND_NAMES;
+
   const inShop = useMemo(
     () =>
       (products || []).filter((item) => {
@@ -431,27 +434,26 @@ export default function ProductGallery({
       </ScrollRow>
 
       {/* ---------------- BRAND CHIPS ---------------- */}
-      {brands.length > 0 && (
-        <ScrollRow label="brands">
-            <button
-              type="button"
-              onClick={() => setSelectedBrand("")}
-              className={chip(!selectedBrand)}
-            >
-              All Brands
-            </button>
-            {brands.map((b) => (
-              <button
-                type="button"
-                key={b}
-                onClick={() => setSelectedBrand(b)}
-                className={chip(selectedBrand === b)}
-              >
-                <BrandLogo brand={b} />
-              </button>
-            ))}
-        </ScrollRow>
-      )}
+      <ScrollRow label="brands">
+        <button
+          type="button"
+          onClick={() => setSelectedBrand("")}
+          className={chip(!selectedBrand)}
+        >
+          All Brands
+        </button>
+        {brandChips.map((b) => (
+          <button
+            type="button"
+            key={b}
+            onClick={() => setSelectedBrand(b)}
+            className={chip(selectedBrand === b)}
+            title={b}
+          >
+            <span className="whitespace-nowrap font-medium">{b}</span>
+          </button>
+        ))}
+      </ScrollRow>
 
       {/* ---------------- PRODUCTS PANEL ---------------- */}
       <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
