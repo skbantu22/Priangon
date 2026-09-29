@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 
 import POSOrder from "@/models/posorder.model";
 import SaleReturn from "@/models/SaleReturn.model";
+import Showroom from "@/models/Showroom.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
+import { resolveLockedTill } from "@/lib/posTillAuth";
 
 const TYPES = ["retail", "dealer", "subDealer", "wholesaler"];
 const PAYMENT = {
@@ -36,11 +38,20 @@ export async function GET(req) {
     }
     if (q.get("exchange") === "1") filter.orderType = "exchange";
     if (mongoose.isValidObjectId(q.get("customerId"))) filter.customerId = new mongoose.Types.ObjectId(q.get("customerId"));
-    const branch = q.get("showroomId") || "";
-    if (branch === "warehouse") {
-      filter.$and = [{ $or: [{ soldFrom: "WAREHOUSE" }, { showroomId: null }] }];
-    } else if (mongoose.isValidObjectId(branch)) {
-      filter.showroomId = new mongoose.Types.ObjectId(branch);
+    if (auth.role !== "admin") {
+      const till = await resolveLockedTill(auth);
+      if (till.isWarehouse) {
+        filter.$and = [{ $or: [{ soldFrom: "WAREHOUSE" }, { showroomId: null }] }];
+      } else if (till.orderShowroomId && mongoose.isValidObjectId(String(till.orderShowroomId))) {
+        filter.showroomId = new mongoose.Types.ObjectId(String(till.orderShowroomId));
+      }
+    } else {
+      const branch = q.get("showroomId") || "";
+      if (branch === "warehouse") {
+        filter.$and = [{ $or: [{ soldFrom: "WAREHOUSE" }, { showroomId: null }] }];
+      } else if (mongoose.isValidObjectId(branch)) {
+        filter.showroomId = new mongoose.Types.ObjectId(branch);
+      }
     }
     if (q.get("soldBy")) filter.soldBy = q.get("soldBy");
     Object.assign(filter, PAYMENT[q.get("paymentStatus")] || {});
@@ -94,6 +105,12 @@ export async function GET(req) {
       ).map((r) => [String(r._id), r.total]),
     );
 
+    const missingName = [...new Set(orders.filter((o) => !o.locationName && o.showroomId).map((o) => String(o.showroomId)))];
+    const named = missingName.length
+      ? await Showroom.find({ _id: { $in: missingName } }).select("name").lean()
+      : [];
+    const showroomName = new Map(named.map((s) => [String(s._id), s.name]));
+
     return NextResponse.json({
       success: true,
       data: orders.map((o) => ({
@@ -102,7 +119,10 @@ export async function GET(req) {
         itemCount: (o.items || []).reduce((sum, i) => sum + (i.qty || 0), 0),
         paymentStatus: paymentStatus(o.paidAmount, o.dueAmount),
         returned: returned.get(String(o._id)) || 0,
-        locationName: o.locationName || (o.soldFrom === "WAREHOUSE" || !o.showroomId ? "Warehouse" : "Sale Center"),
+        locationName:
+          o.locationName ||
+          showroomName.get(String(o.showroomId || "")) ||
+          (o.showroomId ? "Sale Center" : "Warehouse"),
       })),
       total,
       pages: Math.max(1, Math.ceil(total / limit)),

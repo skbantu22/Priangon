@@ -7,6 +7,7 @@ import ProductVariant from "@/models/ProductVariant.model ";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
+import { resolveLockedTill } from "@/lib/posTillAuth";
 
 /**
  * GET ?showroomId&q — what the exchange screen can give out: stock rows of
@@ -21,7 +22,14 @@ export async function GET(req) {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
-    const showroomId = searchParams.get("showroomId");
+    const requested = searchParams.get("showroomId");
+    const till = await resolveLockedTill(auth, requested);
+    const showroomId =
+      auth.role === "admin"
+        ? requested
+        : till.orderShowroomId
+          ? String(till.orderShowroomId)
+          : "";
     const q = String(searchParams.get("q") || "").trim();
 
     if (!mongoose.isValidObjectId(showroomId) || q.length < 2) {
@@ -47,7 +55,11 @@ export async function GET(req) {
       variantId: { $in: variants.map((v) => v._id) },
       stock: { $gt: 0 },
     })
-      .populate("productId", "name sellingPrice dealerPrice subDealerPrice wholesalerPrice")
+      .populate({
+        path: "productId",
+        match: { deletedAt: null },
+        select: "name sellingPrice dealerPrice subDealerPrice wholesalerPrice",
+      })
       .populate("variantId", "color size sku barcode sellingPrice dealerPrice subDealerPrice wholesalerPrice")
       .limit(40)
       .lean();

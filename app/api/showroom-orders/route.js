@@ -98,9 +98,10 @@ export async function POST(req) {
     ========================= */
     if (!items?.length) throw new Error("Cart is empty");
 
+    const shopId = /^[a-f\d]{24}$/i.test(String(showroomId || "")) ? String(showroomId) : "";
     const till = await resolveLockedTill(
       auth,
-      String(soldFromRaw || "").toUpperCase() === "WAREHOUSE" ? "warehouse" : showroomId,
+      shopId || (String(soldFromRaw || "").toUpperCase() === "WAREHOUSE" ? "warehouse" : showroomId),
     );
 
     if (!till.isWarehouse && !till.orderShowroomId) {
@@ -109,10 +110,17 @@ export async function POST(req) {
 
     const productDocs = await Product.find({
       _id: { $in: items.map((i) => i.productId) },
+      deletedAt: null,
     })
       .select("warranty trackSerial purchasePrice")
       .lean();
     const productMap = new Map(productDocs.map((p) => [String(p._id), p]));
+
+    for (const item of items) {
+      if (!productMap.has(String(item.productId))) {
+        throw new Error(`${item.productName || "Product"} is in the trash and cannot be sold`);
+      }
+    }
 
     // Purchases keep a moving average cost per variant, which is the real
     // cost of this handset. The product's own price is only the fallback

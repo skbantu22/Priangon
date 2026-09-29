@@ -40,6 +40,7 @@ export async function GET(req) {
     const stock = await ShowroomStock.findOne(filter)
       .populate({
         path: "productId",
+        match: { deletedAt: null },
         populate: {
           path: "media",
           select: "secure_url",
@@ -49,6 +50,7 @@ export async function GET(req) {
         path: "variantId",
         match: {
           barcode,
+          deletedAt: null,
         },
         select: "color size barcode sku mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice",
       })

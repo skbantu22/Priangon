@@ -33,18 +33,24 @@ import { PurchasePayDialog } from "@/components/ui/Application/Admin/purchase/pu
 
 const EMPTY_FILTERS = { status: "all", paymentStatus: "all", supplierId: "", start: "", end: "", search: "" };
 
-const STATUS_STYLE = {
-  pending: "bg-amber-100 text-amber-800",
-  received: "bg-emerald-100 text-emerald-700",
-  cancelled: "bg-red-100 text-red-700",
-  unpaid: "bg-red-100 text-red-700",
-  partial: "bg-amber-100 text-amber-800",
-  paid: "bg-emerald-100 text-emerald-700",
+const STOCK_STYLE = {
+  pending: "bg-[#fff6dd] text-[#9a6a00]",
+  received: "bg-[#e8f7f0] text-[#0b8a45]",
+  cancelled: "bg-[#f1f3f5] text-[#6c757d]",
 };
+const PAY_STYLE = {
+  unpaid: "bg-[#fff1f1] text-[#d63939]",
+  partial: "bg-[#fff6dd] text-[#9a6a00]",
+  paid: "bg-[#e8f7f0] text-[#0b8a45]",
+};
+const PAY_LABEL = { unpaid: "Due", partial: "Partial Due", paid: "Paid" };
+const STOCK_LABEL = { pending: "Pending", received: "Received", cancelled: "Cancelled" };
 
-const Pill = ({ value }) => (
-  <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${STATUS_STYLE[value] || ""}`}>{value}</span>
-);
+const Pill = ({ value, kind }) => {
+  const label = kind === "pay" ? PAY_LABEL[value] || value : STOCK_LABEL[value] || value;
+  const tone = kind === "pay" ? PAY_STYLE[value] : STOCK_STYLE[value];
+  return <span className={`inline-block whitespace-nowrap px-[8px] py-[2px] text-[12px] font-semibold ${tone || ""}`}>{label}</span>;
+};
 
 const COLUMNS = ["SL", "Date", "Invoice No", "Reference", "Supplier", "Location", "Items", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By"];
 
@@ -180,8 +186,8 @@ export default function PurchasePage() {
     act(() => axios.delete(`/api/purchase/delete/${p._id}`), "Purchase cancelled");
 
   const rowActions = (p) => [
-    ["View", () => router.push(ADMIN_PURCHASE_VIEW(p._id))],
-    ["Print Invoice", () => router.push(`${ADMIN_PURCHASE_VIEW(p._id)}?print=1`)],
+    ["View", () => window.open(ADMIN_PURCHASE_VIEW(p._id), "_blank")],
+    ["Print Invoice", () => window.open(`${ADMIN_PURCHASE_VIEW(p._id)}?print=1`, "_blank")],
     p.status === "pending" && ["Receive (stock in)", () => receive(p)],
     p.status !== "cancelled" && p.dueAmount > 0 && ["Pay Due", () => setPaying(p)],
     p.status === "received" && ["Return Goods", () => router.push(`${ADMIN_PURCHASE_RETURN_ADD}?supplier=${p.supplierId}`)],
@@ -193,29 +199,13 @@ export default function PurchasePage() {
   return (
     <div className="space-y-4">
       <ListCard
-        title="Manage Purchase"
+        title="Purchase List"
         actions={
           <button type="button" onClick={() => router.push(ADMIN_PURCHASE_ADD)} className={btn.primary}>
             <Plus size={14} /> Add Purchase
           </button>
         }
       >
-        {totals && (
-          <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {[
-              ["Purchases", totals.count.toLocaleString("en-BD"), ""],
-              ["Total Purchase", `৳${money(totals.grandTotal)}`, ""],
-              ["Paid", `৳${money(totals.paidAmount)}`, "text-emerald-600"],
-              ["Supplier Due", `৳${money(totals.dueAmount)}`, totals.dueAmount > 0 ? "text-red-600" : ""],
-            ].map(([label, value, tone]) => (
-              <div key={label} className="rounded-[6px] border border-[#ebeff2] bg-[#f7f9fb] px-3 py-2 dark:border-border dark:bg-muted">
-                <p className="m-0 text-[11px] text-muted-foreground">{label}</p>
-                <p className={`m-0 text-[16px] font-semibold tabular-nums ${tone}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
         <form onSubmit={search} className="flex flex-wrap items-center gap-2">
           <select
             value={limit}
@@ -273,7 +263,7 @@ export default function PurchasePage() {
           </button>
         </form>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <ExportButtons
             disabled={busy}
             onPdf={() => withAllRows((body, foot) => exportPdf("Purchase List", COLUMNS, body, foot))}
@@ -284,6 +274,13 @@ export default function PurchasePage() {
               })
             }
           />
+          {totals && (
+            <span className="flex flex-wrap gap-2 text-[13px]">
+              <span className="bg-[#eaf4fd] px-[10px] py-[5px] text-[#188ae2]">Total ৳ {money(totals.grandTotal)}</span>
+              <span className="bg-[#e8f7f0] px-[10px] py-[5px] text-[#0b8a45]">Paid ৳ {money(totals.paidAmount)}</span>
+              <span className="bg-[#fff1f1] px-[10px] py-[5px] text-[#ff5b5b]">Due ৳ {money(totals.dueAmount)}</span>
+            </span>
+          )}
         </div>
 
         {/* Phones: one card per purchase */}
@@ -299,15 +296,15 @@ export default function PurchasePage() {
               <article key={p._id} className="rounded-[6px] border border-[#ebeff2] bg-white p-3 dark:border-border dark:bg-card">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <button type="button" onClick={() => router.push(ADMIN_PURCHASE_VIEW(p._id))} className="text-left text-[15px] font-semibold">
-                      {p.supplierName}
-                    </button>
-                    <p className="m-0 text-[12px] text-muted-foreground">
-                      {p.purchaseNumber} · {fmtDate(p.purchaseDate)} · {p.locationName || "Warehouse"} · {qtyOf(p)} pcs
+                    <a href={ADMIN_PURCHASE_VIEW(p._id)} target="_blank" rel="noreferrer" className="text-[15px] font-semibold text-[#188ae2]">
+                      {p.purchaseNumber}
+                    </a>
+                    <p className="m-0 truncate text-[12px] text-muted-foreground">
+                      {p.supplierName} · {fmtDate(p.purchaseDate)} · {p.locationName || "Warehouse"}
                     </p>
                     <span className="mt-1 flex gap-1">
-                      <Pill value={p.status} />
-                      <Pill value={p.paymentStatus} />
+                      <Pill kind="stock" value={p.status} />
+                      <Pill kind="pay" value={p.paymentStatus} />
                     </span>
                   </div>
                   <ActionMenu items={rowActions(p)} />
@@ -316,7 +313,7 @@ export default function PurchasePage() {
                   {[
                     ["Total", p.grandTotal],
                     ["Paid", p.paidAmount],
-                    ["Due", p.dueAmount, p.dueAmount > 0 ? "text-red-600" : ""],
+                    ["Due", p.dueAmount, p.dueAmount > 0 ? "text-[#ff5b5b]" : ""],
                   ].map(([label, value, tone]) => (
                     <div key={label} className="rounded-[4px] bg-[#f7f9fb] px-2 py-1.5 dark:bg-muted">
                       <dt className="text-[11px] text-muted-foreground">{label}</dt>
@@ -329,7 +326,7 @@ export default function PurchasePage() {
         </div>
 
         <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
+          <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
             <thead>
               <tr className={theadRow}>
                 {["SL", "Date", "Invoice No", "Supplier", "Location", "Qty", "Total", "Paid", "Due Dismiss", "Due", "Stock", "Payment", "Created By", "Action"].map((h) => (
@@ -357,9 +354,9 @@ export default function PurchasePage() {
                     <td className={tdClass}>{meta.from + i}</td>
                     <td className={tdClass}>{fmtDate(p.purchaseDate)}</td>
                     <td className={tdClass}>
-                      <button type="button" onClick={() => router.push(ADMIN_PURCHASE_VIEW(p._id))} className="font-medium text-[#188ae2] hover:underline">
+                      <a href={ADMIN_PURCHASE_VIEW(p._id)} target="_blank" rel="noreferrer" className="text-[#188ae2] hover:underline">
                         {p.purchaseNumber}
-                      </button>
+                      </a>
                       {p.referenceNo && <span className="block text-xs text-muted-foreground">Ref {p.referenceNo}</span>}
                     </td>
                     <td className={tdClass}>{p.supplierName}</td>
@@ -368,15 +365,15 @@ export default function PurchasePage() {
                       {qtyOf(p)}
                       <span className="block text-xs text-muted-foreground">{p.items.length} product(s)</span>
                     </td>
-                    <td className={tdClass}>{money(p.grandTotal)}</td>
+                    <td className={`${tdClass} font-semibold`}>{money(p.grandTotal)}</td>
                     <td className={tdClass}>{money(p.paidAmount)}</td>
                     <td className={tdClass}>{money(p.dismissAmount)}</td>
-                    <td className={`${tdClass} font-semibold ${p.dueAmount > 0 && p.status !== "cancelled" ? "text-red-600" : ""}`}>{money(p.dueAmount)}</td>
+                    <td className={`${tdClass} font-semibold ${p.dueAmount > 0 && p.status !== "cancelled" ? "text-[#ff5b5b]" : ""}`}>{money(p.dueAmount)}</td>
                     <td className={tdClass}>
-                      <Pill value={p.status} />
+                      <Pill kind="stock" value={p.status} />
                     </td>
                     <td className={tdClass}>
-                      <Pill value={p.paymentStatus} />
+                      <Pill kind="pay" value={p.paymentStatus} />
                     </td>
                     <td className={tdClass}>{p.createdBy || ""}</td>
                     <td className={tdClass}>

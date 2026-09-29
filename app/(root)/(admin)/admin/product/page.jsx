@@ -176,10 +176,14 @@ export default function ProductsPage() {
   const runAction = async (ids, action) => {
     if (!ids.length) return showToast("error", "Select products first");
     if (action === "trash" && !confirm(`Move ${ids.length} product(s) to trash?`)) return;
+    if (action === "delete" && !confirm(`Permanently delete ${ids.length} product(s)? This cannot be undone.`)) return;
 
     setBusy(true);
     try {
-      const { data: res } = await axios.put("/api/product/bulk", { ids, action });
+      const { data: res } =
+        action === "delete"
+          ? await axios.delete("/api/product/delete", { data: { ids, deleteType: "PD" } })
+          : await axios.put("/api/product/bulk", { ids, action });
       showToast(res.success ? "success" : "error", res.message);
       setSelected([]);
       queryClient.invalidateQueries({ queryKey: ["product-list"] });
@@ -224,10 +228,16 @@ export default function ProductsPage() {
     }
   };
 
-  const rowActions = (p) => [
-    ["Edit / Variants", () => router.push(ADMIN_PRODUCT_EDIT(p._id))],
-    p.deleted ? ["Restore", () => runAction([p._id], "restore")] : ["Move to trash", () => runAction([p._id], "trash"), "danger"],
-  ];
+  const rowActions = (p) =>
+    p.deleted
+      ? [
+          ["Restore", () => runAction([p._id], "restore")],
+          ["Delete permanently", () => runAction([p._id], "delete"), "danger"],
+        ]
+      : [
+          ["Edit / Variants", () => router.push(ADMIN_PRODUCT_EDIT(p._id))],
+          ["Move to trash", () => runAction([p._id], "trash"), "danger"],
+        ];
 
   const allChecked = rows.length > 0 && rows.every((p) => selected.includes(p._id));
   const check = (id, on) => setSelected(on ? [...selected, id] : selected.filter((x) => x !== id));
@@ -346,7 +356,18 @@ export default function ProductsPage() {
             ))}
           </select>
 
-          <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })} className={`${inputClass} !w-28`} aria-label="Status">
+          <select
+            value={draft.status}
+            onChange={(e) => {
+              const status = e.target.value;
+              setDraft((current) => ({ ...current, status }));
+              setFilters((current) => ({ ...current, status }));
+              setStock("");
+              reset();
+            }}
+            className={`${inputClass} !w-28`}
+            aria-label="Status"
+          >
             <option value="active">Active</option>
             <option value="trash">Trash</option>
           </select>
@@ -379,9 +400,14 @@ export default function ProductsPage() {
           />
           <ActionMenu
             label={selected.length ? `Actions (${selected.length})` : "Actions"}
-            items={[
-              isTrash ? ["Restore", () => runAction(selected, "restore")] : ["Move to trash", () => runAction(selected, "trash"), "danger"],
-            ]}
+            items={
+              isTrash
+                ? [
+                    ["Restore", () => runAction(selected, "restore")],
+                    ["Delete permanently", () => runAction(selected, "delete"), "danger"],
+                  ]
+                : [["Move to trash", () => runAction(selected, "trash"), "danger"]]
+            }
           />
           <span className="ml-auto text-[12px] text-muted-foreground">
             % = margin over cost · <span className="text-amber-600">Not set</span> = POS charges the Buyer price
@@ -394,7 +420,7 @@ export default function ProductsPage() {
 
           {!isLoading && rows.length === 0 && (
             <div className="rounded-[6px] border border-dashed border-[#d4dae0] px-4 py-8 text-center text-[15px] font-medium text-[#495057]">
-              {isError ? "Could not load products" : filtered ? "No products match these filters" : "No products yet"}
+              {isError ? "Could not load products" : isTrash ? "Trash is empty" : filtered ? "No products match these filters" : "No products yet"}
             </div>
           )}
 
@@ -492,7 +518,7 @@ export default function ProductsPage() {
               {!isLoading && !isError && rows.length === 0 && (
                 <EmptyRow
                   colSpan={12}
-                  title={filtered ? "No products match these filters" : "No products yet"}
+                  title={isTrash ? "Trash is empty" : filtered ? "No products match these filters" : "No products yet"}
                   hint="Add a product with opening stock. It lands on the branch selected at the top, and that branch's POS can sell it."
                 />
               )}

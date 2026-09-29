@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { warrantyLabel } from "@/lib/warranty";
 import { showToast } from "@/lib/showToast";
+import InvoiceSheet, { amountInWords, downloadInvoicePdf, money } from "@/components/InvoiceSheet";
 
 const WARRANTY_NOTES = [
   "Warranty covers manufacturing defects only.",
@@ -13,401 +12,161 @@ const WARRANTY_NOTES = [
   "Exchange within 3 days only if the box and accessories are intact.",
 ];
 
-function numberToWords(num) {
-  const a = [
-    "",
-    "One",
-    "Two",
-    "Three",
-    "Four",
-    "Five",
-    "Six",
-    "Seven",
-    "Eight",
-    "Nine",
-    "Ten",
-    "Eleven",
-    "Twelve",
-    "Thirteen",
-    "Fourteen",
-    "Fifteen",
-    "Sixteen",
-    "Seventeen",
-    "Eighteen",
-    "Nineteen",
-  ];
-  const b = [
-    "",
-    "",
-    "Twenty",
-    "Thirty",
-    "Forty",
-    "Fifty",
-    "Sixty",
-    "Seventy",
-    "Eighty",
-    "Ninety",
-  ];
-
-  if ((num = num.toString()).length > 9) return "Overflow";
-  let n = ("000000000" + num)
-    .substr(-9)
-    .match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-  if (!n) return "";
-  let str = "";
-  str +=
-    n[1] != 0
-      ? (a[Number(n[1])] || b[n[1][0]] + " " + a[n[1][1]]) + " Crore "
-      : "";
-  str +=
-    n[2] != 0
-      ? (a[Number(n[2])] || b[n[2][0]] + " " + a[n[2][1]]) + " Lakh "
-      : "";
-  str +=
-    n[3] != 0
-      ? (a[Number(n[3])] || b[n[3][0]] + " " + a[n[3][1]]) + " Thousand "
-      : "";
-  str +=
-    n[4] != 0
-      ? (a[Number(n[4])] || b[n[4][0]] + " " + a[n[4][1]]) + " Hundred "
-      : "";
-  str +=
-    n[5] != 0
-      ? (str != "" ? "and " : "") +
-        (a[Number(n[5])] || b[n[5][0]] + " " + a[n[5][1]])
-      : "";
-  return str.trim();
-}
-
 // sharePath: signed public link of this invoice (admin print page)
 // publicView: the customer's own copy, no auto print and no send buttons
 export default function PrintReceipt({ order, autoPrint = true, sharePath = "", publicView = false }) {
   const [sending, setSending] = useState("");
 
-  // Auto Print popup after 0.5s so buttons are rendered first
-  // (the partner portal shows the invoice first and prints on demand)
   useEffect(() => {
-    if (!autoPrint || publicView) return;
-    const timer = setTimeout(() => {
-      window.print();
-    }, 500);
+    if (!autoPrint || publicView) return undefined;
+    const timer = setTimeout(() => window.print(), 500);
     return () => clearTimeout(timer);
   }, [autoPrint, publicView]);
 
   if (!order) return <div className="p-4 text-center">Loading...</div>;
 
-  // App Settings first, then the showroom's own details, then the
-  // originals — so an unconfigured shop still prints a full header
   const company = order.company || {};
-
   const showroomName = company.name || order.showroom?.name || "SB Telecom";
-  const showroomAddress =
-    order.showroom?.address || company.address || "Dhaka, Bangladesh";
-  const showroomPhone =
-    order.showroom?.phone || company.phone || "01700000001";
-  const showroomEmail =
-    order.showroom?.email || company.email || "support@sbtelecom.com.bd";
+  const showroomAddress = order.showroom?.address || company.address || "Dhaka, Bangladesh";
+  const showroomPhone = order.showroom?.phone || company.phone || "01700000001";
+  const showroomEmail = order.showroom?.email || company.email || "support@sbtelecom.com.bd";
+  const vatLine = company.showMushakLine && company.bin ? `BIN ${company.bin}${company.mushakFormNo ? ` · Mushak ${company.mushakFormNo}` : ""}` : "";
+  const branch = order.showroom?.name || "—";
 
-  // Mushak 6.3 is the VAT challan a registered wholesaler issues
-  const vatLine =
-    company.showMushakLine && company.bin
-      ? `BIN ${company.bin}${company.mushakFormNo ? ` · Mushak ${company.mushakFormNo}` : ""}`
-      : "";
+  const warrantyNotes = company.warrantyTerms
+    ? company.warrantyTerms.split("\n").map((line) => line.trim()).filter(Boolean)
+    : WARRANTY_NOTES;
 
-  const warrantyNotes =
-    company.warrantyTerms
-      ? company.warrantyTerms
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean)
-      : WARRANTY_NOTES;
-
-  const totalAmount = order.total || 0;
-  // older orders have no paidAmount: they were paid in full
-  const totalPaid = order.paidAmount ?? totalAmount;
+  const totalAmount = Number(order.total || 0);
+  const totalPaid = Number(order.paidAmount ?? totalAmount);
   const dueAmount = Number(order.dueAmount || 0);
-  const cashReceive = order.cashReceive || totalPaid;
-  const changeAmount = cashReceive - totalPaid;
-  const payment = order.payments?.[0];
-  const paymentMethod =
-    order.paymentMethod ||
-    [payment?.type, payment?.option].filter(Boolean).join(" - ") ||
-    "Cash";
+  const discount = Number(order.discount || 0);
+  const vat = Number(order.vat || 0);
+  const subtotal = Number(order.subTotal || totalAmount);
+  const cashReceive = Number(order.cashReceive || 0);
+  const changeAmount = cashReceive > totalPaid ? cashReceive - totalPaid : 0;
 
-  // name + variant + IMEI + warranty lines for one invoice row
-  const itemLines = (item) => {
+  const saleDate = order.saleDate ? new Date(order.saleDate) : new Date();
+  const createdTime = order.createdAt ? new Date(order.createdAt) : saleDate;
+  const orderDate = saleDate.toLocaleDateString("en-GB");
+  const orderTime = createdTime.toLocaleTimeString("en-US", { timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", hour12: true });
+
+  const itemNotes = (item) => {
     const lines = [];
     const variant = [item.size, item.color].filter((x) => x && !/^(default|standard)$/i.test(x)).join(" / ");
     if (item.barcode) lines.push(`Barcode: ${item.barcode}`);
     if (variant) lines.push(variant);
     if (item.imeis?.length) lines.push(`IMEI/SN: ${item.imeis.join(", ")}`);
-    const w = warrantyLabel(item);
-    if (w) {
+    const warranty = warrantyLabel(item);
+    if (warranty) {
       const till = item.warrantyExpiry
-        ? new Date(item.warrantyExpiry).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
+        ? new Date(item.warrantyExpiry).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
         : "";
-      lines.push(till ? `${w} (till ${till})` : w);
+      lines.push(till ? `${warranty} (till ${till})` : warranty);
     }
     return lines;
   };
-  const totalInWords = numberToWords(Math.round(totalAmount));
 
-  const saleDate = order.saleDate ? new Date(order.saleDate) : new Date();
-  const createdTime = order.createdAt ? new Date(order.createdAt) : saleDate;
+  const lineAmount = (item) => Number(item.price || 0) * (parseInt(item.qty, 10) || 1);
+  const items = order.items || [];
 
-  const orderDate = saleDate.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const meta = [
+    [
+      { label: "Invoice No", value: order.orderNumber || order._id },
+      { label: "Date", value: `${orderDate} · ${orderTime}` },
+    ],
+    [
+      { label: "Customer", value: order.customerName || "Walk-in" },
+      { label: "Phone", value: order.customerPhone || "—" },
+    ],
+    [
+      { label: "Branch", value: branch },
+      { label: "Sold By", value: order.soldBy || "—" },
+    ],
+  ];
 
-  const orderTime = createdTime.toLocaleTimeString("en-US", {
-    timeZone: "Asia/Dhaka",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const columns = [
+    { key: "sl", label: "SL", align: "center", width: "7%" },
+    { key: "product", label: "Product", align: "left" },
+    { key: "qty", label: "Qty", align: "center", width: "10%" },
+    { key: "rate", label: "Rate", align: "right", width: "16%" },
+    { key: "amount", label: "Amount", align: "right", width: "18%" },
+  ];
 
-  // Action Handlers
-  const handlePrint = () => {
-    window.print();
+  const lines = items.map((item, index) => ({
+    key: index,
+    notes: itemNotes(item),
+    cells: {
+      sl: index + 1,
+      product: item.name || item.title || item.productName || "Item",
+      qty: item.qty || 1,
+      rate: money(item.price),
+      amount: money(lineAmount(item)),
+    },
+  }));
+
+  const totals = [
+    { label: "Subtotal", value: subtotal },
+    ...(discount > 0 ? [{ label: "Discount", value: discount }] : []),
+    ...(vat > 0 ? [{ label: "VAT", value: vat }] : []),
+    { label: "Total", value: totalAmount, strong: true },
+    { label: "Paid", value: totalPaid },
+    { label: "Due", value: dueAmount, strong: true },
+    ...(changeAmount > 0 ? [{ label: "Change", value: changeAmount }] : []),
+  ];
+
+  const words = company.showAmountInWords === false ? "" : amountInWords(totalAmount);
+  const payment = order.payments?.[0];
+  const paymentMethod = order.paymentMethod || [payment?.type, payment?.option].filter(Boolean).join(" - ") || "Cash";
+
+  const sheet = {
+    fileName: `Invoice-${order.orderNumber || order._id}.pdf`,
+    shopName: showroomName,
+    shopAddress: showroomAddress,
+    shopPhone: showroomPhone,
+    shopEmail: showroomEmail,
+    vatLine,
+    title: "SALES INVOICE",
+    meta,
+    head: ["SL", "Product", "Qty", "Rate", "Amount"],
+    body: items.map((item, index) => [
+      String(index + 1),
+      [item.name || item.title || item.productName || "Item", ...itemNotes(item)].join("\n"),
+      String(item.qty || 1),
+      money(item.price),
+      money(lineAmount(item)),
+    ]),
+    widths: [14, 88, 18, 32, 34],
+    totals,
+    words,
+    note: order.note || "",
+    extraHead: ["Payment", "Amount"],
+    extraBody: [[paymentMethod, money(totalPaid)]],
   };
 
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF({
-      unit: "mm",
-      format: [90, 240],
-    });
-
-    let y = 8;
-    const pageWidth = 80;
-    const margin = 4;
-    const contentWidth = pageWidth - margin * 2;
-
-    // Header Info
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text(showroomName, pageWidth / 2, y, { align: "center" });
-    y += 5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    const splitAddress = doc.splitTextToSize(showroomAddress, contentWidth);
-    doc.text(splitAddress, pageWidth / 2, y, { align: "center" });
-    y += splitAddress.length * 3.5 + 1;
-
-    doc.text(`Mobile: ${showroomPhone}`, pageWidth / 2, y, { align: "center" });
-    y += 3.5;
-    doc.text(`Email: ${showroomEmail}`, pageWidth / 2, y, { align: "center" });
-    y += 3.5;
-
-    if (vatLine) {
-      doc.text(vatLine, pageWidth / 2, y, { align: "center" });
-      y += 3.5;
-    }
-
-    y += 1.5;
-
-    // Divider Line
-    doc.setLineDash([1, 1], 0);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 4;
-
-    // Meta Details
-    doc.setFontSize(8);
-    const meta = [
-      ["Invoice ID:", order.orderNumber || order._id || "20261011747"],
-      ["Sale Date:", `${orderDate} @ ${orderTime}`],
-      ["Customer:", order.customerName || "Walk-in"],
-      ["Phone:", order.customerPhone || "N/A"],
-      ["Sold By:", order.soldBy || "N/A"],
-    ];
-
-    meta.forEach(([label, val]) => {
-      doc.setFont("helvetica", "bold");
-      doc.text(label, margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(String(val), margin + 22, y);
-      y += 4;
-    });
-
-    y += 2;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 4;
-
-    // Title
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("INVOICE", pageWidth / 2, y, { align: "center" });
-    y += 4;
-
-    // Products Table (Fixed undefined and table bracket issues)
-    const tableRows = (order.items || []).map((item, index) => {
-      const itemName = item.name || item.title || item.productName || "Item";
-      return [
-        index + 1,
-        [itemName, ...itemLines(item)].join("\n"),
-        Number(item.price || 0).toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-        }),
-        item.qty || 1,
-        ((item.price || 0) * (parseInt(item.qty) || 1)).toLocaleString(
-          "en-US",
-          { minimumFractionDigits: 2 },
-        ),
-      ];
-    });
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      head: [["Sl", "Name", "Price", "Qty", "Total"]],
-      body: tableRows,
-      theme: "grid", // grid দিলে টেবিলের লাইন পরিষ্কার থাকবে
-      styles: {
-        fontSize: 7.5,
-        cellPadding: 1,
-        textColor: [0, 0, 0],
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
-      },
-      headStyles: {
-        fillColor: [255, 255, 255],
-        textColor: [0, 0, 0],
-        fontStyle: "bold",
-        lineWidth: 0.2,
-        lineColor: [0, 0, 0],
-      },
-      columnStyles: {
-        0: { cellWidth: 6 },
-        1: { cellWidth: 33 },
-        2: { cellWidth: 15, halign: "right" },
-        3: { cellWidth: 8, halign: "center" },
-        4: { cellWidth: 18, halign: "right" },
-      },
-    });
-
-    // Get final Y position after table
-    y = doc.lastAutoTable.finalY + 4;
-    doc.setLineDash([], 0);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 4;
-
-    // Summary Calculations
-    const summaries = [
-      ["Subtotal :", Number(order.subTotal || totalAmount)],
-      ["Total :", Number(totalAmount)],
-      ["Paid :", Number(totalPaid)],
-      ...(dueAmount > 0
-        ? [["Due :", dueAmount]]
-        : [
-            ["Cash Receive:", Number(cashReceive)],
-            ["Change :", Number(changeAmount)],
-          ]),
-    ];
-
-    doc.setFontSize(8);
-    summaries.forEach(([label, val]) => {
-      doc.setFont("helvetica", "bold");
-      doc.text(label, 35, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        val.toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-        pageWidth - margin,
-        y,
-        { align: "right" },
-      );
-      y += 4;
-    });
-
-    y += 2;
-    doc.setFont("helvetica", "bold");
-    doc.text(`In Words: ${totalInWords} TK Only`, margin, y);
-    y += 6;
-
-    // Payment Box
-    doc.setLineWidth(0.2);
-    doc.rect(margin, y, contentWidth, 12);
-    doc.setFont("helvetica", "bold");
-    doc.text("PAYMENTS", pageWidth / 2, y + 4, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.text(
-      `${paymentMethod} =              TK ${Number(totalPaid).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      margin + 3,
-      y + 9,
-    );
-    y += 16;
-
-    // Footer Notes
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "italic");
-    warrantyNotes.forEach((note) => {
-      doc.text(note, pageWidth / 2, y, {
-        align: "center",
-        maxWidth: contentWidth,
-      });
-      y += 3.5;
-    });
-    y += 1;
-
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      "This is a computer generated copy. No signature required.",
-      pageWidth / 2,
-      y,
-      { align: "center", maxWidth: contentWidth },
-    );
-
-    doc.save(`Invoice-${order.orderNumber || order._id}.pdf`);
-  };
-
-  // customer's number as 01XXXXXXXXX, or null
   const customerPhone = () => {
     const digits = String(order.customerPhone || "").replace(/\D/g, "").replace(/^88/, "");
     return /^01\d{9}$/.test(digits) ? digits : null;
   };
 
-  const invoiceLink = () => (sharePath ? `${window.location.origin}${sharePath}` : "");
-
-  // picture of the receipt (PNG) for WhatsApp
-  const receiptImage = async () => {
-    const { toBlob } = await import("html-to-image");
-    const node = document.getElementById("receipt");
-    const blob = await toBlob(node, {
-      pixelRatio: 2,
-      backgroundColor: "#ffffff",
-      // an image that can't be read (e.g. the external barcode) is left blank
-      imagePlaceholder:
-        "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
-    });
-    return new File([blob], `Invoice-${order.orderNumber || order._id}.png`, { type: "image/png" });
-  };
-
   const handleWhatsApp = async () => {
     const phone = customerPhone();
-    const link = invoiceLink();
+    const link = sharePath ? `${window.location.origin}${sharePath}` : "";
     const text = `Thank you for shopping with SB Telecom!\nInvoice ${order.orderNumber}${link ? `\n${link}` : ""}`;
-
     setSending("whatsapp");
     try {
-      const file = await receiptImage();
-
-      // phones (and Chrome on Windows): share sheet with the picture -> pick WhatsApp
+      const { toBlob } = await import("html-to-image");
+      const node = document.getElementById("invoice-print");
+      const blob = await toBlob(node, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
+      });
+      const file = new File([blob], `Invoice-${order.orderNumber || order._id}.png`, { type: "image/png" });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], text });
         return;
       }
-
-      // elsewhere: keep a copy, put the picture on the clipboard, open the chat
       const a = document.createElement("a");
       a.href = URL.createObjectURL(file);
       a.download = file.name;
@@ -415,15 +174,13 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
       URL.revokeObjectURL(a.href);
       try {
         await navigator.clipboard.write([new ClipboardItem({ "image/png": file })]);
-        showToast("success", "Receipt picture copied: press Ctrl+V in the WhatsApp chat");
+        showToast("success", "Invoice picture copied: press Ctrl+V in the WhatsApp chat");
       } catch {
-        showToast("success", "Receipt picture downloaded: attach it in the WhatsApp chat");
+        showToast("success", "Invoice picture downloaded: attach it in the WhatsApp chat");
       }
-      const to = phone ? `88${phone}` : "";
-      window.open(`https://wa.me/${to}?text=${encodeURIComponent(text)}`, "_blank");
+      window.open(`https://wa.me/${phone ? `88${phone}` : ""}?text=${encodeURIComponent(text)}`, "_blank");
     } catch (err) {
-      // closing the share sheet is not an error
-      if (err?.name !== "AbortError") showToast("error", "Could not make the receipt picture");
+      if (err?.name !== "AbortError") showToast("error", "Could not make the invoice picture");
     } finally {
       setSending("");
     }
@@ -438,7 +195,6 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
         return;
       }
     }
-
     setSending("sms");
     try {
       const res = await fetch("/api/sms/invoice", {
@@ -448,13 +204,8 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
-
-      if (data.configured) {
-        showToast("success", data.message);
-      } else {
-        // no SMS gateway set up yet: open this device's SMS app with the text
-        window.location.href = `sms:+${data.number}?body=${encodeURIComponent(data.message)}`;
-      }
+      if (data.configured) showToast("success", data.message);
+      else window.location.href = `sms:+${data.number}?body=${encodeURIComponent(data.message)}`;
     } catch (err) {
       showToast("error", err.message || "Could not send SMS");
     } finally {
@@ -462,285 +213,55 @@ export default function PrintReceipt({ order, autoPrint = true, sharePath = "", 
     }
   };
 
-  return (
-    <div className="max-w-[80mm] mx-auto">
-      {/* Action Buttons Panel (Hidden during print) */}
-      <div className="print:hidden flex flex-wrap gap-2 justify-center mb-4 p-2 bg-gray-100 rounded shadow-sm">
-        <button
-          onClick={handlePrint}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
-        >
-          🖨️ Print
-        </button>
+  const btn = "rounded px-3 py-1.5 text-[12px] font-medium text-white transition disabled:opacity-60";
 
-        <button
-          onClick={handleDownloadPDF}
-          className="bg-red-600 hover:bg-red-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition"
-        >
-          📥 Download PDF
-        </button>
-
-        {!publicView && (
-          <>
-            <button
-              onClick={handleWhatsApp}
-              disabled={!!sending}
-              className="bg-green-600 hover:bg-green-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition disabled:opacity-60"
-            >
-              {sending === "whatsapp" ? "⏳ Preparing..." : "📱 Send WhatsApp"}
-            </button>
-
-            <button
-              onClick={handleSms}
-              disabled={!!sending}
-              className="bg-violet-600 hover:bg-violet-700 text-white text-[12px] font-medium px-3 py-1.5 rounded transition disabled:opacity-60"
-            >
-              {sending === "sms" ? "⏳ Sending..." : "💬 Send SMS"}
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Main Receipt Content */}
-      <div
-        id="receipt"
-        className="mx-auto p-4 font-sans text-[12px] leading-relaxed text-black bg-white"
-        style={{ width: "80mm", color: "#000000", background: "#ffffff" }}
-      >
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-            @media print {
-              body * { visibility: hidden; background: #fff !important; }
-              #receipt, #receipt * { visibility: visible; }
-              #receipt { position: absolute; left: 0; top: 0; width: 80mm !important; }
-            }
-          `,
-          }}
-        />
-
-        {/* Header Info */}
-        <div className="text-center mb-3">
-          <img src="/assets/sbt-logo-wide.png" alt="SB Telecom" className="mx-auto mb-1 h-16 w-auto object-contain" />
-          <h2 className="font-serif font-bold text-[22px] tracking-wide text-gray-800">
-            {showroomName}
-          </h2>
-          <p className="whitespace-pre-line text-[11px] leading-4 text-gray-700 mt-1">
-            {showroomAddress}
-          </p>
-          <p className="text-[11px] text-gray-700 mt-0.5">
-            Mobile: {showroomPhone}
-          </p>
-          <p className="text-[11px] text-gray-700">Email: {showroomEmail}</p>
-          {vatLine && (
-            <p className="text-[11px] text-gray-700">{vatLine}</p>
-          )}
-        </div>
-
-        {/* Core Metadata Specifications Grid Block */}
-        <div className="space-y-0.5 text-[11px] px-1 text-gray-800 border-t border-b border-gray-200 py-1.5 my-2">
-          <div className="flex">
-            <span className="w-32 font-medium">Invoice ID:</span>
-            <span>{order.orderNumber || order._id || "20261011747"}</span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-medium">Sale Date:</span>
-            <span>
-              {orderDate} @ {orderTime}
-            </span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-medium">Customer Name:</span>
-            <span>{order.customerName}</span>
-          </div>
-          <div className="flex">
-            <span className="w-32 font-medium">Phone:</span>
-            <span>{order.customerPhone}</span>
-          </div>
-          <div className="flex font-semibold text-gray-950">
-            <span className="w-32">Sold By:</span>
-            <span>{order.soldBy}</span>
-          </div>
-        </div>
-
-        {/* Barcode Element */}
-        <div className="my-3 text-center">
-          <img
-            src={`https://barcode.tec-it.com/barcode.ashx?data=${order.orderNumber || "20261011747"}&code=Code128&translate-esc=true`}
-            alt="barcode"
-            className="mx-auto h-8 w-[85%] object-stretch block"
-          />
-        </div>
-
-        <h3 className="text-center font-bold text-[13px] tracking-wider my-1 uppercase">
-          INVOICE
-        </h3>
-
-        {/* Products Grid Layout Table */}
-        <table className="w-full text-left border-collapse text-[11px] mt-2">
-          <thead>
-            <tr className="border-b border-black font-semibold text-gray-800">
-              <th className="w-[8%] pb-1">Sl.</th>
-              <th className="w-[47%] pb-1">Name</th>
-              <th className="text-right w-[20%] pb-1">Price</th>
-              <th className="text-center w-[10%] pb-1">Qty</th>
-              <th className="text-right w-[15%] pb-1">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(order.items || []).map((item, index) => (
-              <tr
-                key={index}
-                className="align-top border-b border-black/5 last:border-b-0"
-              >
-                <td className="py-1 text-gray-800">{index + 1}</td>
-                <td className="py-1 pr-1 break-words">
-                  <span className="block font-medium text-gray-800">
-                    {item.name || item.productName}
-                  </span>
-                  {itemLines(item).map((line) => (
-                    <span
-                      key={line}
-                      className="block text-[10px] leading-3.5 text-gray-600"
-                    >
-                      {line}
-                    </span>
-                  ))}
-                </td>
-                <td className="text-right py-1 align-bottom text-gray-800">
-                  {Number(item.price).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-                <td className="text-center py-1 align-bottom text-gray-800">
-                  {item.qty}
-                </td>
-                <td className="text-right py-1 align-bottom font-medium text-gray-900">
-                  {(item.price * (parseInt(item.qty) || 1)).toLocaleString(
-                    "en-US",
-                    { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="border-t border-black my-1" />
-
-        {/* Calculations Pricing Summary */}
-        <div className="text-[11px] font-medium space-y-0.5 pr-0.5 text-gray-900">
-          <div className="flex justify-end space-x-4">
-            <span className="w-28 text-right font-bold">Subtotal :</span>
-            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-              {Number(order.subTotal || totalAmount).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-          <div className="flex justify-end space-x-4">
-            <span className="w-28 text-right font-bold">Total :</span>
-            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-              {Number(totalAmount).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-          <div className="flex justify-end space-x-4">
-            <span className="w-28 text-right font-bold">Paid :</span>
-            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-              {Number(totalPaid).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-          {dueAmount > 0 && (
-            <div className="flex justify-end space-x-4 text-red-700">
-              <span className="w-28 text-right font-bold">Due :</span>
-              <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5 font-bold">
-                {dueAmount.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-          )}
-          <div className="flex justify-end space-x-4">
-            <span className="w-28 text-right font-bold">Cash Receive:</span>
-            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-              {Number(cashReceive).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-          <div className="flex justify-end space-x-4">
-            <span className="w-28 text-right font-bold">Change:</span>
-            <span className="w-20 text-right border-b border-dashed border-gray-400 pb-0.5">
-              {Number(changeAmount).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
-          </div>
-        </div>
-
-        {/* Words Summary */}
-        <div className="text-[11px] font-medium text-gray-800 mt-3 px-1">
-          <strong>In Words:</strong> {totalInWords} TK Only
-        </div>
-
-        {/* Payment Block */}
-        <div className="mt-3 border border-black text-[11px]">
-          <div className="text-center font-bold tracking-wider py-0.5 border-b border-black bg-gray-50 uppercase">
-            Payments
-          </div>
-          <div className="p-1 px-2 space-y-0.5">
-            <div className="flex justify-between text-gray-800">
-              <span>{paymentMethod}</span>
-              <span>
-                =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
-                {Number(totalPaid).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-            <div className="flex justify-between font-bold border-t border-dashed border-black/40 pt-0.5 text-gray-950">
-              <span>Total</span>
-              <span>
-                =&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TK{" "}
-                {Number(totalPaid).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Notes */}
-        <div className="text-center mt-5 px-1 space-y-1 text-[9px] leading-3 text-gray-600 font-sans font-medium italic opacity-90">
-          <p className="border-t border-dashed border-black/20 pt-2 font-bold not-italic text-gray-800">
-            Warranty Terms
-          </p>
-          {warrantyNotes.map((note) => (
-            <p key={note}>{note}</p>
-          ))}
-          <p className="text-black font-semibold not-italic mt-2">
-            This is a computer generated copy. No signature is required from the
-            company.
-          </p>
-          {/* software credit, last line of every receipt */}
-          <p className="mt-2 border-t border-dashed border-black/20 pt-1.5 text-[9px] font-semibold not-italic text-gray-700">
-            Made by Ecommerce Solution · 01619421979
-          </p>
-        </div>
-      </div>
+  const warranty = (
+    <div className="mt-4 text-center text-[11px] leading-4">
+      <p className="font-bold">Warranty</p>
+      {warrantyNotes.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+      {company.invoiceFooter && <p className="mt-2">{company.invoiceFooter}</p>}
+      <p className="mt-2 font-semibold">This is a computer generated copy. No signature is required from the company.</p>
     </div>
+  );
+
+  return (
+    <InvoiceSheet
+      shopName={showroomName}
+      shopAddress={showroomAddress}
+      shopPhone={showroomPhone}
+      shopEmail={showroomEmail}
+      vatLine={vatLine}
+      title="SALES INVOICE"
+      meta={meta}
+      columns={columns}
+      lines={lines}
+      totals={totals}
+      words={words}
+      note={order.note}
+      below={warranty}
+      signatures={["Customer", "Authorised Signature"]}
+      toolbar={
+        <div className="print-hide print:hidden mb-4 flex flex-wrap justify-center gap-2 rounded bg-gray-100 p-2 shadow-sm">
+          <button type="button" onClick={() => window.print()} className={`${btn} bg-blue-600 hover:bg-blue-700`}>
+            Print
+          </button>
+          <button type="button" onClick={() => downloadInvoicePdf(sheet)} className={`${btn} bg-red-600 hover:bg-red-700`}>
+            Download PDF
+          </button>
+          {!publicView && (
+            <>
+              <button type="button" onClick={handleWhatsApp} disabled={!!sending} className={`${btn} bg-green-600 hover:bg-green-700`}>
+                {sending === "whatsapp" ? "Preparing..." : "Send WhatsApp"}
+              </button>
+              <button type="button" onClick={handleSms} disabled={!!sending} className={`${btn} bg-violet-600 hover:bg-violet-700`}>
+                {sending === "sms" ? "Sending..." : "Send SMS"}
+              </button>
+            </>
+          )}
+        </div>
+      }
+    />
   );
 }

@@ -13,5 +13,5 @@ export default async function Page({ params }) {
     return <div className="p-6 text-center text-red-500">Order not found</div>;
   }
 
-  return <PrintReceipt order={order} sharePath={invoicePath(order.orderNumber)} />;
+  return <PrintReceipt order={order} sharePath={invoicePath(order.orderNumber)} autoPrint={false} />;
 }

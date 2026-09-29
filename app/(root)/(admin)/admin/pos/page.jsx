@@ -12,7 +12,6 @@ import CheckoutModal from "@/components/ui/Application/Admin/pos/CheckoutModal";
 import ExchangeModal from "@/components/ui/Application/Admin/pos/ExchangeModal";
 import { shallowEqual, useDispatch, useSelector } from "react-redux";
 import {
-  keepPreviousData,
   useInfiniteQuery,
   useIsRestoring,
   useQuery,
@@ -24,7 +23,6 @@ import {
   posCategoriesQueryOptions,
   posProductsQueryOptions,
   posShowroomsQueryOptions,
-  resolvePosShowroomId,
   resolvePosTill,
   usePosShowroomId,
   WAREHOUSE_TILL,
@@ -48,6 +46,20 @@ import BranchSwitchScreen from "@/components/ui/Application/Admin/BranchSwitchSc
 
 // pages (20 products each) that are loaded in the background without scrolling
 const MAX_EAGER_PAGES = 20;
+
+const inThisShop = (items) =>
+  (items || [])
+    .map((product) => {
+      const variants = (product.variants || []).filter(
+        (variant) => Number(variant.showroomStock ?? variant.stock ?? 0) > 0,
+      );
+      const totalStock = variants.reduce(
+        (sum, variant) => sum + Number(variant.showroomStock ?? variant.stock ?? 0),
+        0,
+      );
+      return { ...product, variants, totalStock };
+    })
+    .filter((product) => product.totalStock > 0);
 
 // Held (parked) sales live only on this device, like a paper slip at the till
 const HELD_SALES_KEY = "pos-held-sales";
@@ -183,16 +195,13 @@ export default function POSPage() {
 
   // single store: everyone sells from the one store
   const pickedShowroomId = usePosShowroomId();
-  const saleCenterId = resolvePosShowroomId({ showrooms });
   const selectedTill = resolvePosTill({
     picked: pickedShowroomId,
     showrooms,
     currentUser,
   });
-  const canSwitchTill = !!currentUser;
+  const canSwitchTill = currentUser?.role === "admin";
   const selectedShowroomId = selectedTill;
-  const isWarehouseTill = selectedTill === WAREHOUSE_TILL;
-  const saleCenter = showrooms.find((s) => String(s._id) === String(saleCenterId));
 
   useEffect(() => {
     if (tillRef.current && tillRef.current !== selectedTill) {
@@ -218,12 +227,12 @@ export default function POSPage() {
   // ==========================
   const isRestoring = useIsRestoring();
 
+  const shopSelected = /^[a-f\d]{24}$/i.test(String(selectedShowroomId || ""));
+
   const baseQuery = useInfiniteQuery({
     ...posProductsQueryOptions({ showroomId: selectedShowroomId, currentUser }),
     // wait for the store list so the first request uses the till's branch
-    enabled: !!user && showroomsFetched,
-    // switching showroom keeps the old list on screen until the new one is in
-    placeholderData: keepPreviousData,
+    enabled: !!user && showroomsFetched && shopSelected,
     refetchOnWindowFocus: false, // 🚀 উইন্ডো ফোকাস পরিবর্তন হলে রিলোড বন্ধ
   });
 
@@ -247,8 +256,8 @@ export default function POSPage() {
   }, [baseData, baseHasNext, baseFetching, baseError, baseIsPlaceholder, isRestoring, fetchNextBasePage]);
 
   const allProducts = useMemo(
-    () => baseQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [baseQuery.data],
+    () => inThisShop(baseIsPlaceholder ? [] : baseQuery.data?.pages.flatMap((page) => page.items) ?? []),
+    [baseQuery.data, baseIsPlaceholder],
   );
 
   const listFilters = {
@@ -291,7 +300,7 @@ export default function POSPage() {
   const products = useMemo(
     () =>
       useServer
-        ? serverQuery.data.pages.flatMap((page) => page.items)
+        ? inThisShop(serverQuery.data.pages.flatMap((page) => page.items))
         : localProducts,
     [useServer, serverQuery.data, localProducts],
   );
@@ -304,7 +313,7 @@ export default function POSPage() {
     refetch,
   } = activeQuery;
   // a spinner only on a truly empty cache (first ever visit)
-  const isLoading = !baseData && (isRestoring || baseFetching);
+  const isLoading = baseIsPlaceholder || (!baseData && (isRestoring || baseFetching || !showroomsFetched));
 
   const { data: categories = [] } = useQuery({
     ...posCategoriesQueryOptions(),
@@ -385,7 +394,11 @@ export default function POSPage() {
       return;
     }
 
-    const showroomId = selectedTill || WAREHOUSE_TILL;
+    const showroomId = selectedTill;
+    if (!/^[a-f\d]{24}$/i.test(String(showroomId || ""))) {
+      showToast("error", "Choose a branch");
+      return;
+    }
 
     try {
       setCheckoutLoading(true);
@@ -443,7 +456,7 @@ export default function POSPage() {
 
       const payload = {
         showroomId,
-        soldFrom: isWarehouseTill ? "WAREHOUSE" : "SHOWROOM",
+        soldFrom: "SHOWROOM",
         createdBy: currentUser?._id,
         orderType: isExchange ? "exchange" : "pos",
         customerName: dataClean.customerName || "Walk-in Customer",
@@ -784,6 +797,7 @@ export default function POSPage() {
       ? "Warehouse"
       : showrooms.find((branch) => String(branch._id) === String(id))?.name || "Branch";
   const switchTill = (id) => {
+    if (currentUser?.role !== "admin") return;
     if (!id || id === "shop" || String(id) === String(selectedTill)) return;
     setTrip({ from: tillLabel(selectedTill), to: tillLabel(id) });
     writePosShowroom(String(id));
@@ -806,7 +820,7 @@ export default function POSPage() {
         onExchange={openExchange}
         till={selectedTill}
         branches={showrooms.filter((branch) => branch?._id && branch.isActive !== false)}
-        saleCenterName={saleCenter?.name || "Main Shop"}
+        saleCenterName={tillLabel(selectedTill)}
         onTillChange={canSwitchTill ? switchTill : undefined}
         canSwitchTill={canSwitchTill}
       />
@@ -815,10 +829,16 @@ export default function POSPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {!cartExpanded && (
           <ProductGallery
+            key={selectedShowroomId || "shop"}
             products={products}
             loading={isLoading}
             isError={isError}
             onRetry={() => refetch()}
+            emptyHint={
+              search.trim() || selectedCategoryId || selectedBrand
+                ? "No products found"
+                : "No products in this shop"
+            }
             search={search}
             setSearch={setSearch}
             setOpenProduct={setOpenProduct}

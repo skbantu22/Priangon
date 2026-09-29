@@ -6,7 +6,13 @@ import Image from "next/image";
 import { skipOptimize } from "@/lib/imageSrc";
 import Link from "next/link";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { posShowroomsQueryOptions } from "@/lib/posProducts";
+import { useSelector } from "react-redux";
+import {
+  WAREHOUSE_TILL,
+  getPosCurrentUser,
+  posShowroomsQueryOptions,
+  useOpeningStockTill,
+} from "@/lib/posProducts";
 import {
   Area,
   AreaChart,
@@ -170,9 +176,24 @@ export default function Dashboard() {
   const [from, setFrom] = useState(isoDay(new Date(today.getTime() - 29 * 864e5)));
   const [to, setTo] = useState(isoDay(today));
   const [limit, setLimit] = useState(10);
-  // This only filters the figures on this page. It does not switch the shop.
-  const [branchId, setBranchId] = useState("");
+  // Top-bar switch is the shop. The card can narrow this page only.
+  const till = useOpeningStockTill();
+  const switchedId = till.id || "";
+  const auth = useSelector((state) => state.authStore.auth);
+  const isAdmin = getPosCurrentUser(auth)?.role === "admin";
+  const [cardBranch, setCardBranch] = useState(null);
+  const [cardFollows, setCardFollows] = useState("");
+  const scope =
+    !isAdmin
+      ? switchedId
+      : cardBranch !== null && cardFollows === switchedId
+        ? cardBranch
+        : switchedId;
   const { data: branches = [] } = useQuery(posShowroomsQueryOptions());
+  const branchName =
+    scope === WAREHOUSE_TILL
+      ? "Warehouse"
+      : branches.find((s) => String(s._id) === String(scope))?.name || till.name;
 
   const params = new URLSearchParams({
     chart,
@@ -180,7 +201,7 @@ export default function Dashboard() {
     from,
     to,
     limit: String(limit),
-    ...(branchId ? { showroomId: branchId } : {}),
+    ...(scope ? { showroomId: scope } : {}),
   });
 
   const { data, isLoading, isFetching, isError } = useQuery({
@@ -255,13 +276,25 @@ export default function Dashboard() {
         <Kpi icon={Store} tone="orange" label="">
           <p className="text-xl font-bold text-gray-900 dark:text-white">Select Branch</p>
           <select
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-white/10 dark:bg-card"
+            value={scope}
+            disabled={!isAdmin}
+            onChange={(e) => {
+              setCardFollows(switchedId);
+              setCardBranch(e.target.value);
+            }}
+            className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm disabled:cursor-default dark:border-white/10 dark:bg-card"
           >
-            <option value="">All Branch</option>
+            {isAdmin && <option value="">All Branch</option>}
+            {scope === WAREHOUSE_TILL && (
+              <option value={WAREHOUSE_TILL}>Warehouse</option>
+            )}
+            {scope &&
+              scope !== WAREHOUSE_TILL &&
+              !branches.some((s) => String(s._id) === String(scope)) && (
+                <option value={scope}>{branchName}</option>
+              )}
             {branches.map((s) => (
-              <option key={s._id} value={s._id}>
+              <option key={s._id} value={String(s._id)}>
                 {s.name}
               </option>
             ))}

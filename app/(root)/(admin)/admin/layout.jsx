@@ -16,6 +16,10 @@ export default function Layout({ children }) {
   const isPos =
     pathname.startsWith("/admin/pos") || pathname.startsWith("/admin/payment");
 
+  // Sale and purchase invoice clicks open a large print, not the admin shell
+  const isLargePrint =
+    pathname.startsWith("/admin/print/") || /^\/admin\/purchase\/[a-f0-9]{24}$/i.test(pathname);
+
   // Dialogs and dropdowns are portalled to <body>, so the admin theme
   // has to live there too (the wrapper div below covers the first paint).
   useEffect(() => {
@@ -35,6 +39,11 @@ export default function Layout({ children }) {
       >
         <NetworkStatus />
 
+        {isLargePrint ? (
+          <div className="min-h-screen bg-[#d6d6d6] px-4 py-8" style={{ background: "#d6d6d6" }}>
+            {children}
+          </div>
+        ) : (
         <div className="admin-theme bg-background">
           <SidebarProvider>
             <Appsidebar />
@@ -54,6 +63,7 @@ export default function Layout({ children }) {
             )}
           </SidebarProvider>
         </div>
+        )}
 
         <ToastContainer />
       </ThemeProvider>

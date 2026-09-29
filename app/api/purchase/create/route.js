@@ -13,6 +13,7 @@ import {
   cleanRates,
   locationForTill,
   nextPurchaseNumber,
+  purchaseLocationForAuth,
 } from "@/lib/purchaseService";
 import { ensureSystemRoles } from "@/models/Role.model";
 
@@ -143,8 +144,12 @@ export async function POST(req) {
       discountType === "percent" ? round2((subtotal * discountValue) / 100) : discountValue,
     );
 
-    // The open branch owns this purchase. A missing branch is not the warehouse.
-    const location = await locationForTill(body.showroomId);
+    // Admin buys into the branch they picked. Everyone else is locked to
+    // the branch on their login, even if the form names another one.
+    const location =
+      auth.role === "admin"
+        ? await locationForTill(body.showroomId)
+        : await purchaseLocationForAuth(auth);
     if (!location) return fail("Select the branch this purchase belongs to");
 
     const createdBy = await actorFullName(auth);

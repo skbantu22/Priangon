@@ -40,7 +40,7 @@ export default function PosTopbar({
   branches = [],
   saleCenterName,
   onTillChange,
-  canSwitchTill = true,
+  canSwitchTill = false,
 }) {
   const { toggleSidebar } = useSidebar();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -75,7 +75,6 @@ export default function PosTopbar({
         title="Branch"
         className="h-9 max-w-[200px] truncate rounded-lg bg-white px-2 text-sm font-bold text-gray-900"
       >
-        <option value="warehouse">Warehouse</option>
         {branches.map((branch) => (
           <option key={branch._id} value={String(branch._id)}>
             {branch.name}

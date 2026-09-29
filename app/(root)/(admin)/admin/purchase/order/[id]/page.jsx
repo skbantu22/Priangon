@@ -12,15 +12,17 @@ import {
   ADMIN_PURCHASE_ORDER_SHOW,
   ADMIN_PURCHASE_VIEW,
 } from "@/Route/Adminpannelroute";
-import { ListCard, btn, tdClass, thClass, theadClass, totalRowClass } from "@/components/ui/Application/Admin/listKit";
+import { ListCard, btn } from "@/components/ui/Application/Admin/listKit";
 import { fmtDate, money } from "@/components/ui/Application/Admin/supplier/supplierKit";
-import { ORDER_STATUS_STYLE, PartyBlock, PrintHeader, RATES } from "@/components/ui/Application/Admin/purchase/purchaseKit";
+import { RATES } from "@/components/ui/Application/Admin/purchase/purchaseKit";
+import InvoiceSheet, { amountInWords, downloadInvoicePdf, money as sheetMoney } from "@/components/InvoiceSheet";
 
 /** A purchase order as the supplier receives it: lines, new rates and total; prints on A4 */
 export default function PurchaseOrderViewPage() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
+  const [shop, setShop] = useState({});
 
   useEffect(() => {
     axios
@@ -29,15 +31,83 @@ export default function PurchaseOrderViewPage() {
       .catch((err) => setError(err.response?.data?.message || "Could not load the purchase order"));
   }, [id]);
 
+  useEffect(() => {
+    axios
+      .get("/api/settings")
+      .then(({ data }) => {
+        if (!data.success || !data.data) return;
+        const s = data.data;
+        setShop({
+          name: s.companyName || "",
+          address: s.address || "",
+          phone: s.phone || "",
+          email: s.email || "",
+          vatLine: s.showMushakLine && s.bin ? `BIN ${s.bin}${s.mushakFormNo ? ` · Mushak ${s.mushakFormNo}` : ""}` : "",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   if (error && !order) {
     return <p className="rounded-[8px] bg-white p-6 text-center text-[#ff5b5b] dark:bg-card" role="alert">{error}</p>;
   }
   if (!order) return <div className="h-[420px] animate-pulse rounded-[8px] bg-white dark:bg-card" />;
 
   const supplier = order.supplierId && typeof order.supplierId === "object" ? order.supplierId : {};
-  // sale rate changes only; a supplier copy does not need them, so they stay off paper
   const newRates = (item) =>
     RATES.filter(([f]) => item[f] > 0).map(([f, label]) => `${label} ${money(item[f])}`).join(" · ");
+
+  const meta = [
+    [
+      { label: "P.O. No", value: order.orderNumber },
+      { label: "Date", value: fmtDate(order.orderDate) },
+    ],
+    [
+      { label: "Supplier", value: supplier.name || order.supplierName },
+      { label: "Phone", value: supplier.phone || "—" },
+    ],
+    [
+      { label: "Delivery", value: fmtDate(order.deliveryDate) || "—" },
+      { label: "Ordered by", value: order.createdBy || "—" },
+    ],
+  ];
+  if (order.reference) meta.push([{ label: "Reference", value: order.reference }]);
+
+  const lines = order.items.map((item, index) => ({
+    key: index,
+    notes: [item.variantLabel, item.barcode && `Barcode: ${item.barcode}`, item.extraQty ? `Extra qty: ${item.extraQty}` : "", item.discount ? `Discount: ${sheetMoney(item.discount)}` : ""].filter(Boolean),
+    cells: {
+      sl: index + 1,
+      product: item.productName,
+      qty: item.quantity,
+      rate: sheetMoney(item.purchasePrice),
+      amount: sheetMoney(item.total),
+    },
+  }));
+
+  const pdf = () =>
+    downloadInvoicePdf({
+      fileName: `Purchase-Order-${order.orderNumber}.pdf`,
+      shopName: shop.name || "SB Telecom",
+      shopAddress: shop.address,
+      shopPhone: shop.phone,
+      shopEmail: shop.email,
+      vatLine: shop.vatLine,
+      title: "PURCHASE ORDER",
+      meta,
+      head: ["SL", "Product", "Qty", "Rate", "Amount"],
+      body: order.items.map((item, index) => [
+        String(index + 1),
+        [item.productName, item.variantLabel, item.barcode].filter(Boolean).join("\n"),
+        String(item.quantity),
+        sheetMoney(item.purchasePrice),
+        sheetMoney(item.total),
+      ]),
+      widths: [14, 88, 18, 32, 34],
+      totals: [{ label: "Total", value: order.total, strong: true }],
+      words: amountInWords(order.total),
+      note: order.note || "",
+    });
 
   return (
     <ListCard
@@ -60,97 +130,56 @@ export default function PurchaseOrderViewPage() {
           <button type="button" className={btn.primary} onClick={() => window.print()}>
             <Printer size={14} /> Print
           </button>
+          <button type="button" className={btn.secondary} onClick={pdf}>
+            PDF
+          </button>
         </>
       }
     >
-      <div id="invoice-print" className="text-[14px] text-[#212529] dark:text-foreground">
-        <PrintHeader title="PURCHASE ORDER">
-          <p className="m-0 mt-1">
-            P.O. No: <b>{order.orderNumber}</b>
-          </p>
-          <p className="m-0">
-            Date: {fmtDate(order.orderDate)} · Delivery: {fmtDate(order.deliveryDate)}
-          </p>
-          {order.reference && <p className="m-0">Reference: {order.reference}</p>}
-          <span className={`mt-1 inline-block rounded-[4px] px-2 py-0.5 text-[12px] font-semibold capitalize ${ORDER_STATUS_STYLE[order.status]}`}>{order.status}</span>
-        </PrintHeader>
-
-        <div className="grid gap-4 py-4 sm:grid-cols-2">
-          <PartyBlock
-            label="Supplier"
-            name={supplier.name || order.supplierName}
-            lines={[supplier.companyName, [supplier.phone, supplier.email].filter(Boolean).join(" · "), supplier.address]}
-          />
-          <div className="sm:text-right">
-            <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#98a6ad]">Ordered by</p>
-            <p className="m-0 mt-1">{order.createdBy || "—"}</p>
+      <InvoiceSheet
+        shopName={shop.name || "SB Telecom"}
+        shopAddress={shop.address}
+        shopPhone={shop.phone}
+        shopEmail={shop.email}
+        vatLine={shop.vatLine}
+        title="PURCHASE ORDER"
+        meta={meta}
+        columns={[
+          { key: "sl", label: "SL", align: "center", width: "7%" },
+          { key: "product", label: "Product", align: "left" },
+          { key: "qty", label: "Qty", align: "center", width: "10%" },
+          { key: "rate", label: "Rate", align: "right", width: "16%" },
+          { key: "amount", label: "Amount", align: "right", width: "18%" },
+        ]}
+        lines={lines}
+        totals={[{ label: "Total", value: order.total, strong: true }]}
+        words={amountInWords(order.total)}
+        note={order.note}
+        signatures={["Supplier", "Authorised Signature"]}
+        below={
+          <div className="print-hide mt-3 space-y-1 text-[13px]">
+            <p className="m-0 capitalize text-[#495057]">Status: {order.status}</p>
+            {order.items.some((item) => newRates(item)) && (
+              <p className="m-0 text-[#188ae2]">
+                {order.items.filter((item) => newRates(item)).map((item) => `${item.productName}: ${newRates(item)}`).join(" · ")}
+              </p>
+            )}
+            {order.attachment?.url && (
+              <a href={order.attachment.url} target="_blank" rel="noreferrer" className="text-[#188ae2]">
+                View attachment
+              </a>
+            )}
+            {order.purchaseId && (
+              <p className="m-0 text-[#0b8a45]">
+                Received as purchase{" "}
+                <Link href={ADMIN_PURCHASE_VIEW(order.purchaseId)} className="font-semibold underline">
+                  {order.purchaseNumber}
+                </Link>
+              </p>
+            )}
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-left">
-            <thead className={theadClass}>
-              <tr>
-                {["SL", "Product", "PPP", "Qty", "Extra", "Discount", "Total"].map((h) => (
-                  <th key={h} className={thClass}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((item, i) => (
-                <tr key={i}>
-                  <td className={tdClass}>{i + 1}</td>
-                  <td className={tdClass}>
-                    {item.productName}
-                    {item.variantLabel && <span className="text-[#6c757d]"> ({item.variantLabel})</span>}
-                    <span className="block text-[12px] text-[#98a6ad]">{item.barcode}</span>
-                    {newRates(item) && <span className="print-hide block text-[12px] text-[#188ae2]">New rate: {newRates(item)}</span>}
-                  </td>
-                  <td className={tdClass}>{money(item.purchasePrice)}</td>
-                  <td className={tdClass}>{item.quantity}</td>
-                  <td className={tdClass}>{item.extraQty || "—"}</td>
-                  <td className={tdClass}>{money(item.discount)}</td>
-                  <td className={`${tdClass} font-semibold`}>{money(item.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className={totalRowClass}>
-                <td colSpan={6} className={tdClass}>
-                  Total
-                </td>
-                <td className={tdClass}>৳ {money(order.total)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        {order.note && (
-          <p className="m-0 mt-3 whitespace-pre-line text-[#495057] dark:text-muted-foreground">
-            <b>Note:</b> {order.note}
-          </p>
-        )}
-        {order.attachment?.url && (
-          <a href={order.attachment.url} target="_blank" rel="noreferrer" className="print-hide mt-2 inline-block text-[#188ae2]">
-            View attachment
-          </a>
-        )}
-        {order.purchaseId && (
-          <p className="print-hide m-0 mt-2 text-[#0b8a45]">
-            Received as purchase{" "}
-            <Link href={ADMIN_PURCHASE_VIEW(order.purchaseId)} className="font-semibold underline">
-              {order.purchaseNumber}
-            </Link>
-          </p>
-        )}
-
-        <div className="print-signatures mt-[56px] hidden justify-between text-[13px]">
-          <span className="w-[180px] border-t border-[#999] pt-1 text-center">Supplier</span>
-          <span className="w-[180px] border-t border-[#999] pt-1 text-center">Authorised Signature</span>
-        </div>
-      </div>
+        }
+      />
     </ListCard>
   );
 }

@@ -2,11 +2,9 @@ import { connectDB } from "@/lib/databaseconnection";
 import VatGroupModel from "@/models/VatGroup.model";
 import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
-import WarehouseStock from "@/models/WarehouseStock.model";
 import ProductVariant from "@/models/ProductVariant.model ";
 import Media from "@/models/Media.model";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
-import { stockMapAt } from "@/lib/posShelf";
 import { resolveLockedTill } from "@/lib/posTillAuth";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -34,7 +32,46 @@ export async function GET(req) {
     const q = (searchParams.get("q") || "").trim();
 
     const isWarehouse = till.isWarehouse;
-    const hasShowroom = !isWarehouse && !!showroomId;
+    const hasShowroom =
+      !isWarehouse && /^[a-f\d]{24}$/i.test(String(showroomId || ""));
+
+    // Only this shop. Missing rows and zero stock stay off the grid.
+    if (!hasShowroom) {
+      return Response.json({
+        success: true,
+        items: [],
+        page,
+        limit,
+        total: 0,
+        hasMore: false,
+      });
+    }
+
+    // This shop only. No warehouse, no variant.stock, no other branch.
+    const stockRows = await ShowroomStock.find({
+      showroomId,
+      stock: { $gt: 0 },
+    })
+      .select("productId variantId stock")
+      .lean();
+
+    const stockedProductIds = [
+      ...new Set(stockRows.map((row) => row.productId).filter(Boolean)),
+    ];
+    const shopStock = new Map(
+      stockRows.map((row) => [String(row.variantId), Number(row.stock) || 0]),
+    );
+
+    if (!stockedProductIds.length) {
+      return Response.json({
+        success: true,
+        items: [],
+        page,
+        limit,
+        total: 0,
+        hasMore: false,
+      });
+    }
 
     const matchedVariants = q
       ? await ProductVariant.find({
@@ -49,6 +86,7 @@ export async function GET(req) {
 
     const query = {
       deletedAt: null,
+      _id: { $in: stockedProductIds },
     };
 
     if (categoryId && categoryId !== "all") {
@@ -60,18 +98,22 @@ export async function GET(req) {
     }
 
     if (q) {
-      query.$or = [
-        { name: { $regex: escapeRegex(q), $options: "i" } },
+      const allowed = new Set(stockedProductIds.map((id) => String(id)));
+      const fromVariant = (matchedVariants || [])
+        .map((row) => row.product)
+        .filter((id) => id && allowed.has(String(id)));
+      // Search stays inside this shop's in-stock ids. It cannot add the catalog.
+      query.$and = [
+        { _id: { $in: stockedProductIds } },
         {
-          _id: {
-            $in: matchedVariants.map((v) => v.product).filter(Boolean),
-          },
+          $or: [
+            { name: { $regex: escapeRegex(q), $options: "i" } },
+            { _id: { $in: fromVariant } },
+          ],
         },
       ];
+      delete query._id;
     }
-
-    // Every product stays on the grid. Stock below is only this branch's
-    // number, so another branch shows the same product at 0.
 
     // No populate: variant and media ids are already on the product,
     // so they are fetched below in parallel with the stock
@@ -109,18 +151,13 @@ export async function GET(req) {
       mediaIds.push(...(product.media || []));
     }
 
-    const [variants, mediaDocs, stockMap] = await Promise.all([
-      ProductVariant.find({ _id: { $in: variantIds } })
+    const [variants, mediaDocs] = await Promise.all([
+      ProductVariant.find({ _id: { $in: variantIds }, deletedAt: null })
         .select("color size sku barcode mrp sellingPrice dealerPrice subDealerPrice wholesalerPrice media")
         .lean(),
       Media.find({ _id: { $in: mediaIds } })
         .select("secure_url")
         .lean(),
-      stockMapAt({
-        locationType: isWarehouse ? "WAREHOUSE" : "SHOWROOM",
-        locationId: hasShowroom ? showroomId : null,
-        variantIds,
-      }),
     ]);
 
     const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
@@ -177,16 +214,17 @@ export async function GET(req) {
             subDealerPrice: variant.subDealerPrice,
             wholesalerPrice: variant.wholesalerPrice,
 
-            showroomStock: stockMap.get(variant._id.toString()) ?? 0,
+            showroomStock: shopStock.get(variant._id.toString()) || 0,
 
             // variant media holds either a Media doc or a plain image URL
             image:
               (typeof variant.media?.[0] === "string"
                 ? variant.media[0]
                 : variant.media?.[0]?.secure_url) || productImage,
-          })),
+          }))
+          .filter((variant) => Number(variant.showroomStock) > 0),
       };
-    });
+    }).filter((item) => item.variants.length > 0);
 
     console.log(
       "TOTAL Execution:",

@@ -4,7 +4,7 @@ import ProductVariantModel from "@/models/ProductVariant.model ";
 import ProductModel from "@/models/Product.model";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
 import { applyStockChange } from "@/lib/stockService";
-import { locationForTill } from "@/lib/purchaseService";
+import { locationForTill, purchaseLocationForAuth } from "@/lib/purchaseService";
 import { onHandAt } from "@/lib/posShelf";
 
 // SKU generator
@@ -19,9 +19,12 @@ const generateBarcode = () => {
 };
 
 // Opening stock stays on the branch that is open. A showroom is never
-// rewritten to the warehouse.
-async function openingLocation(requested) {
-  const location = await locationForTill(requested);
+// rewritten to the warehouse. A non-admin cannot pick another branch.
+async function openingLocation(auth, requested) {
+  const location =
+    auth?.role === "admin"
+      ? await locationForTill(requested)
+      : await purchaseLocationForAuth(auth);
   if (!location) throw new Error("Select the branch this stock belongs to");
   return location;
 }
@@ -73,7 +76,7 @@ export async function POST(request) {
         // POS kept saying out of stock. Place it only when nothing is on hand,
         // so a second Save does not double the stock.
         const stock = Math.max(0, Number(item.stock || 0));
-        location ??= await openingLocation(payload.location || payload.showroomId);
+        location ??= await openingLocation(auth, payload.location || payload.showroomId);
         if (stock > 0 && (await onHandAt({
           locationType: location.locationType,
           locationId: location.locationId,
@@ -135,7 +138,7 @@ export async function POST(request) {
       // Opening qty goes only onto the selected branch. A showroom does not
       // get a warehouse row, so other branches cannot sell it.
       if (stock > 0) {
-        location ??= await openingLocation(payload.location || payload.showroomId);
+        location ??= await openingLocation(auth, payload.location || payload.showroomId);
         createdBy ??= await actorFullName(auth);
         await applyStockChange({
           locationType: location.locationType,

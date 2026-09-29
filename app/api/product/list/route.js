@@ -38,6 +38,8 @@ const STOCK_FILTERS = {
 // Admin product list, one row per product with its variants. Every variant
 // carries the rate each buyer type pays at the POS and its cost, so the list
 // shows the margin per tier. ?location = all | warehouse | <showroomId>.
+// A specific shop keeps only stock > 0 there. A product that lives only in
+// another shop is left out, not returned as stock 0. "all" is the full catalog.
 export async function GET(request) {
   try {
     const auth = await isAuthenticated();
@@ -54,6 +56,7 @@ export async function GET(request) {
     const brand = (sp.get("brand") || "").trim();
     const category = sp.get("category");
     const location = sp.get("location") || "all";
+    const shopOnly = location !== "all";
     const status = sp.get("status") || "active";
     const stockFilter = STOCK_FILTERS[sp.get("stock")] || null;
     const sort = SORTS[sp.get("sort")] || SORTS.newest;
@@ -129,7 +132,8 @@ export async function GET(request) {
             mrp: Number(v.mrp) || Number(p.mrp) || 0,
             ...rates,
           };
-        });
+        })
+        .filter((l) => !shopOnly || l.stock > 0);
 
       const totalStock = lines.reduce((sum, l) => sum + l.stock, 0);
       const missingTier = TIERS.some((f) => !p[f]);
@@ -156,6 +160,8 @@ export async function GET(request) {
         lossTier,
       };
     });
+
+    if (shopOnly) rows = rows.filter((p) => p.totalStock > 0);
 
     const counts = {
       all: rows.length,

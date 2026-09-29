@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { isAuthenticated } from "@/lib/auth.server";
+import { requireRoles, ADMIN_MANAGER } from "@/lib/apiAuth";
 import { connectDB } from "@/lib/databaseconnection";
 import ProductModel from "@/models/Product.model";
 
@@ -14,10 +14,8 @@ const ACTIONS = {
 
 export async function PUT(request) {
   try {
-    const auth = await isAuthenticated("admin");
-    if (!auth.isAuth) {
-      return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 403 });
-    }
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
 
     await connectDB();
 

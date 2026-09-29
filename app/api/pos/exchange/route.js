@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/databaseconnection";
 import Posorder from "@/models/posorder.model";
+import Product from "@/models/Product.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 import { longNumber } from "@/lib/documentNumber";
+import { resolveLockedTill } from "@/lib/posTillAuth";
 
 export async function POST(req) {
   const auth = await requireRoles(STAFF_ROLES);
@@ -17,9 +19,15 @@ export async function POST(req) {
     session.startTransaction();
 
     const body = await req.json();
+    const till = await resolveLockedTill(auth, body.showroomId);
+    const showroomId =
+      auth.role === "admin"
+        ? body.showroomId
+        : till.orderShowroomId
+          ? String(till.orderShowroomId)
+          : "";
 
     const {
-      showroomId,
       originalOrderId,
       reason,
       returnedItems,
@@ -104,6 +112,20 @@ export async function POST(req) {
     // =========================
     // DEDUCT NEW STOCK
     // =========================
+    const liveProducts = await Product.find({
+      _id: { $in: newItems.map((item) => item.productId) },
+      deletedAt: null,
+    })
+      .select("_id")
+      .session(session)
+      .lean();
+    const liveIds = new Set(liveProducts.map((product) => String(product._id)));
+    for (const item of newItems) {
+      if (!liveIds.has(String(item.productId))) {
+        throw new Error(`${item.productName || item.name || "Product"} is in the trash and cannot be sold`);
+      }
+    }
+
     for (const item of newItems) {
       const stockDoc = await ShowroomStock.findOne({
         showroomId,

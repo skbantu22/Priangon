@@ -163,6 +163,7 @@ function AddButton({ disabled, onClick }) {
 function ProductItem({ item, view, setOpenProduct, addToCart }) {
   const { name, brand, warranty, variants, imageUrl, rawProduct, stock, minPrice, maxPrice, options } =
     summarize(item);
+  if (stock <= 0) return null;
   const [label, labelClass] = stockLabel(stock);
   const warrantyText =
     warranty?.type && warranty.type !== "none" && warranty.months
@@ -307,10 +308,19 @@ export default function ProductGallery({
   const [localFilter, setLocalFilter] = useState("");
   const [view, setView] = useState("grid");
 
+  const inShop = useMemo(
+    () =>
+      (products || []).filter((item) => {
+        const { variants } = getParsedProduct(item);
+        return variants.some((variant) => variantStock(variant) > 0);
+      }),
+    [products],
+  );
+
   const visibleProducts = useMemo(() => {
     const term = localFilter.trim().toLowerCase();
-    if (!term) return products;
-    return products.filter((item) => {
+    if (!term) return inShop;
+    return inShop.filter((item) => {
       const { name, brand, variants } = getParsedProduct(item);
       return (
         name.toLowerCase().includes(term) ||
@@ -322,7 +332,7 @@ export default function ProductGallery({
         )
       );
     });
-  }, [products, localFilter]);
+  }, [inShop, localFilter]);
 
   const hasProducts = visibleProducts.length > 0;
 
@@ -446,7 +456,7 @@ export default function ProductGallery({
       {/* ---------------- PRODUCTS PANEL ---------------- */}
       <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
         {/* filter bar */}
-        <div className="grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]">
+        <div className="grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]">
           <label className="col-span-2 hidden h-10 items-center gap-2 sm:flex rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
             <Search className="size-4 text-gray-400" />
             <input
@@ -466,19 +476,6 @@ export default function ProductGallery({
             {categories.map((cat) => (
               <option key={cat._id} value={cat._id}>
                 {cat.name || cat.title}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All Brands</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>
-                {b}
               </option>
             ))}
           </select>

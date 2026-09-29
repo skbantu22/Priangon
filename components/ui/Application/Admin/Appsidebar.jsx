@@ -144,7 +144,7 @@ export default function Appsidebar() {
             </Link>
 
             <p className="mt-2 truncate rounded-lg bg-white/10 px-2 py-1.5 text-[12px] font-bold text-white">
-              {isWarehouseUser ? "Sells warehouse stock" : "Warehouse · stock"}
+              {branchName}
             </p>
           </div>
 

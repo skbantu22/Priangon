@@ -73,13 +73,13 @@ const Trash = () => {
   // ✅ columns config
 
   const searchParams = useSearchParams();
-  const trashOf = searchParams.get("trashof");
-
+  const requested = searchParams.get("trashof");
+  const trashOf = TRASH_CONFIG[requested] ? requested : "product";
   const config = TRASH_CONFIG[trashOf];
 
   const columns = useMemo(() => {
     return columnConfig(config.columns, false, false, true);
-  }, []);
+  }, [config]);
 
   // ✅ row action menu
 

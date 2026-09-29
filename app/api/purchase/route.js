@@ -18,14 +18,18 @@ export async function GET(req) {
 
     const filter = { deletedAt: null };
 
-    const location = await purchaseLocationForAuth(auth);
-    const branch = searchParams.get("showroomId") || "";
-    if (branch === "warehouse") {
-      filter.showroomId = null;
-    } else if (mongoose.isValidObjectId(branch)) {
-      filter.showroomId = new mongoose.Types.ObjectId(branch);
-    } else if (auth.role !== "admin") {
-      filter.showroomId = location.showroomId || null;
+    if (auth.role !== "admin") {
+      const location = await purchaseLocationForAuth(auth);
+      filter.showroomId = location.showroomId
+        ? new mongoose.Types.ObjectId(String(location.showroomId))
+        : null;
+    } else {
+      const branch = searchParams.get("showroomId") || "";
+      if (branch === "warehouse") {
+        filter.showroomId = null;
+      } else if (mongoose.isValidObjectId(branch)) {
+        filter.showroomId = new mongoose.Types.ObjectId(branch);
+      }
     }
 
     const status = searchParams.get("status");

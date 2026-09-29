@@ -2,33 +2,15 @@
 
 import { useMemo, useState } from "react";
 import axios from "axios";
-import { FiTrash2 } from "react-icons/fi";
+import { Trash2 } from "lucide-react";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import VariantPicker from "@/components/ui/Application/Admin/inventory/VariantPicker";
 import { useItemRows, useLocations } from "@/components/ui/Application/Admin/inventory/useInventory";
 import { showToast } from "@/lib/showToast";
-import { ADMIN_DASHBOARD, ADMIN_INVENTORY_TRANSFER } from "@/Route/Adminpannelroute";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ListCard, btn, filterInput, tdClass, thClass, theadClass } from "@/components/ui/Application/Admin/listKit";
+import { Field, cell } from "@/components/ui/Application/Admin/purchase/purchaseKit";
 
 const today = () => new Date().toISOString().slice(0, 10);
-
-const breadcrumbData = [
-  { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_INVENTORY_TRANSFER, label: "Transfer" },
-];
 
 /** Warehouse to the sale center. Stock stays in transit until Received List. */
 export default function TransferPage() {
@@ -96,111 +78,113 @@ export default function TransferPage() {
   };
 
   return (
-    <div>
-      <BreadCrumb breadcrumbData={breadcrumbData} />
-
-      <Card>
-        <CardHeader className="border-b">
-          <h1 className="text-lg font-semibold">Stock Transfer</h1>
-          <p className="text-sm text-muted-foreground">
-            Send goods from the warehouse to the sale center
-          </p>
-        </CardHeader>
-
-        <CardContent className="grid gap-4 pt-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>From</Label>
-              <Input value="Warehouse" readOnly />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Branch</Label>
-              <Input value={saleCenter?.name || "Sale center not set"} readOnly />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={transferDate}
-                onChange={(event) => setTransferDate(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Product</Label>
-            <VariantPicker
-              location="warehouse"
-              onAdd={addItem}
-              placeholder="Enter Product Name/Sku/scan barcode"
+    <div className="space-y-4">
+      <ListCard title="Stock Transfer">
+        <p className="m-0 mb-4 text-[13px] text-muted-foreground">
+          Send goods from the warehouse to the sale center
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Field label="From" htmlFor="transfer-from">
+            <input id="transfer-from" value="Warehouse" readOnly className={filterInput} />
+          </Field>
+          <Field label="Branch" htmlFor="transfer-branch">
+            <input
+              id="transfer-branch"
+              value={saleCenter?.name || "Sale center not set"}
+              readOnly
+              className={filterInput}
             />
-          </div>
+          </Field>
+          <Field label="Date" htmlFor="transfer-date">
+            <input
+              id="transfer-date"
+              type="date"
+              value={transferDate}
+              onChange={(event) => setTransferDate(event.target.value)}
+              className={filterInput}
+            />
+          </Field>
+        </div>
+      </ListCard>
 
-          <div className="overflow-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead className="text-right">Stock Quantity</TableHead>
-                  <TableHead className="w-36">Transfer Quantity</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      Search a product to add it
-                    </TableCell>
-                  </TableRow>
-                )}
+      <ListCard title="Products">
+        <Field label="Product">
+          <VariantPicker
+            location="warehouse"
+            onAdd={addItem}
+            placeholder="Enter Product Name/Sku/scan barcode"
+          />
+        </Field>
 
-                {items.map((row) => (
-                  <TableRow key={row.variantId}>
-                    <TableCell>
-                      <span className="block font-medium">{row.productName}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {row.variantLabel}
-                        {row.sku ? ` · ${row.sku}` : ""}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">{row.stock}</TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={row.stock}
-                        value={row.quantity}
-                        onChange={(event) =>
-                          updateItem(row.variantId, { quantity: event.target.value })
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(row.variantId)}
-                      >
-                        <FiTrash2 />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+            <thead>
+              <tr className={theadClass}>
+                <th className={thClass}>Product Name</th>
+                <th className={`${thClass} text-right`}>Stock Quantity</th>
+                <th className={thClass}>Transfer Quantity</th>
+                <th className={`${thClass} w-12 text-center`} aria-label="Remove" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={4} className={`${tdClass} py-10 text-center text-muted-foreground`}>
+                    Search a product to add it
+                  </td>
+                </tr>
+              )}
 
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={busy || !saleCenter}>
-              {busy ? "Transferring…" : "Transfer Stock"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {items.map((row) => (
+                <tr key={row.variantId}>
+                  <td className={tdClass}>
+                    <b className="block font-medium">{row.productName}</b>
+                    <span className="block text-[12px] text-muted-foreground">
+                      {row.variantLabel}
+                      {row.sku ? ` · ${row.sku}` : ""}
+                    </span>
+                  </td>
+                  <td className={`${tdClass} text-right`}>{row.stock}</td>
+                  <td className={tdClass}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={row.stock}
+                      value={row.quantity}
+                      onChange={(event) =>
+                        updateItem(row.variantId, { quantity: event.target.value })
+                      }
+                      className={`${cell} w-[110px]`}
+                      aria-label={`Transfer quantity for ${row.productName}`}
+                    />
+                  </td>
+                  <td className={`${tdClass} text-center`}>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(row.variantId)}
+                      className="rounded-[4px] bg-[#ff5b5b] p-1.5 text-white hover:bg-[#f24242]"
+                      aria-label={`Remove ${row.productName}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-[18px] flex justify-end">
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy || !saleCenter}
+            className={`${btn.success} min-w-[140px] !text-[15px]`}
+          >
+            {busy ? "Transferring…" : "Transfer Stock"}
+          </button>
+        </div>
+      </ListCard>
     </div>
   );
 }
