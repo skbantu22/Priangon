@@ -37,6 +37,9 @@ const stockAdjustmentItemSchema = new mongoose.Schema(
 
     previousStock: { type: Number, default: 0 },
     newStock: { type: Number, default: 0 },
+
+    purchaseRate: { type: Number, default: 0 },
+    loss: { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -88,6 +91,14 @@ const stockAdjustmentSchema = new mongoose.Schema(
 
     totalAdded: { type: Number, default: 0 },
     totalSubtracted: { type: Number, default: 0 },
+    totalLoss: { type: Number, default: 0 },
+
+    status: {
+      type: String,
+      enum: ["confirmed"],
+      default: "confirmed",
+      index: true,
+    },
 
     note: { type: String, trim: true, default: "" },
     createdBy: { type: String, trim: true, default: "" },

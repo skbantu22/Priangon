@@ -26,6 +26,17 @@ import {
   theadRow,
   totalRow,
 } from "@/components/ui/Application/Admin/listKit";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const cancelBtn =
+  "inline-flex items-center justify-center rounded-[6px] border border-[#dee2e6] bg-white px-4 py-2 text-[13px] font-semibold text-[#495057] shadow-sm transition hover:bg-[#f8f9fa] dark:border-input dark:bg-transparent dark:text-foreground";
 const EMPTY_FILTERS = {
   branchId: "",
   status: "all",
@@ -81,6 +92,7 @@ export default function TransferList({ title, view = "transferred", canConfirm =
   const [confirmingId, setConfirmingId] = useState("");
   const [rejectingId, setRejectingId] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [pending, setPending] = useState(null);
 
   const [draft, setDraft] = useState(EMPTY_FILTERS);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -158,9 +170,53 @@ export default function TransferList({ title, view = "transferred", canConfirm =
     setPage(1);
   };
 
-  const confirmTransfer = async (row) => {
-    if (!window.confirm(`Confirm ${row.transferNumber}? Stock will enter your shop.`)) return;
+  const deleteMessage = (row) => {
+    if (view === "received" && row.status === "pending") {
+      return `Delete ${row.transferNumber}? Stock will return to ${row.fromName || "the sender"}.`;
+    }
+    if (view === "received" && row.status === "rejected") {
+      return `Delete ${row.transferNumber}? This rejected transfer will be removed.`;
+    }
+    return `Delete ${row.transferNumber}? Stock will go back to your shop.`;
+  };
 
+  const pendingCopy = (item) => {
+    if (!item) return null;
+    const { kind, row } = item;
+    if (kind === "confirm") {
+      return {
+        title: "Confirm transfer",
+        body: `Confirm ${row.transferNumber}? Stock will enter your shop.`,
+        label: "Confirm",
+        tone: btn.success,
+      };
+    }
+    if (kind === "reject") {
+      return {
+        title: "Reject transfer",
+        body: `Reject ${row.transferNumber}? Stock will go back to ${row.fromName || "the sender"}.`,
+        label: "Reject",
+        tone: btn.danger,
+      };
+    }
+    return {
+      title: "Delete transfer",
+      body: deleteMessage(row),
+      label: "Delete",
+      tone: btn.danger,
+    };
+  };
+
+  const runPending = async () => {
+    if (!pending) return;
+    const { kind, row } = pending;
+    setPending(null);
+    if (kind === "confirm") await executeConfirm(row);
+    else if (kind === "reject") await executeReject(row);
+    else await executeDelete(row);
+  };
+
+  const executeConfirm = async (row) => {
     setConfirmingId(row._id);
 
     try {
@@ -185,15 +241,9 @@ export default function TransferList({ title, view = "transferred", canConfirm =
     }
   };
 
-  const rejectTransfer = async (row) => {
-    if (
-      !window.confirm(
-        `Reject ${row.transferNumber}? Stock will go back to ${row.fromName || "the sender"}.`,
-      )
-    ) {
-      return;
-    }
+  const confirmTransfer = (row) => setPending({ kind: "confirm", row });
 
+  const executeReject = async (row) => {
     setRejectingId(row._id);
 
     try {
@@ -215,20 +265,11 @@ export default function TransferList({ title, view = "transferred", canConfirm =
     }
   };
 
+  const rejectTransfer = (row) => setPending({ kind: "reject", row });
+
   const partyName = (row) => (view === "received" ? row.fromName : row.toName);
 
-  const deleteTransfer = async (row) => {
-    const pendingReceived =
-      view === "received" && row.status === "pending"
-        ? `Delete ${row.transferNumber}? Stock will return to ${row.fromName || "the sender"}.`
-        : view === "received" && row.status === "rejected"
-          ? `Delete ${row.transferNumber}? This rejected transfer will be removed.`
-          : `Delete ${row.transferNumber}? Stock will go back to your shop.`;
-
-    if (!window.confirm(pendingReceived)) {
-      return;
-    }
-
+  const executeDelete = async (row) => {
     setDeletingId(row._id);
 
     try {
@@ -252,6 +293,15 @@ export default function TransferList({ title, view = "transferred", canConfirm =
       setDeletingId("");
     }
   };
+
+  const deleteTransfer = (row) => setPending({ kind: "delete", row });
+
+  const dialogCopy = pendingCopy(pending);
+  const dialogBusy =
+    pending &&
+    ((pending.kind === "confirm" && confirmingId === pending.row._id) ||
+      (pending.kind === "reject" && rejectingId === pending.row._id) ||
+      (pending.kind === "delete" && deletingId === pending.row._id));
 
   const rowActions = (row) => {
     const billUrl = ADMIN_INVENTORY_TRANSFER_VIEW(row._id);
@@ -308,6 +358,27 @@ export default function TransferList({ title, view = "transferred", canConfirm =
 
   return (
     <div className="space-y-4">
+      <Dialog open={!!pending} onOpenChange={(open) => !open && !dialogBusy && setPending(null)}>
+        <DialogContent className="border-[#e3e3e3] bg-white sm:max-w-md" showCloseButton={!dialogBusy}>
+          {dialogCopy ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[17px] text-[#212529]">{dialogCopy.title}</DialogTitle>
+                <DialogDescription className="text-[14px] text-[#495057]">{dialogCopy.body}</DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <button type="button" className={cancelBtn} disabled={dialogBusy} onClick={() => setPending(null)}>
+                  Cancel
+                </button>
+                <button type="button" className={dialogCopy.tone} disabled={dialogBusy} onClick={runPending}>
+                  {dialogBusy ? `${dialogCopy.label}…` : dialogCopy.label}
+                </button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <ListCard
         title={title}
         actions={

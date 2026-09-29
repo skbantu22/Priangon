@@ -137,6 +137,10 @@ export const ADMIN_ROLE_MANAGE = (id) =>
 // Inventory routes
 export const ADMIN_INVENTORY_STOCK = "/admin/inventory/stock";
 export const ADMIN_INVENTORY_ADJUSTMENTS = "/admin/inventory/adjustments";
+export const ADMIN_INVENTORY_ADJUSTMENT_NEW = "/admin/inventory/adjustments/new";
+export const ADMIN_INVENTORY_ADJUSTMENT_TYPES = "/admin/inventory/adjustments/types";
+export const ADMIN_INVENTORY_ADJUSTMENT_VIEW = (id) =>
+  `/admin/inventory/adjustments/${id}`;
 export const ADMIN_INVENTORY_TRANSFER = "/admin/inventory/transfer";
 export const ADMIN_INVENTORY_TRANSFER_VIEW = (id) => `/admin/inventory/transfers/${id}`;
 export const ADMIN_INVENTORY_TRANSFERRED = "/admin/inventory/transferred";
