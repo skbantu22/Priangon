@@ -19,6 +19,9 @@ export default function VariantPicker({
   onAdd,
   disabled = false,
   placeholder = "Scan a barcode or search by name, SKU",
+  stockedOnly = false,
+  /** AmarSolution transfer row: icon box + green-bordered input */
+  amarSearch = false,
 }) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState([]);
@@ -30,19 +33,25 @@ export default function VariantPicker({
   useEffect(() => {
     const query = term.trim();
 
-    if (query.length < 2) {
+    if (!query) {
       setResults([]);
+      setOpen(false);
       return undefined;
     }
 
     let cancelled = false;
 
     const timer = setTimeout(async () => {
+      setOpen(true);
       setSearching(true);
 
       try {
         const { data } = await axios.get("/api/inventory/variant-search", {
-          params: { q: query, location },
+          params: {
+            q: query,
+            location,
+            ...(stockedOnly ? { stocked: "1" } : {}),
+          },
         });
 
         if (cancelled) return;
@@ -67,7 +76,7 @@ export default function VariantPicker({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [term, location]);
+  }, [term, location, stockedOnly]);
 
   // Clicking away closes the list without picking anything
   useEffect(() => {
@@ -89,28 +98,48 @@ export default function VariantPicker({
     setOpen(false);
   };
 
+  const inputClass = amarSearch
+    ? "h-[38px] rounded-l-none border-2 border-[#28a745] bg-white px-3 text-[13px] shadow-none focus-visible:border-[#28a745] focus-visible:ring-[#28a745]/25"
+    : "pl-9";
+
+  const searchInput = (
+    <Input
+      value={term}
+      disabled={disabled}
+      onChange={(event) => setTerm(event.target.value)}
+      onFocus={() => results.length > 0 && setOpen(true)}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") return;
+
+        event.preventDefault();
+
+        // A scanner has already typed the whole code by now
+        if (results.length === 1) pick(results[0]);
+      }}
+      placeholder={placeholder}
+      className={inputClass}
+    />
+  );
+
   return (
-    <div className="relative" ref={boxRef}>
-      <FiSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div className={`relative ${amarSearch ? "flex min-w-0 flex-1" : ""}`} ref={boxRef}>
+      {!amarSearch && (
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      )}
 
-      <Input
-        value={term}
-        disabled={disabled}
-        onChange={(event) => setTerm(event.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
+      {amarSearch && (
+        <div
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-l-[4px] border border-r-0 border-[#ced4da] bg-[#f8f9fa] text-[#6c757d]"
+          aria-hidden
+        >
+          <FiSearch className="size-4" />
+        </div>
+      )}
 
-          event.preventDefault();
+      <div className={amarSearch ? "relative min-w-0 flex-1" : undefined}>
+        {searchInput}
 
-          // A scanner has already typed the whole code by now
-          if (results.length === 1) pick(results[0]);
-        }}
-        placeholder={placeholder}
-        className="pl-9"
-      />
-
-      {open && term.trim().length >= 2 && (
+      {open && term.trim().length >= 1 && (
         <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover shadow-md">
           {searching && (
             <p className="px-3 py-2 text-sm text-muted-foreground">Searching…</p>
@@ -150,6 +179,7 @@ export default function VariantPicker({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

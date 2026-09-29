@@ -9,6 +9,7 @@ import Topbar from "@/components/ui/Application/Admin/Topbar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ToastContainer } from "react-toastify";
 import NetworkStatus from "@/components/ui/Application/Admin/NetworkStatus";
+import { adminLargePrintShellClass, isAdminLargePrintPath } from "@/lib/adminLargePrint";
 
 export default function Layout({ children }) {
   const pathname = usePathname();
@@ -16,16 +17,18 @@ export default function Layout({ children }) {
   const isPos =
     pathname.startsWith("/admin/pos") || pathname.startsWith("/admin/payment");
 
-  // Sale and purchase invoice clicks open a large print, not the admin shell
-  const isLargePrint =
-    pathname.startsWith("/admin/print/") || /^\/admin\/purchase\/[a-f0-9]{24}$/i.test(pathname);
+  const isLargePrint = isAdminLargePrintPath(pathname);
 
   // Dialogs and dropdowns are portalled to <body>, so the admin theme
   // has to live there too (the wrapper div below covers the first paint).
   useEffect(() => {
+    if (isLargePrint) {
+      document.body.classList.remove("admin-theme");
+      return () => document.body.classList.remove("admin-theme");
+    }
     document.body.classList.add("admin-theme");
     return () => document.body.classList.remove("admin-theme");
-  }, []);
+  }, [isLargePrint]);
 
   // the store / query cache come from the root layout: a second provider here
   // would restore the whole saved cache again every time admin opens
@@ -40,7 +43,7 @@ export default function Layout({ children }) {
         <NetworkStatus />
 
         {isLargePrint ? (
-          <div className="min-h-screen bg-[#d6d6d6] px-4 py-8" style={{ background: "#d6d6d6" }}>
+          <div className={adminLargePrintShellClass} style={{ background: "#d6d6d6" }}>
             {children}
           </div>
         ) : (

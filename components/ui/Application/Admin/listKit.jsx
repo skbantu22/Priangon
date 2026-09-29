@@ -40,6 +40,9 @@ export const tdClass =
 export const totalRowClass =
   "bg-[#cbd5e1] text-[15px] font-bold text-[#212529] dark:bg-slate-700 dark:text-slate-100 [&>td]:py-[9px]";
 
+/** Aliases used by inventory transfer lists and other admin screens */
+export { filterInput as inputClass, theadClass as theadRow, totalRowClass as totalRow };
+
 /** Card with a faint header strip holding the title and the action buttons */
 export function ListCard({ title, actions, children, bodyClass = "p-[20px]" }) {
   return (

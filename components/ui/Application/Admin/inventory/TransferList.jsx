@@ -1,65 +1,123 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import { FiSearch } from "react-icons/fi";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
 import { showToast } from "@/lib/showToast";
-import { formatDateBD } from "@/lib/bdFormat";
-import { selectClass } from "@/components/ui/Application/Admin/inventory/useInventory";
-import { ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useOpeningStockTill, posShowroomsQueryOptions } from "@/lib/posProducts";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  ADMIN_INVENTORY_TRANSFER,
+  ADMIN_INVENTORY_TRANSFER_VIEW,
+} from "@/Route/Adminpannelroute";
 
-const statusLabel = {
-  pending: "Pending",
-  received: "Received",
+import {
+  ActionMenu,
+  DateRange,
+  EmptyRow,
+  ListCard,
+  Pagination,
+  btn,
+  inputClass,
+  tdClass,
+  thClass,
+  theadRow,
+  totalRow,
+} from "@/components/ui/Application/Admin/listKit";
+const EMPTY_FILTERS = {
+  branchId: "",
+  status: "all",
+  productId: "",
+  start: "",
+  end: "",
+  search: "",
 };
 
-/**
- * Transferred List and Received List are the same papers.
- * Received List is where a pending transfer is taken onto the shelf.
- */
-export default function TransferList({ title, href, canReceive = false }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState(canReceive ? "pending" : "all");
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [detail, setDetail] = useState(null);
-  const [receivingId, setReceivingId] = useState("");
+const STATUS_LABEL = { pending: "Pending", received: "Confirmed", rejected: "Rejected" };
+const STATUS_STYLE = {
+  pending: "bg-[#f9c851] text-[#212529]",
+  received: "bg-[#10c469] text-white",
+  rejected: "bg-[#6c757d] text-white",
+};
 
-  const loadTransfers = useCallback(async () => {
+const fmtDate = (value) =>
+  value ? new Date(value).toLocaleDateString("en-GB") : "";
+
+const lineQty = (row) =>
+  Number(row.totalQuantity) ||
+  (row.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+
+const StatusChip = ({ status }) => (
+  <span
+    className={`inline-block whitespace-nowrap px-[10px] py-[3px] text-[12px] font-semibold ${STATUS_STYLE[status] || "bg-[#e9ecef] text-[#495057]"}`}
+  >
+    {STATUS_LABEL[status] || status}
+  </span>
+);
+
+/**
+ * AmarSolution-style transferred / received lists.
+ * `view`: "transferred" (outgoing) or "received" (incoming).
+ */
+export default function TransferList({ title, view = "transferred", canConfirm = false }) {
+  const till = useOpeningStockTill();
+  const { data: showrooms = [] } = useQuery(posShowroomsQueryOptions());
+  const { data: products = [] } = useQuery({
+    queryKey: ["transfer-list-products"],
+    queryFn: async () => {
+      const { data } = await axios.get("/api/product/list", {
+        params: { limit: 100, location: "all" },
+      });
+      return data.success ? data.items : [];
+    },
+    staleTime: 60_000,
+  });
+
+  const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState({ total: 0, pages: 1, from: 0, totalQuantity: 0 });
+  const [loading, setLoading] = useState(true);
+  const [confirmingId, setConfirmingId] = useState("");
+  const [rejectingId, setRejectingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
+  const [draft, setDraft] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [page, setPage] = useState(1);
+  const [limit] = useState("25");
+
+  const partyHeader = view === "received" ? "Sender" : "Received";
+  const branchOptions = showrooms.filter((s) => String(s._id) !== String(till.id));
+
+  const params = useCallback(
+    (extra) => ({
+      view,
+      showroomId: till.id,
+      status: filters.status,
+      ...(filters.branchId && { branchId: filters.branchId }),
+      ...(filters.productId && { productId: filters.productId }),
+      ...(filters.search && { search: filters.search }),
+      ...(filters.start && { from: filters.start }),
+      ...(filters.end && { to: filters.end }),
+      ...extra,
+    }),
+    [filters, till.id, view],
+  );
+
+  const load = useCallback(async () => {
+    if (!till.id || till.id === "warehouse") {
+      setRows([]);
+      setMeta({ total: 0, pages: 1, from: 0, totalQuantity: 0 });
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data } = await axios.get("/api/inventory/transfers", {
-        params: {
-          status,
-          page,
-          limit: 25,
-          ...(search.trim() && { search: search.trim() }),
-        },
+        params: params({ page, limit }),
       });
 
       if (!data.success) {
@@ -68,7 +126,12 @@ export default function TransferList({ title, href, canReceive = false }) {
       }
 
       setRows(data.data);
-      setPages(data.pages);
+      setMeta({
+        total: data.total,
+        pages: data.pages,
+        from: data.from,
+        totalQuantity: data.totalQuantity || 0,
+      });
     } catch (error) {
       showToast(
         "error",
@@ -77,230 +140,338 @@ export default function TransferList({ title, href, canReceive = false }) {
     } finally {
       setLoading(false);
     }
-  }, [status, page, search]);
+  }, [limit, page, params, till.id]);
 
   useEffect(() => {
-    const timer = setTimeout(loadTransfers, 250);
-    return () => clearTimeout(timer);
-  }, [loadTransfers]);
+    load();
+  }, [load]);
 
-  useEffect(() => {
+  const search = (event) => {
+    event?.preventDefault();
     setPage(1);
-  }, [status, search]);
+    setFilters({ ...draft, search: draft.search.trim() });
+  };
 
-  const receive = async (row) => {
-    setReceivingId(row._id);
+  const clear = () => {
+    setDraft(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
+    setPage(1);
+  };
+
+  const confirmTransfer = async (row) => {
+    if (!window.confirm(`Confirm ${row.transferNumber}? Stock will enter your shop.`)) return;
+
+    setConfirmingId(row._id);
 
     try {
-      const { data } = await axios.post(`/api/inventory/transfers/${row._id}/receive`);
+      const { data } = await axios.post(`/api/inventory/transfers/${row._id}/receive`, {
+        showroomId: till.id,
+      });
 
       if (!data.success) {
-        showToast("error", data.message || "Could not receive this transfer");
+        showToast("error", data.message || "Could not confirm");
         return;
       }
 
       showToast("success", data.message);
-      setDetail(null);
-      loadTransfers();
+      load();
     } catch (error) {
       showToast(
         "error",
-        error.response?.data?.message || "Could not receive this transfer",
+        error.response?.data?.message || "Could not confirm",
       );
     } finally {
-      setReceivingId("");
+      setConfirmingId("");
     }
   };
 
+  const rejectTransfer = async (row) => {
+    if (
+      !window.confirm(
+        `Reject ${row.transferNumber}? Stock will go back to ${row.fromName || "the sender"}.`,
+      )
+    ) {
+      return;
+    }
+
+    setRejectingId(row._id);
+
+    try {
+      const { data } = await axios.post(`/api/inventory/transfers/${row._id}/reject`, {
+        showroomId: till.id,
+      });
+
+      if (!data.success) {
+        showToast("error", data.message || "Could not reject");
+        return;
+      }
+
+      showToast("success", data.message);
+      load();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || "Could not reject");
+    } finally {
+      setRejectingId("");
+    }
+  };
+
+  const partyName = (row) => (view === "received" ? row.fromName : row.toName);
+
+  const deleteTransfer = async (row) => {
+    const pendingReceived =
+      view === "received" && row.status === "pending"
+        ? `Delete ${row.transferNumber}? Stock will return to ${row.fromName || "the sender"}.`
+        : view === "received" && row.status === "rejected"
+          ? `Delete ${row.transferNumber}? This rejected transfer will be removed.`
+          : `Delete ${row.transferNumber}? Stock will go back to your shop.`;
+
+    if (!window.confirm(pendingReceived)) {
+      return;
+    }
+
+    setDeletingId(row._id);
+
+    try {
+      const { data } = await axios.delete(`/api/inventory/transfers/${row._id}`, {
+        data: { showroomId: till.id },
+      });
+
+      if (!data.success) {
+        showToast("error", data.message || "Could not delete");
+        return;
+      }
+
+      showToast("success", data.message || "Transfer deleted");
+      load();
+    } catch (error) {
+      showToast(
+        "error",
+        error.response?.data?.message || "Could not delete",
+      );
+    } finally {
+      setDeletingId("");
+    }
+  };
+
+  const rowActions = (row) => {
+    const billUrl = ADMIN_INVENTORY_TRANSFER_VIEW(row._id);
+    const items = [
+      ["View", () => window.open(billUrl, "_blank", "noopener,noreferrer")],
+      [
+        "Invoice",
+        () => window.open(`${billUrl}?print=1`, "_blank", "noopener,noreferrer"),
+      ],
+    ];
+
+    if (view === "transferred") {
+      if (row.status === "pending") {
+        items.push([
+          deletingId === row._id ? "Deleting…" : "Delete",
+          () => deleteTransfer(row),
+          "danger",
+        ]);
+      }
+    } else if (canConfirm) {
+      if (row.status === "pending") {
+        items.push([
+          confirmingId === row._id ? "Confirming…" : "Make Confirmed",
+          () => confirmTransfer(row),
+        ]);
+        items.push([
+          rejectingId === row._id ? "Rejecting…" : "Make Rejected",
+          () => rejectTransfer(row),
+        ]);
+      }
+
+      if (row.status === "pending" || row.status === "rejected") {
+        items.push([
+          deletingId === row._id ? "Deleting…" : "Delete",
+          () => deleteTransfer(row),
+          "danger",
+        ]);
+      }
+    }
+
+    return items;
+  };
+
+  const filtered =
+    filters.search ||
+    filters.start ||
+    filters.end ||
+    filters.branchId ||
+    filters.productId ||
+    filters.status !== "all";
+
+  const warehouseBlocked = !till.id || till.id === "warehouse";
+  const pageTotalQty = rows.reduce((sum, row) => sum + lineQty(row), 0);
+
   return (
-    <div>
-      <BreadCrumb
-        breadcrumbData={[
-          { href: ADMIN_DASHBOARD, label: "Home" },
-          { href, label: title },
-        ]}
-      />
-
-      <Card>
-        <CardHeader className="flex flex-col gap-3 border-b lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">{title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {canReceive
-                ? "Stock waiting at the sale center until it is received"
-                : "Stock sent out of the warehouse"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <FiSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Number or product"
-                className="w-60 pl-9"
-              />
-            </div>
-
+    <div className="space-y-4">
+      <ListCard
+        title={title}
+        actions={
+          <Link href={ADMIN_INVENTORY_TRANSFER} className={btn.primary}>
+            Make Transfer
+          </Link>
+        }
+      >
+        <form onSubmit={search} className="flex flex-wrap items-center gap-2">
+          {view === "transferred" ? (
             <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className={selectClass}
+              value={draft.branchId}
+              onChange={(event) => setDraft({ ...draft, branchId: event.target.value })}
+              className={`${inputClass} !w-40`}
+              aria-label="Branch"
             >
-              <option value="all">All</option>
-              <option value="pending">Pending</option>
-              <option value="received">Received</option>
+              <option value="">Select Branch</option>
+              {branchOptions.map((branch) => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
             </select>
-          </div>
-        </CardHeader>
+          ) : null}
 
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Number</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>From</TableHead>
-                <TableHead>To</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
+          <select
+            value={draft.status}
+            onChange={(event) => setDraft({ ...draft, status: event.target.value })}
+            className={`${inputClass} !w-36`}
+            aria-label="Status"
+          >
+            <option value="all">Select Status</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            {view === "received" ? <option value="rejected">Rejected</option> : null}
+          </select>
 
-            <TableBody>
+          <select
+            value={draft.productId}
+            onChange={(event) => setDraft({ ...draft, productId: event.target.value })}
+            className={`${inputClass} !w-40`}
+            aria-label="Product"
+          >
+            <option value="">Select Product</option>
+            {products.map((product) => (
+              <option key={product._id} value={product._id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+
+          <DateRange
+            className="w-full sm:w-[300px]"
+            start={draft.start}
+            end={draft.end}
+            onStart={(value) => setDraft({ ...draft, start: value })}
+            onEnd={(value) => setDraft({ ...draft, end: value })}
+          />
+
+          <input
+            value={draft.search}
+            onChange={(event) => setDraft({ ...draft, search: event.target.value })}
+            placeholder="Search"
+            className={`${inputClass} min-w-[160px] flex-1`}
+          />
+
+          <button type="submit" className={btn.info}>
+            <FiSearch size={14} /> Search
+          </button>
+          <button type="button" onClick={clear} className={btn.danger}>
+            Clear
+          </button>
+        </form>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead>
+              <tr className={theadRow}>
+                {["SL", "Date", "Invoice No.", partyHeader, "Total Quantity", "Status", "Action"].map(
+                  (head) => (
+                    <th key={head} className={thClass}>
+                      {head}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
               {loading &&
-                Array.from({ length: 5 }).map((_, index) => (
-                  <TableRow key={index}>
+                Array.from({ length: 4 }).map((_, index) => (
+                  <tr key={index}>
                     {Array.from({ length: 7 }).map((__, cell) => (
-                      <TableCell key={cell}>
-                        <Skeleton className="h-5 w-full" />
-                      </TableCell>
+                      <td key={cell} className={tdClass}>
+                        <div className="h-4 animate-pulse rounded bg-slate-100" />
+                      </td>
                     ))}
-                  </TableRow>
+                  </tr>
                 ))}
 
-              {!loading && rows.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                    No transfers yet
-                  </TableCell>
-                </TableRow>
+              {!loading && warehouseBlocked && (
+                <EmptyRow
+                  colSpan={7}
+                  title="Switch to a shop branch"
+                  hint="Use the branch switch at the top to see transfers for that shop."
+                />
+              )}
+
+              {!loading && !warehouseBlocked && rows.length === 0 && (
+                <EmptyRow
+                  colSpan={7}
+                  title={filtered ? "No transfers match these filters" : "No transfers yet"}
+                />
               )}
 
               {!loading &&
-                rows.map((row) => (
-                  <TableRow key={row._id}>
-                    <TableCell className="font-medium">{row.transferNumber}</TableCell>
-                    <TableCell>{formatDateBD(row.transferDate)}</TableCell>
-                    <TableCell>{row.fromName}</TableCell>
-                    <TableCell>{row.toName}</TableCell>
-                    <TableCell className="text-right">{row.totalQuantity}</TableCell>
-                    <TableCell>
-                      <Badge variant={row.status === "received" ? "default" : "secondary"}>
-                        {statusLabel[row.status] || row.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setDetail(row)}>
-                          View
-                        </Button>
-                        {canReceive && row.status === "pending" && (
-                          <Button
-                            size="sm"
-                            disabled={receivingId === row._id}
-                            onClick={() => receive(row)}
-                          >
-                            {receivingId === row._id ? "Receiving…" : "Receive"}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                !warehouseBlocked &&
+                rows.map((row, index) => (
+                  <tr key={row._id}>
+                    <td className={tdClass}>{meta.from + index}</td>
+                    <td className={tdClass}>{fmtDate(row.transferDate)}</td>
+                    <td className={tdClass}>
+                      <a
+                        href={ADMIN_INVENTORY_TRANSFER_VIEW(row._id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[15px] font-semibold text-[#188ae2] hover:underline"
+                      >
+                        {row.transferNumber}
+                      </a>
+                    </td>
+                    <td className={tdClass}>{partyName(row)}</td>
+                    <td className={tdClass}>{lineQty(row)}</td>
+                    <td className={tdClass}>
+                      <StatusChip status={row.status} />
+                    </td>
+                    <td className={tdClass}>
+                      <ActionMenu items={rowActions(row)} />
+                    </td>
+                  </tr>
                 ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
-      {pages > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => current - 1)}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {pages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= pages}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
-
-      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{detail?.transferNumber}</DialogTitle>
-          </DialogHeader>
-
-          {detail && (
-            <div className="grid gap-3">
-              <p className="text-sm text-muted-foreground">
-                {detail.fromName} → {detail.toName} · {formatDateBD(detail.transferDate)} ·{" "}
-                {statusLabel[detail.status]}
-              </p>
-
-              <div className="max-h-72 overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>SKU</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detail.items?.map((item) => (
-                      <TableRow key={String(item.variantId)}>
-                        <TableCell>
-                          <span className="block font-medium">{item.productName}</span>
-                          {item.variantLabel && (
-                            <span className="block text-xs text-muted-foreground">
-                              {item.variantLabel}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>{item.sku || "—"}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {canReceive && detail.status === "pending" && (
-                <div className="flex justify-end">
-                  <Button disabled={receivingId === detail._id} onClick={() => receive(detail)}>
-                    {receivingId === detail._id ? "Receiving…" : "Receive"}
-                  </Button>
-                </div>
+              {!loading && !warehouseBlocked && rows.length > 0 && (
+                <tr className={totalRow}>
+                  <td className={tdClass} colSpan={2} />
+                  <td className={`${tdClass} text-center`} colSpan={2}>
+                    Total
+                  </td>
+                  <td className={tdClass}>{pageTotalQty}</td>
+                  <td className={tdClass} colSpan={2} />
+                </tr>
               )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            </tbody>
+          </table>
+        </div>
+
+        <Pagination
+          page={page}
+          pages={meta.pages}
+          from={meta.from}
+          count={rows.length}
+          total={meta.total}
+          onPage={setPage}
+        />
+      </ListCard>
     </div>
   );
 }

@@ -48,6 +48,10 @@ const fmt = (v) => {
 
 const COLUMNS = ["Sl", "Date", "Invoice No", "Location", "Items", "Customer", "Phone", "Type", "Sale By", "Total", "Paid", "Due", "Returned", "Payment Status", "Remark"];
 
+const SALE_INVOICE_LINK_CLASS =
+  "relative z-[1] font-semibold text-[#188ae2] underline decoration-[#188ae2]/40 underline-offset-2 hover:decoration-[#188ae2] dark:text-[#5eb8ff]";
+const saleInvoiceHref = (row) => `/admin/print/${String(row._id ?? "")}`;
+
 export default function SalesPage() {
   return (
     <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[8px] bg-white dark:bg-card" />}>
@@ -268,7 +272,7 @@ function SaleList() {
           <article key={row._id} className="rounded-[6px] border border-[#ebeff2] bg-white p-3 dark:border-border dark:bg-card">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <a href={`/admin/print/${row._id}`} target="_blank" rel="noreferrer" className="text-[15px] font-semibold text-[#188ae2]">
+                <a href={saleInvoiceHref(row)} target="_blank" rel="noopener noreferrer" className={`text-[15px] ${SALE_INVOICE_LINK_CLASS}`}>
                   {row.orderNumber}
                 </a>
                 <p className="m-0 truncate text-[12px] text-muted-foreground">
@@ -322,7 +326,7 @@ function SaleList() {
                 <td className={tdClass}>{result.from + i}</td>
                 <td className={`${tdClass} whitespace-nowrap`}>{fmt(row.createdAt)}</td>
                 <td className={tdClass}>
-                  <a href={`/admin/print/${row._id}`} target="_blank" rel="noreferrer" className="text-[#188ae2] hover:underline">
+                  <a href={saleInvoiceHref(row)} target="_blank" rel="noopener noreferrer" className={SALE_INVOICE_LINK_CLASS}>
                     {row.orderNumber}
                   </a>
                   {row.orderType === "exchange" && <span className="block text-[11px] text-[#7a33cb]">Exchange</span>}

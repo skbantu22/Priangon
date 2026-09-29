@@ -4,12 +4,13 @@ import { connectDB } from "@/lib/databaseconnection";
 import { actorFullName, requireAnyPermission, requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
 import {
-  WAREHOUSE,
+  SHOWROOM,
   applyStockChange,
   buildStockItems,
   nextDocumentNumber,
   readStock,
 } from "@/lib/stockService";
+import { resolveTransferSource } from "@/lib/posTillAuth";
 
 import Showroom from "@/models/Showroom.model";
 import StockTransfer from "@/models/StockTransfer.model";
@@ -28,30 +29,62 @@ const mergeItems = (items) => {
   return [...byVariant.values()];
 };
 
-/** The one counter that sells. Transfers land there, not on another branch. */
-async function saleCenter() {
-  return Showroom.findOne({ isSaleCenter: true, isActive: { $ne: false } })
-    .sort({ createdAt: 1 })
+/** The other shop. It cannot be the shop the stock is leaving. */
+async function resolveDestination(requested, sourceId) {
+  const id = String(requested || "");
+
+  if (!/^[a-f\d]{24}$/i.test(id)) {
+    return { error: "Select a branch" };
+  }
+
+  if (id === String(sourceId)) {
+    return { error: "Choose a different branch. Stock cannot move to the same shop" };
+  }
+
+  const shop = await Showroom.findOne({ _id: id, isActive: { $ne: false } })
     .select("name")
     .lean();
+
+  if (!shop) return { error: "That branch is not available" };
+
+  return { id, name: shop.name };
 }
 
-/** Puts warehouse stock back if a transfer cannot be finished */
-async function restoreWarehouse(items, note, createdBy) {
-  for (const item of items) {
+/** Undoes stock already moved when a later line or the save fails */
+async function undoMoves(moves, createdBy) {
+  for (const move of [...moves].reverse()) {
     await applyStockChange({
-      locationType: WAREHOUSE,
-      locationId: null,
-      productId: item.productId,
-      variantId: item.variantId,
-      delta: item.quantity,
-      type: "TRANSFER_IN",
-      note,
+      locationType: move.locationType,
+      locationId: move.locationId,
+      productId: move.productId,
+      variantId: move.variantId,
+      delta: -move.delta,
+      type: move.delta < 0 ? "TRANSFER_IN" : "TRANSFER_OUT",
+      note: `${move.note} reversed`,
       createdBy,
-      productName: item.productName,
+      productName: move.productName,
     });
   }
 }
+
+const dayStart = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const dayEnd = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(23, 59, 59, 999);
+  return date;
+};
+
+const lineQuantity = (transfer) => {
+  if (Number(transfer.totalQuantity) > 0) return Number(transfer.totalQuantity);
+  return (transfer.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+};
 
 /** Transferred and received lists share this paper trail */
 export async function GET(req) {
@@ -63,33 +96,89 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const search = (searchParams.get("search") || "").trim();
-    const status = searchParams.get("status") || "all";
+    const statusParam = searchParams.get("status") || "all";
+    const status =
+      statusParam === "confirmed" ? "received" : statusParam;
+    const view = searchParams.get("view") || "transferred";
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const limit = Math.min(100, Math.max(10, Number(searchParams.get("limit")) || 25));
 
+    const shop = await resolveTransferSource(auth, searchParams.get("showroomId"));
+
+    if (shop.error) {
+      return NextResponse.json({ success: false, message: shop.error }, { status: 400 });
+    }
+
     const filter = {};
 
-    if (status === "pending" || status === "received") filter.status = status;
+    if (view === "received") filter.toId = shop.id;
+    else filter.fromId = shop.id;
+
+    const branchId = String(searchParams.get("branchId") || "");
+
+    if (/^[a-f\d]{24}$/i.test(branchId)) {
+      if (view === "received") filter.fromId = branchId;
+      else filter.toId = branchId;
+    }
+
+    const productId = String(searchParams.get("productId") || "");
+
+    if (/^[a-f\d]{24}$/i.test(productId)) {
+      filter["items.productId"] = productId;
+    }
+
+    if (status === "pending" || status === "received" || status === "rejected") {
+      filter.status = status;
+    }
+
+    const from = dayStart(searchParams.get("from") || "");
+    const to = dayEnd(searchParams.get("to") || "");
+
+    if (from || to) {
+      filter.transferDate = {};
+      if (from) filter.transferDate.$gte = from;
+      if (to) filter.transferDate.$lte = to;
+    }
 
     if (search) {
       const pattern = { $regex: escapeRegex(search), $options: "i" };
 
       filter.$or = [
         { transferNumber: pattern },
+        { fromName: pattern },
         { toName: pattern },
         { "items.productName": pattern },
         { "items.sku": pattern },
       ];
     }
 
-    const [data, total] = await Promise.all([
+    const [rawRows, total, qtyAgg] = await Promise.all([
       StockTransfer.find(filter)
         .sort({ transferDate: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       StockTransfer.countDocuments(filter),
+      StockTransfer.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            lineQty: {
+              $cond: {
+                if: { $gt: ["$totalQuantity", 0] },
+                then: "$totalQuantity",
+                else: { $sum: "$items.quantity" },
+              },
+            },
+          },
+        },
+        { $group: { _id: null, totalQuantity: { $sum: "$lineQty" } } },
+      ]),
     ]);
+
+    const data = rawRows.map((row) => ({ ...row, totalQuantity: lineQuantity(row) }));
+    const totalQuantity = qtyAgg[0]?.totalQuantity || 0;
+    const fromIndex = total ? (page - 1) * limit + 1 : 0;
 
     return NextResponse.json({
       success: true,
@@ -98,6 +187,8 @@ export async function GET(req) {
       limit,
       total,
       pages: Math.max(1, Math.ceil(total / limit)),
+      from: fromIndex,
+      totalQuantity,
     });
   } catch (error) {
     console.error("TRANSFER LIST ERROR:", error);
@@ -110,11 +201,11 @@ export async function GET(req) {
 }
 
 /**
- * Moves goods out of the warehouse toward the sale center.
+ * Sends stock from the current shop toward another branch.
  *
- * The shelf does not gain them yet. Received List is what puts them
- * on the counter. The whole basket is checked first, and a failure
- * puts back anything already taken out.
+ * Source stock leaves immediately; destination stock waits until Received
+ * List confirms. A shortfall, the same shop on both sides, or a failed save
+ * puts back anything already moved from the source.
  */
 export async function POST(req) {
   try {
@@ -123,16 +214,22 @@ export async function POST(req) {
 
     await connectDB();
 
-    const center = await saleCenter();
+    const body = await req.json();
+    const source = await resolveTransferSource(auth, body.sourceId);
 
-    if (!center) {
+    if (source.error) {
+      return NextResponse.json({ success: false, message: source.error }, { status: 400 });
+    }
+
+    const destination = await resolveDestination(body.toId, source.id);
+
+    if (destination.error) {
       return NextResponse.json(
-        { success: false, message: "Set a sale center before transferring stock" },
+        { success: false, message: destination.error },
         { status: 400 },
       );
     }
 
-    const body = await req.json();
     let items;
 
     try {
@@ -146,8 +243,8 @@ export async function POST(req) {
 
     for (const item of items) {
       const onHand = await readStock({
-        locationType: WAREHOUSE,
-        locationId: null,
+        locationType: SHOWROOM,
+        locationId: source.id,
         productId: item.productId,
         variantId: item.variantId,
       });
@@ -156,7 +253,7 @@ export async function POST(req) {
         return NextResponse.json(
           {
             success: false,
-            message: `"${item.productName}" has only ${onHand} in the warehouse, so ${item.quantity} cannot be transferred`,
+            message: `"${item.productName}" has only ${onHand} in ${source.name}, so ${item.quantity} cannot be transferred`,
           },
           { status: 400 },
         );
@@ -165,14 +262,14 @@ export async function POST(req) {
 
     const transferNumber = await nextDocumentNumber();
     const createdBy = await actorFullName(auth);
-    const note = `${transferNumber} — warehouse to ${center.name}`;
-    const moved = [];
+    const note = `${transferNumber} — ${source.name} to ${destination.name}`;
+    const applied = [];
 
     try {
       for (const item of items) {
-        const result = await applyStockChange({
-          locationType: WAREHOUSE,
-          locationId: null,
+        const out = await applyStockChange({
+          locationType: SHOWROOM,
+          locationId: source.id,
           productId: item.productId,
           variantId: item.variantId,
           delta: -item.quantity,
@@ -182,12 +279,21 @@ export async function POST(req) {
           productName: item.productName,
         });
 
-        item.previousStock = result.previousStock;
-        item.newStock = result.newStock;
-        moved.push(item);
+        applied.push({
+          locationType: SHOWROOM,
+          locationId: source.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          delta: -item.quantity,
+          productName: item.productName,
+          note,
+        });
+
+        item.previousStock = out.previousStock;
+        item.newStock = out.newStock;
       }
     } catch (moveError) {
-      await restoreWarehouse(moved, `${transferNumber} reversed`, createdBy);
+      await undoMoves(applied, createdBy);
       throw moveError;
     }
 
@@ -198,23 +304,25 @@ export async function POST(req) {
       transfer = await StockTransfer.create({
         transferNumber,
         transferDate: Number.isNaN(transferDate.getTime()) ? new Date() : transferDate,
-        fromName: "Warehouse",
-        toId: center._id,
-        toName: center.name,
+        fromId: source.id,
+        fromName: source.name,
+        toId: destination.id,
+        toName: destination.name,
         items,
         totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
         status: "pending",
+        destinationStockApplied: false,
         createdBy,
         note: String(body.note || "").trim(),
       });
     } catch (saveError) {
-      await restoreWarehouse(moved, `${transferNumber} reversed`, createdBy);
+      await undoMoves(applied, createdBy);
       throw saveError;
     }
 
     return NextResponse.json({
       success: true,
-      message: `Transfer ${transferNumber} sent to ${center.name}`,
+      message: `Transfer ${transferNumber} sent to ${destination.name}`,
       data: transfer,
     });
   } catch (error) {

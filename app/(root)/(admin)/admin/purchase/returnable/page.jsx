@@ -194,9 +194,14 @@ export default function ReturnablePage() {
                   <td className={tdClass}>{meta.from + i}</td>
                   <td className={tdClass}>{fmtDate(r.purchaseDate)}</td>
                   <td className={tdClass}>
-                    <Link href={ADMIN_PURCHASE_VIEW(r.purchaseId)} className="text-[#188ae2] hover:underline">
+                    <a
+                      href={ADMIN_PURCHASE_VIEW(String(r.purchaseId ?? ""))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-[#188ae2] underline decoration-[#188ae2]/40 underline-offset-2 hover:decoration-[#188ae2] dark:text-[#5eb8ff]"
+                    >
                       {r.purchaseNumber}
-                    </Link>
+                    </a>
                   </td>
                   <td className={tdClass}>
                     {r.supplierName}

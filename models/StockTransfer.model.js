@@ -2,11 +2,11 @@ import mongoose from "mongoose";
 import { activityLog } from "@/lib/activityLog";
 
 /**
- * Goods leaving the warehouse for the sale center.
+ * Goods in transit between shops.
  *
- * Stock leaves the warehouse when the transfer is saved, and lands on the
- * sale-center shelf only when that transfer is received. Until then the
- * units are in transit and are not for sale.
+ * Source stock leaves on send. Destination stock lands when Received List
+ * confirms. Rows with destinationStockApplied already true (legacy sends)
+ * only update status on confirm — stock is not applied twice.
  */
 const stockTransferItemSchema = new mongoose.Schema(
   {
@@ -46,7 +46,14 @@ const stockTransferSchema = new mongoose.Schema(
 
     transferDate: { type: Date, default: Date.now, index: true },
 
-    fromName: { type: String, trim: true, default: "Warehouse" },
+    fromId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Showroom",
+      default: null,
+      index: true,
+    },
+
+    fromName: { type: String, trim: true, default: "" },
 
     toId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -69,13 +76,18 @@ const stockTransferSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "received"],
+      enum: ["pending", "received", "rejected"],
       default: "pending",
       index: true,
     },
 
+    /** True once destination stock was applied (legacy send-time or after receive) */
+    destinationStockApplied: { type: Boolean, default: false },
+
     receivedAt: { type: Date, default: null },
     receivedBy: { type: String, trim: true, default: "" },
+    rejectedAt: { type: Date, default: null },
+    rejectedBy: { type: String, trim: true, default: "" },
     createdBy: { type: String, trim: true, default: "" },
     note: { type: String, trim: true, default: "" },
   },

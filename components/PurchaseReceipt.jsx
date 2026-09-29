@@ -1,16 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { showToast } from "@/lib/showToast";
+import { useEffect } from "react";
+import { Printer } from "lucide-react";
 import { methodLabel } from "@/components/ui/Application/Admin/supplier/supplierKit";
-import InvoiceSheet, { amountInWords, downloadInvoicePdf, money } from "@/components/InvoiceSheet";
+import { amountInWords, money } from "@/components/InvoiceSheet";
+
+const cell = "border border-black px-2 py-1.5 align-top text-[#111] text-[13px]";
+const headCell = `${cell} bg-[#f4f4f5] font-bold align-middle text-center`;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatBillDate(value) {
+  const date = value ? new Date(value) : new Date();
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${day} - ${MONTHS[date.getMonth()]} - ${date.getFullYear()}`;
+}
+
+function formatCreatedAt(value) {
+  const date = value ? new Date(value) : new Date();
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${formatBillDate(date)} : ${h}:${m}:${s}`;
+}
+
+function tk(value) {
+  return `TK ${money(value)}`;
+}
+
+function wordsForBill(value) {
+  const raw = amountInWords(value).replace(/\s*Taka\s*/i, " ").trim();
+  return raw.endsWith("Only") ? raw : `${raw} Only`;
+}
+
+function QtyCell({ qty, unit = "Pcs" }) {
+  return (
+    <div className="text-center leading-tight">
+      <div>{qty}</div>
+      <div className="text-[11px] font-normal">{unit}</div>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }) {
+  return (
+    <p className="text-[13px] leading-5">
+      <span className="font-semibold">{label}</span>
+      {value ? ` ${value}` : ""}
+    </p>
+  );
+}
 
 /**
- * Purchase bill on the shared AmarSolution paper, not the 80mm sales slip.
+ * AmarSolution-style purchase bill — white paper, no admin chrome when opened from the list.
  */
 export default function PurchaseReceipt({ purchase, company = {}, autoPrint = false, toolbarStart = null }) {
-  const [sending, setSending] = useState(false);
-
   useEffect(() => {
     if (!autoPrint) return undefined;
     const timer = setTimeout(() => window.print(), 500);
@@ -20,200 +64,187 @@ export default function PurchaseReceipt({ purchase, company = {}, autoPrint = fa
   if (!purchase) return <div className="p-4 text-center">Loading...</div>;
 
   const supplier = purchase.supplierId && typeof purchase.supplierId === "object" ? purchase.supplierId : {};
-  const supplierName = supplier.name || purchase.supplierName || "Supplier";
-  const supplierPhone = supplier.phone || "—";
-  const shopName = company.name || "SB Telecom";
-  const shopAddress = company.address || "Dhaka, Bangladesh";
-  const shopPhone = company.phone || "01700000001";
-  const shopEmail = company.email || "support@sbtelecom.com.bd";
-  const vatLine = company.showMushakLine && company.bin ? `BIN ${company.bin}${company.mushakFormNo ? ` · Mushak ${company.mushakFormNo}` : ""}` : "";
+  const shopName = company.name || "Shop";
+  const shopAddress = company.address || "";
+  const shopPhone = company.phone || "";
+  const shopEmail = company.email || "";
+  const shopLogo = company.logo || "";
 
-  const subtotal = Number(purchase.subtotal || purchase.grandTotal || 0);
-  const discount = Number(purchase.discount || 0);
-  const shipping = Number(purchase.shippingCost || 0);
-  const totalAmount = Number(purchase.grandTotal || 0);
-  const totalPaid = Number(purchase.paidAmount || 0);
-  const dueAmount = Number(purchase.dueAmount || 0);
-  const dismiss = Number(purchase.dismissAmount || 0);
-  const branch = purchase.locationName || "Warehouse";
-  const orderDate = (purchase.purchaseDate ? new Date(purchase.purchaseDate) : new Date()).toLocaleDateString("en-GB");
   const items = purchase.items || [];
   const payments = purchase.payments || [];
 
-  const itemNotes = (item) => {
-    const lines = [];
-    if (item.variantLabel) lines.push(item.variantLabel);
-    if (item.sku) lines.push(`SKU: ${item.sku}`);
-    if (item.imeis?.length) lines.push(`IMEI/SN: ${item.imeis.join(", ")}`);
-    if (item.extraQty) lines.push(`Extra qty: ${item.extraQty}`);
-    if (item.expireDate) lines.push(`Expire: ${new Date(item.expireDate).toLocaleDateString("en-GB")}`);
-    if (item.returnedQty > 0) lines.push(`${item.returnedQty} returned`);
-    return lines;
-  };
+  const subtotal = Number(purchase.subtotal || purchase.grandTotal || 0);
+  const totalAmount = Number(purchase.grandTotal || 0);
+  const totalPaid = Number(purchase.paidAmount || 0);
+  const dueAmount = Number(purchase.dueAmount || 0);
+
+  const totalQty = items.reduce((sum, item) => sum + (parseInt(item.quantity, 10) || 0), 0);
+  const totalExtraQty = items.reduce((sum, item) => sum + (parseInt(item.extraQty, 10) || 0), 0);
+  const totalLineDiscount = items.reduce((sum, item) => sum + Number(item.discount || 0), 0);
 
   const lineTotal = (item) => Number(item.total ?? Number(item.unitPrice || 0) * (parseInt(item.quantity, 10) || 1));
 
-  const meta = [
-    [
-      { label: "Invoice No", value: purchase.purchaseNumber },
-      { label: "Date", value: orderDate },
-    ],
-    [
-      { label: "Supplier", value: supplierName },
-      { label: "Phone", value: supplierPhone },
-    ],
-    purchase.referenceNo
-      ? [
-          { label: "Branch", value: branch },
-          { label: "Reference", value: purchase.referenceNo },
-        ]
-      : [{ label: "Branch", value: branch }],
-  ];
-
-  const columns = [
-    { key: "sl", label: "SL", align: "center", width: "7%" },
-    { key: "product", label: "Product", align: "left" },
-    { key: "qty", label: "Qty", align: "center", width: "10%" },
-    { key: "rate", label: "Rate", align: "right", width: "16%" },
-    { key: "discount", label: "Discount", align: "right", width: "14%" },
-    { key: "amount", label: "Amount", align: "right", width: "18%" },
-  ];
-
-  const lines = items.map((item, index) => ({
-    key: index,
-    notes: itemNotes(item),
-    cells: {
-      sl: index + 1,
-      product: item.productName || "Item",
-      qty: item.quantity,
-      rate: money(item.unitPrice),
-      discount: money(item.discount),
-      amount: money(lineTotal(item)),
-    },
-  }));
-
-  const totals = [
-    { label: "Subtotal", value: subtotal },
-    ...(discount > 0 ? [{ label: "Discount", value: discount }] : []),
-    ...(shipping > 0 ? [{ label: "Shipping", value: shipping }] : []),
-    { label: "Grand Total", value: totalAmount, strong: true },
-    { label: "Paid", value: totalPaid },
-    ...(dismiss > 0 ? [{ label: "Due dismiss", value: dismiss }] : []),
-    { label: "Due", value: dueAmount, strong: true },
-  ];
-
-  const words = amountInWords(totalAmount);
-
-  const sheet = {
-    fileName: `Purchase-${purchase.purchaseNumber || purchase._id}.pdf`,
-    shopName,
-    shopAddress,
-    shopPhone,
-    shopEmail,
-    vatLine,
-    title: "PURCHASE INVOICE",
-    meta,
-    head: ["SL", "Product", "Qty", "Rate", "Discount", "Amount"],
-    body: items.map((item, index) => [
-      String(index + 1),
-      [item.productName || "Item", ...itemNotes(item)].join("\n"),
-      String(item.quantity || 1),
-      money(item.unitPrice),
-      money(item.discount),
-      money(lineTotal(item)),
-    ]),
-    widths: [12, 74, 16, 28, 28, 28],
-    totals,
-    words,
-    note: purchase.note || "",
-    extraHead: payments.length ? ["Payment", "Reference", "Amount"] : undefined,
-    extraBody: payments.map((pay) => [methodLabel(pay.method), pay.reference || "—", money(pay.amount)]),
+  const itemLabel = (item) => {
+    const name = item.productName || "Item";
+    const code = item.barcode || item.sku;
+    return code ? `${name} (${code})` : name;
   };
 
-  const handleWhatsApp = async () => {
-    const digits = String(supplierPhone).replace(/\D/g, "").replace(/^88/, "");
-    const text = `Purchase invoice ${purchase.purchaseNumber} from ${shopName}`;
-    setSending(true);
-    try {
-      const { toBlob } = await import("html-to-image");
-      const node = document.getElementById("invoice-print");
-      const blob = await toBlob(node, {
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-        imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
-      });
-      const file = new File([blob], `Purchase-${purchase.purchaseNumber || purchase._id}.png`, { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text });
-        return;
-      }
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(file);
-      a.download = file.name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      showToast("success", "Invoice picture downloaded: attach it in the WhatsApp chat");
-      const to = /^01\d{9}$/.test(digits) ? `88${digits}` : "";
-      window.open(`https://wa.me/${to}?text=${encodeURIComponent(text)}`, "_blank");
-    } catch (err) {
-      if (err?.name !== "AbortError") showToast("error", "Could not make the invoice picture");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const paymentsTable =
-    payments.length > 0 ? (
-      <table className="mt-4 w-full max-w-[480px] border-collapse text-[13px]">
-        <thead>
-          <tr className="bg-[#f4f4f5]">
-            <th className="border border-black px-2 py-1.5 text-left font-bold">Payment</th>
-            <th className="border border-black px-2 py-1.5 text-left font-bold">Reference</th>
-            <th className="border border-black px-2 py-1.5 text-right font-bold">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {payments.map((pay, index) => (
-            <tr key={pay._id || index}>
-              <td className="border border-black px-2 py-1.5">{methodLabel(pay.method)}</td>
-              <td className="border border-black px-2 py-1.5">{pay.reference || "—"}</td>
-              <td className="border border-black px-2 py-1.5 text-right font-semibold tabular-nums">{money(pay.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    ) : null;
+  const paymentRows =
+    payments.length > 0
+      ? payments
+      : [{ method: "cash", createdBy: "", amount: 0, reference: "" }];
 
   return (
-    <InvoiceSheet
-      shopName={shopName}
-      shopAddress={shopAddress}
-      shopPhone={shopPhone}
-      shopEmail={shopEmail}
-      vatLine={vatLine}
-      title="PURCHASE INVOICE"
-      meta={meta}
-      columns={columns}
-      lines={lines}
-      totals={totals}
-      words={words}
-      note={purchase.note}
-      below={paymentsTable}
-      signatures={["Supplier", "Authorised Signature"]}
-      toolbar={
-        <div className="print-hide print:hidden mb-4 flex flex-wrap justify-center gap-2 rounded bg-gray-100 p-2 shadow-sm">
-          {toolbarStart}
-          <button type="button" onClick={() => window.print()} className="rounded bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-blue-700">
-            Print
-          </button>
-          <button type="button" onClick={() => downloadInvoicePdf(sheet)} className="rounded bg-red-600 px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-red-700">
-            Download PDF
-          </button>
-          <button type="button" onClick={handleWhatsApp} disabled={sending} className="rounded bg-green-600 px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-green-700 disabled:opacity-60">
-            {sending ? "Preparing..." : "Send WhatsApp"}
-          </button>
+    <div className="mx-auto w-full max-w-[900px]">
+      {toolbarStart ? <div className="print:hidden mb-4 flex flex-wrap justify-center gap-2">{toolbarStart}</div> : null}
+
+      <div
+        id="invoice-print"
+        className="bg-white px-6 py-7 text-[13px] leading-snug text-[#111] shadow-[0_1px_8px_rgba(0,0,0,0.12)] print:p-0 print:shadow-none"
+        style={{ background: "#ffffff", color: "#111111" }}
+      >
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            {shopLogo ? (
+              <img src={shopLogo} alt="" className="mb-2 h-14 max-w-[220px] object-contain object-left" />
+            ) : null}
+            <h1 className="text-[20px] font-bold leading-tight text-[#188ae2]">{shopName}</h1>
+            {shopAddress ? <p className="mt-2 text-[13px] leading-5">Address: {shopAddress}</p> : null}
+            {shopPhone ? <p className="text-[13px] leading-5">Mobile: {shopPhone}</p> : null}
+            {shopEmail ? <p className="text-[13px] leading-5">Email: {shopEmail}</p> : null}
+          </div>
+
+          <div className="shrink-0 sm:min-w-[280px]">
+            <p className="text-[15px] font-semibold">Purchase</p>
+            <InfoLine label="Invoice No :" value={purchase.purchaseNumber} />
+            <InfoLine label="Date :" value={formatBillDate(purchase.purchaseDate)} />
+            <p className="mt-3 text-[13px] font-semibold">Billing To</p>
+            <InfoLine label="Name:" value={supplier.name || purchase.supplierName || ""} />
+            <InfoLine label="Business Name:" value={supplier.companyName || ""} />
+            <InfoLine label="Address:" value={supplier.address || ""} />
+            <InfoLine label="Mobile:" value={supplier.phone || ""} />
+            <InfoLine label="Email:" value={supplier.email || ""} />
+          </div>
         </div>
-      }
-    />
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[680px] border-collapse">
+            <thead>
+              <tr>
+                <th className={`${headCell} w-[6%]`}>SL.</th>
+                <th className={`${headCell} text-left`}>Item</th>
+                <th className={`${headCell} w-[11%]`}>Total Qty</th>
+                <th className={`${headCell} w-[11%]`}>Extra Qty</th>
+                <th className={`${headCell} w-[12%]`}>Rate</th>
+                <th className={`${headCell} w-[12%]`}>Discount</th>
+                <th className={`${headCell} w-[12%]`}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={index}>
+                  <td className={`${cell} text-center align-middle`}>{index + 1}</td>
+                  <td className={cell}>{itemLabel(item)}</td>
+                  <td className={`${cell} align-middle`}>
+                    <QtyCell qty={item.quantity ?? 0} />
+                  </td>
+                  <td className={`${cell} align-middle`}>
+                    <QtyCell qty={item.extraQty ?? 0} />
+                  </td>
+                  <td className={`${cell} text-right tabular-nums align-middle`}>{money(item.unitPrice)}</td>
+                  <td className={`${cell} text-right tabular-nums align-middle`}>{money(item.discount)}</td>
+                  <td className={`${cell} text-right tabular-nums align-middle font-semibold`}>{money(lineTotal(item))}</td>
+                </tr>
+              ))}
+              <tr>
+                <td className={cell} />
+                <td className={cell} />
+                <td className={`${cell} align-middle font-semibold`}>
+                  <QtyCell qty={totalQty} />
+                </td>
+                <td className={`${cell} align-middle font-semibold`}>
+                  <QtyCell qty={totalExtraQty} />
+                </td>
+                <td className={cell} />
+                <td className={`${cell} text-right tabular-nums align-middle font-semibold`}>{money(totalLineDiscount)}</td>
+                <td className={cell} />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <p className="max-w-[480px] text-[13px] font-semibold leading-5">In Words: {wordsForBill(totalAmount)}</p>
+
+          <table className="w-full max-w-[280px] shrink-0 border-collapse text-[13px] sm:ml-auto">
+            <tbody>
+              <tr>
+                <td className={`${cell} font-semibold`}>Subtotal</td>
+                <td className={`${cell} text-right tabular-nums`}>{tk(subtotal)}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} text-[15px] font-bold`}>Total</td>
+                <td className={`${cell} text-right text-[15px] font-bold tabular-nums`}>{tk(totalAmount)}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} font-semibold`}>Paid</td>
+                <td className={`${cell} text-right tabular-nums`}>{tk(totalPaid)}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} font-semibold`}>Due</td>
+                <td className={`${cell} text-right tabular-nums font-semibold`}>{tk(dueAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-5">
+          <p className="mb-1 text-[13px] font-semibold">Payment Details</p>
+          <table className="w-full max-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr>
+                <th className={`${headCell} w-[8%]`}>Sl</th>
+                <th className={`${headCell} text-left`}>Payment Method</th>
+                <th className={`${headCell} text-left`}>Payment By</th>
+                <th className={`${headCell} w-[22%]`}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentRows.map((pay, index) => (
+                <tr key={pay._id || index}>
+                  <td className={`${cell} text-center align-middle`}>{index + 1}</td>
+                  <td className={`${cell} align-middle`}>{methodLabel(pay.method)}</td>
+                  <td className={`${cell} align-middle`}>
+                    {typeof pay.createdBy === "string" && pay.createdBy.trim() ? pay.createdBy.trim() : "-"}
+                  </td>
+                  <td className={`${cell} text-right tabular-nums align-middle`}>{money(pay.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {purchase.note ? (
+          <p className="mt-4 text-[13px] leading-5">
+            <span className="font-bold">Note: </span>
+            {purchase.note}
+          </p>
+        ) : null}
+
+        <p className="mt-10 text-center text-[11px] text-[#888]">Created at : {formatCreatedAt(purchase.createdAt)}</p>
+      </div>
+
+      <div className="print:hidden mt-5 flex justify-center">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 rounded bg-[#188ae2] px-5 py-2.5 text-[14px] font-medium text-white shadow-sm transition hover:bg-[#1576c4]"
+        >
+          <Printer className="h-4 w-4" aria-hidden />
+          Print
+        </button>
+      </div>
+    </div>
   );
 }

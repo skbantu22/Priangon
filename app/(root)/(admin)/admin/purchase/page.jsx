@@ -46,6 +46,11 @@ const PAY_STYLE = {
 const PAY_LABEL = { unpaid: "Due", partial: "Partial Due", paid: "Paid" };
 const STOCK_LABEL = { pending: "Pending", received: "Received", cancelled: "Cancelled" };
 
+const invoiceHref = (p) => ADMIN_PURCHASE_VIEW(String(p._id ?? ""));
+
+const INVOICE_LINK_CLASS =
+  "relative z-[1] font-semibold text-[#188ae2] underline decoration-[#188ae2]/40 underline-offset-2 hover:decoration-[#188ae2] dark:text-[#5eb8ff]";
+
 const Pill = ({ value, kind }) => {
   const label = kind === "pay" ? PAY_LABEL[value] || value : STOCK_LABEL[value] || value;
   const tone = kind === "pay" ? PAY_STYLE[value] : STOCK_STYLE[value];
@@ -296,7 +301,7 @@ export default function PurchasePage() {
               <article key={p._id} className="rounded-[6px] border border-[#ebeff2] bg-white p-3 dark:border-border dark:bg-card">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <a href={ADMIN_PURCHASE_VIEW(p._id)} target="_blank" rel="noreferrer" className="text-[15px] font-semibold text-[#188ae2]">
+                    <a href={invoiceHref(p)} target="_blank" rel="noopener noreferrer" className={`text-[15px] ${INVOICE_LINK_CLASS}`}>
                       {p.purchaseNumber}
                     </a>
                     <p className="m-0 truncate text-[12px] text-muted-foreground">
@@ -354,7 +359,7 @@ export default function PurchasePage() {
                     <td className={tdClass}>{meta.from + i}</td>
                     <td className={tdClass}>{fmtDate(p.purchaseDate)}</td>
                     <td className={tdClass}>
-                      <a href={ADMIN_PURCHASE_VIEW(p._id)} target="_blank" rel="noreferrer" className="text-[#188ae2] hover:underline">
+                      <a href={invoiceHref(p)} target="_blank" rel="noopener noreferrer" className={INVOICE_LINK_CLASS}>
                         {p.purchaseNumber}
                       </a>
                       {p.referenceNo && <span className="block text-xs text-muted-foreground">Ref {p.referenceNo}</span>}

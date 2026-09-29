@@ -138,5 +138,6 @@ export const ADMIN_ROLE_MANAGE = (id) =>
 export const ADMIN_INVENTORY_STOCK = "/admin/inventory/stock";
 export const ADMIN_INVENTORY_ADJUSTMENTS = "/admin/inventory/adjustments";
 export const ADMIN_INVENTORY_TRANSFER = "/admin/inventory/transfer";
+export const ADMIN_INVENTORY_TRANSFER_VIEW = (id) => `/admin/inventory/transfers/${id}`;
 export const ADMIN_INVENTORY_TRANSFERRED = "/admin/inventory/transferred";
 export const ADMIN_INVENTORY_RECEIVED = "/admin/inventory/received";
