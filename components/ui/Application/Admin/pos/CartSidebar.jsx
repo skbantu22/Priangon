@@ -14,6 +14,8 @@ import {
   Minus,
   Plus,
   ScanBarcode,
+  ArrowLeftRight,
+  Pencil,
 } from "lucide-react";
 import PosCustomerPicker from "./PosCustomerPicker";
 import {
@@ -96,6 +98,7 @@ export default function CartSidebar({
   onComplete,
   onClear,
   onPrint,
+  onExchange,
   canPrint = false,
   checkoutLoading = false,
 }) {
@@ -232,37 +235,55 @@ export default function CartSidebar({
   const itemCount = cart.length;
   const afterDiscount = total;
 
+  const summaryRow = (label, value, extra = null) => (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-gray-700">{label}</span>
+      <span className="flex items-center gap-1 font-semibold tabular-nums text-gray-900">
+        {value}
+        {extra}
+      </span>
+    </div>
+  );
+
   return (
     <aside
-      className={`flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-white dark:bg-card ${
+      className={`flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#e8e8e8] ${
         expanded ? "md:flex-1" : ""
       }`}
     >
-      <div className="hidden shrink-0 space-y-2 border-b border-gray-200 px-3 py-2 md:block dark:border-white/10">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="hidden shrink-0 items-center gap-2 bg-white px-3 py-2 md:flex">
+        <button
+          type="button"
+          onClick={onExchange}
+          title="Exchange (F6)"
+          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#3b82f6] text-white shadow-sm hover:brightness-110"
+        >
+          <ArrowLeftRight className="size-5" />
+        </button>
+        <input
+          type="checkbox"
+          className="size-4 shrink-0 rounded border-gray-300 accent-[#2563eb]"
+          aria-label="Scan mode"
+        />
+        <label className="flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-md border border-gray-300 bg-white focus-within:border-primary">
           <input
-            type="checkbox"
-            className="size-4 shrink-0 rounded border-gray-300 accent-[#2563eb]"
-            aria-label="Scan mode"
+            ref={inputRef}
+            value={search}
+            onChange={(e) => setSearch?.(e.target.value)}
+            onKeyDown={onSearchKeyDown}
+            placeholder="Enter Product Name / Scan Barcode / SKU"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none"
           />
-          <label className="flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-md border border-gray-300 bg-white focus-within:border-primary">
-            <input
-              ref={inputRef}
-              value={search}
-              onChange={(e) => setSearch?.(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              placeholder="Enter Product Name / Scan Barcode / SKU"
-              className="h-full min-w-0 flex-1 bg-transparent px-3 text-[13px] outline-none"
-            />
-            <span className="flex h-full w-11 shrink-0 items-center justify-center border-l border-gray-200 bg-gray-50 text-gray-600">
-              <ScanBarcode className="size-5" />
-            </span>
-          </label>
+          <span className="flex h-full w-11 shrink-0 items-center justify-center border-l border-gray-200 bg-gray-50 text-gray-600">
+            <ScanBarcode className="size-5" />
+          </span>
+        </label>
+        <div className="min-w-[11rem] shrink-0">
+          <PosCustomerPicker amarGuest />
         </div>
-        <PosCustomerPicker amarGuest />
       </div>
 
-      <div className="mx-2 flex min-h-[120px] flex-1 flex-col overflow-hidden rounded-md border border-gray-200 sm:mx-3 md:min-h-[200px] dark:border-white/10">
+      <div className="mx-2 mb-2 flex min-h-[120px] flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white sm:mx-3 md:min-h-0">
         <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_52px_72px_56px_28px] items-center gap-1 bg-[#1e3a5f] px-2 py-1.5 text-[11px] font-semibold text-white sm:grid-cols-[minmax(0,1fr)_56px_80px_64px_32px] sm:px-3">
           <span>Name</span>
           <span className="text-right">Price</span>
@@ -316,13 +337,13 @@ export default function CartSidebar({
                         <span className="text-right font-medium tabular-nums">
                           {Math.round(price)}
                         </span>
-                        <div className="flex h-7 items-center justify-center overflow-hidden rounded border border-gray-200">
+                        <div className="flex h-7 items-center justify-center gap-0.5">
                           <button
                             type="button"
                             onClick={() => changeQty(item, (Number(item.qty) || 1) - 1)}
                             disabled={(Number(item.qty) || 1) <= 1}
                             aria-label="One less"
-                            className="flex h-full w-7 items-center justify-center bg-red-500 text-white disabled:opacity-40"
+                            className="flex size-7 items-center justify-center rounded-sm bg-[#e11d48] text-white disabled:opacity-40"
                           >
                             <Minus className="size-3" strokeWidth={3} />
                           </button>
@@ -332,13 +353,13 @@ export default function CartSidebar({
                             value={item.qty}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => changeQty(item, e.target.value)}
-                            className="h-full w-8 border-x border-gray-200 bg-white text-center text-[11px] font-bold outline-none"
+                            className="h-7 w-8 rounded-sm border border-gray-200 bg-white text-center text-[11px] font-bold outline-none"
                           />
                           <button
                             type="button"
                             onClick={() => changeQty(item, (Number(item.qty) || 1) + 1)}
                             aria-label="One more"
-                            className="flex h-full w-7 items-center justify-center bg-emerald-500 text-white"
+                            className="flex size-7 items-center justify-center rounded-sm bg-[#16a34a] text-white"
                           >
                             <Plus className="size-3" strokeWidth={3} />
                           </button>
@@ -367,60 +388,51 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2 px-2 pb-2 pt-2 sm:px-3">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-md bg-[#f5f0e6] p-2.5 text-[11px] sm:text-[12px]">
-          <span className="text-gray-600">Items</span>
-          <span className="text-right font-semibold">{itemCount}</span>
-          <span className="text-gray-600">Total</span>
-          <span className="text-right font-semibold">{money(subtotal)}</span>
-          <span className="text-gray-600">Quantity</span>
-          <span className="text-right font-semibold">{totalQty}</span>
-          <span className="text-gray-600">Discount</span>
-          <span className="flex items-center justify-end gap-1 font-semibold">
-            {money(discount)}
-            <input
-              type="number"
-              min="0"
-              value={discountValue}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) =>
-                dispatch(
-                  setDiscount({
-                    type: discountType,
-                    value: Number(e.target.value) || 0,
-                  }),
-                )
-              }
-              className={`${inputBox} h-6 w-12 px-1 text-[11px]`}
-            />
-          </span>
-          <span className="flex items-center gap-1 text-gray-600">
-            Total Vat (
-            <select
-              value={vatValue}
-              onChange={(e) =>
-                dispatch(setVat({ type: "percent", value: Number(e.target.value) }))
-              }
-              className="rounded border border-gray-300 bg-white px-0.5 text-[11px]"
-            >
-              <option value={0}>0%</option>
-              <option value={5}>5%</option>
-              <option value={7.5}>7.5%</option>
-              <option value={15}>15%</option>
-            </select>
-            )
-          </span>
-          <span className="text-right font-semibold">{money(vat)}</span>
-          <span className="text-gray-600">After Discount Price</span>
-          <span className="text-right font-bold">{money(afterDiscount)}</span>
+      <div className="shrink-0 space-y-2 px-2 pb-2 pt-1 sm:px-3 md:pb-3">
+        <div className="rounded-md bg-[#f5f0e6] p-2.5 text-[11px] sm:text-[12px]">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <div className="space-y-1">
+              {summaryRow("Items", itemCount)}
+              {summaryRow("Quantity", totalQty)}
+              {summaryRow(
+                `Total Vat (${vatValue || 0}%)`,
+                money(vat),
+              )}
+            </div>
+            <div className="space-y-1">
+              {summaryRow("Total", money(subtotal))}
+              {summaryRow(
+                "Discount",
+                money(discount),
+                <span className="inline-flex items-center gap-0.5">
+                  <Pencil className="size-3 text-gray-500" />
+                  <input
+                    type="number"
+                    min="0"
+                    value={discountValue}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) =>
+                      dispatch(
+                        setDiscount({
+                          type: discountType,
+                          value: Number(e.target.value) || 0,
+                        }),
+                      )
+                    }
+                    className={`${inputBox} h-6 w-12 px-1 text-[11px]`}
+                  />
+                </span>,
+              )}
+              {summaryRow("After Discount Price", money(afterDiscount))}
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-[#e8dcc8] pt-2 font-bold text-gray-900">
+            <span>Payable</span>
+            <span className="text-[15px] tabular-nums">{money(total)}</span>
+          </div>
         </div>
 
-        <div className="hidden items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-2 md:flex">
-          <span className="text-sm font-bold text-gray-800">Payable</span>
-          <span className="text-lg font-extrabold text-[#1e3a5f]">{money(total)}</span>
-        </div>
-
-        <div className="hidden grid-cols-4 gap-1.5 md:grid">
+        <div className="grid grid-cols-4 gap-1.5 md:hidden">
           {METHODS.map(({ key, icon: Icon }) => (
             <button
               key={key}
@@ -457,7 +469,7 @@ export default function CartSidebar({
           </div>
         )}
 
-        <div className="hidden grid-cols-2 items-center gap-2 text-[11px] md:grid">
+        <div className="grid grid-cols-2 items-center gap-2 text-[11px] md:hidden">
           <label className="block">
             <span className="text-gray-600 dark:text-gray-300">
               {method === "Due" ? "Paid Now" : "Received"}
@@ -489,7 +501,7 @@ export default function CartSidebar({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 mt-auto hidden shrink-0 justify-end gap-1.5 border-t border-gray-100 bg-white px-3 py-2 md:flex dark:border-white/10 dark:bg-card">
+      <div className="hidden shrink-0 justify-end gap-1.5 border-t border-gray-100 bg-white px-3 py-2 max-md:flex">
         <button
           type="button"
           onClick={onPrint}

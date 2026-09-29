@@ -847,7 +847,7 @@ export default function POSPage() {
 
   return (
     // h-dvh: on phones h-screen runs under the browser bar and hides the bottom
-    <div className="flex h-dvh flex-col overflow-x-hidden bg-background">
+    <div className="flex h-dvh flex-col overflow-x-hidden bg-[#e8e8e8]">
       {trip && (
         <BranchSwitchScreen from={trip.from} to={trip.to} onDone={() => setTrip(null)} />
       )}
@@ -897,7 +897,7 @@ export default function POSPage() {
           <PosCustomerPicker amarMobile />
         </div>
 
-        <div className="order-3 flex min-h-0 min-w-0 flex-1 flex-col md:order-2 md:w-[min(52%,640px)] md:shrink-0 md:overflow-hidden md:border-l md:border-gray-200 md:dark:border-white/10">
+        <div className="order-3 flex min-h-0 min-w-0 flex-1 flex-col md:order-2 md:w-1/2 md:shrink-0 md:overflow-hidden md:border-l md:border-gray-300">
           <CartSidebar
             key={saleKey}
             products={products}
@@ -912,6 +912,7 @@ export default function POSPage() {
             onComplete={(paymentData) => handleCheckout(paymentData)}
             onClear={handleClearCart}
             onPrint={printLastInvoice}
+            onExchange={openExchange}
             canPrint={!!lastOrderId}
             checkoutLoading={checkoutLoading}
           />
