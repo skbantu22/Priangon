@@ -190,7 +190,7 @@ export default function PosBottomActionBar({
 
             title="Fullscreen"
 
-            className={`${iconBtn} bg-[#38bdf8]`}
+            className={`${iconBtn} hidden bg-[#38bdf8] md:flex`}
 
           >
 

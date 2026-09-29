@@ -565,18 +565,12 @@ export default function ProductGallery({
                     Loading more products...
                   </p>
                 ) : hasNextPage ? (
-                  <button
-                    type="button"
-                    onClick={() => fetchNextPage()}
-                    className="text-xs text-gray-400 hover:text-primary"
-                  >
-                    Scroll down or click to load more
-                  </button>
-                ) : (
+                  <p className="text-xs text-gray-400">Scroll for more</p>
+                ) : visibleProducts.length > 0 ? (
                   <p className="text-xs text-gray-400">
                     {visibleProducts.length} products · all loaded
                   </p>
-                )}
+                ) : null}
               </div>
             </>
           ) : (

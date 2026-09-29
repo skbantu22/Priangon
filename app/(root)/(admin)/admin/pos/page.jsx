@@ -53,8 +53,8 @@ import {
   writeAllHeldSales,
 } from "@/lib/posHeldSales";
 
-// pages (20 products each) that are loaded in the background without scrolling
-const MAX_EAGER_PAGES = 20;
+// First page only; more load when the product panel is scrolled
+const MAX_EAGER_PAGES = 1;
 
 const inThisShop = (items) =>
   (items || [])
@@ -851,7 +851,7 @@ export default function POSPage() {
       {trip && (
         <BranchSwitchScreen from={trip.from} to={trip.to} onDone={() => setTrip(null)} />
       )}
-      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto md:flex-row md:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
         {!cartExpanded && (
           <div className="order-1 flex min-h-0 min-w-0 shrink-0 flex-col max-md:max-h-[min(42vh,340px)] md:min-h-0 md:w-1/2 md:max-h-none md:flex-1 md:overflow-hidden">
             <ProductGallery
