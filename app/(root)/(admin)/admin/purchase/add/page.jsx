@@ -256,37 +256,48 @@ function AddPurchase() {
 
   if (step === "pick") {
     return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold">Add products</h1>
+      <div className="space-y-3 pb-24 md:pb-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold sm:text-xl">Add products</h1>
             <p className="text-sm text-muted-foreground">Tap a product, the same way as the POS. The purchase form opens after that.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href={ADMIN_PURCHASE_SHOW} className={btn.primary}>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Link href={ADMIN_PURCHASE_SHOW} className={`${btn.primary} flex-1 sm:flex-none`}>
               <List size={14} /> Purchase List
             </Link>
             <button
               type="button"
               disabled={!items.length}
               onClick={() => setStep("form")}
-              className={`${btn.success} disabled:cursor-not-allowed disabled:opacity-40`}
+              className={`${btn.success} hidden disabled:cursor-not-allowed disabled:opacity-40 md:inline-flex`}
             >
               Add product to Purchase Product{items.length ? ` · ${items.length}` : ""}
             </button>
           </div>
         </div>
         <PurchasePosPicker onPick={addItem} showroomId={till.id} picked={items} />
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e6ebf1] bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_20px_-12px_rgba(0,0,0,0.35)] md:hidden dark:border-border dark:bg-card">
+          <button
+            type="button"
+            disabled={!items.length}
+            onClick={() => setStep("form")}
+            className={`${btn.success} h-11 w-full !whitespace-normal disabled:cursor-not-allowed disabled:opacity-40`}
+          >
+            Add product to Purchase Product{items.length ? ` · ${items.length}` : ""}
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={save} noValidate className="space-y-4">
+    <form onSubmit={save} noValidate className="space-y-4 pb-28 max-sm:[&_input]:text-base max-sm:[&_select]:text-base max-sm:[&_textarea]:text-base md:pb-0">
       <ListCard
         title="Purchase Product"
+        bodyClass="p-3 sm:p-5"
         actions={
-          <Link href={ADMIN_PURCHASE_SHOW} className={btn.primary}>
+          <Link href={ADMIN_PURCHASE_SHOW} className={`${btn.primary} w-full sm:w-auto`}>
             <List size={14} /> Purchase List
           </Link>
         }
@@ -337,7 +348,7 @@ function AddPurchase() {
         </div>
       </ListCard>
 
-      <ListCard title="Products">
+      <ListCard title="Products" bodyClass="p-3 sm:p-5">
         {order && (
           <p className="m-0 mb-3 flex items-center gap-2 rounded-[6px] bg-[#eaf4fd] px-3 py-[9px] text-[13px] text-[#1766a8]">
             <ClipboardList size={16} /> Receiving purchase order <b>{order.orderNumber}</b>. Adjust quantities if the delivery differs. Its new sale
@@ -345,14 +356,39 @@ function AddPurchase() {
           </p>
         )}
 
-        <div className="mb-3 flex justify-end">
-          <button type="button" onClick={() => setStep("pick")} className={btn.warning}>
+        <div className="mb-3 flex justify-stretch sm:justify-end">
+          <button type="button" onClick={() => setStep("pick")} className={`${btn.warning} w-full sm:w-auto`}>
             Add more products
           </button>
         </div>
         <ProductSearch onPick={addItem} />
 
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 space-y-3 md:hidden">
+          {!items.length && (
+            <p className="rounded-[6px] border border-dashed border-[#e3e3e3] py-8 text-center text-sm text-muted-foreground">
+              Search above to add products to this purchase.
+            </p>
+          )}
+          {items.map((item, index) => (
+            <MobileLine
+              key={item.variantId}
+              item={item}
+              index={index}
+              count={items.length}
+              onChange={(patch) => updateItem(index, patch)}
+              onRemove={() => removeItem(index)}
+              onImei={() => openImei(index)}
+            />
+          ))}
+          {items.length > 0 && (
+            <div className="flex items-center justify-between rounded-[6px] bg-[#cbd5e1] px-3 py-2 text-sm font-bold dark:bg-slate-700">
+              <span>Total ({items.length})</span>
+              <span>{money(totals.subtotal)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
             <thead>
               <tr className={theadClass}>
@@ -496,12 +532,12 @@ function AddPurchase() {
               <Box>{money(totals.subtotal)}</Box>
             </SumRow>
             <SumRow label="Discount">
-              <div className="flex">
-                <select value={discount.type} onChange={(e) => setDiscount({ ...discount, type: e.target.value })} className={`${inputClass} !w-[130px] !rounded-r-none`} aria-label="Discount type">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-0">
+                <select value={discount.type} onChange={(e) => setDiscount({ ...discount, type: e.target.value })} className={`${inputClass} sm:!w-[130px] sm:!rounded-r-none`} aria-label="Discount type">
                   <option value="amount">Amount</option>
                   <option value="percent">Percentage</option>
                 </select>
-                <input type="number" min="0" step="0.01" placeholder="0" value={discount.value} onChange={(e) => setDiscount({ ...discount, value: e.target.value })} className={`${inputClass} !rounded-l-none text-right`} aria-label="Discount value" />
+                <input type="number" min="0" step="0.01" placeholder="0" value={discount.value} onChange={(e) => setDiscount({ ...discount, value: e.target.value })} className={`${inputClass} text-right sm:!rounded-l-none`} aria-label="Discount value" />
               </div>
             </SumRow>
             <SumRow label="Total Discount">
@@ -515,7 +551,7 @@ function AddPurchase() {
             </SumRow>
             {payments.map((payment, index) => (
               <SumRow key={index} label={index === 0 ? "Payment Type" : ""}>
-                <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-nowrap">
                   <select value={payment.method} onChange={(e) => setPayment(index, { method: e.target.value })} className={`${inputClass} sm:!w-[170px]`} aria-label="Payment type">
                     {PAYMENT_METHODS.map(([key, label]) => (
                       <option key={key} value={key}>
@@ -561,11 +597,11 @@ function AddPurchase() {
           </div>
         </div>
 
-        <div className="mt-[18px] flex justify-end gap-2">
-          <button type="button" className={btn.secondary} onClick={() => router.push(ADMIN_PURCHASE_SHOW)}>
+        <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2 border-t border-[#e6ebf1] bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_20px_-12px_rgba(0,0,0,0.35)] md:static md:mt-[18px] md:justify-end md:border-0 md:bg-transparent md:p-0 md:shadow-none dark:border-border dark:bg-card md:dark:bg-transparent">
+          <button type="button" className={`${btn.secondary} h-11 flex-1 md:h-auto md:flex-none`} onClick={() => router.push(ADMIN_PURCHASE_SHOW)}>
             Cancel
           </button>
-          <button type="submit" disabled={saving || !items.length} className={`${btn.success} min-w-[120px] !text-[15px]`}>
+          <button type="submit" disabled={saving || !items.length} className={`${btn.success} h-11 min-w-0 flex-[1.4] !text-[15px] md:h-auto md:min-w-[120px] md:flex-none`}>
             {saving ? "Saving..." : head.status === "received" ? "Buy" : "Save as Pending"}
           </button>
         </div>
@@ -610,6 +646,115 @@ function SumRow({ label, strong, children }) {
       <span className={`text-[14px] sm:text-right ${strong ? "text-[16px] font-bold" : "font-medium"}`}>{label}</span>
       {children}
     </div>
+  );
+}
+
+function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
+  const cost = unitCost(item);
+  const change = item.lastCost && cost ? round2(cost - item.lastCost) : 0;
+  const units = num(item.quantity) + num(item.extraQty);
+
+  return (
+    <article className="rounded-[8px] border border-[#e6ebf1] bg-white p-3 dark:border-border dark:bg-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground">#{count - index}</p>
+          <p className="text-[15px] font-semibold leading-5">
+            {item.productName}
+            {item.variantLabel ? <span className="font-normal text-muted-foreground"> · {item.variantLabel}</span> : null}
+          </p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Barcode <span className="font-mono">{item.barcode || "—"}</span> · Stock {item.stock}
+          </p>
+        </div>
+        <button type="button" onClick={onRemove} className="shrink-0 rounded-[4px] bg-[#ff5b5b] p-2 text-white" aria-label={`Remove ${item.productName}`}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="col-span-2 text-[12px] font-medium text-muted-foreground">
+          Received Qty
+          <div className="mt-1 flex">
+            <button
+              type="button"
+              onClick={() => onChange({ quantity: String(Math.max(1, num(item.quantity) - 1)) })}
+              className="flex h-11 w-11 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white"
+              aria-label={`One less ${item.productName}`}
+            >
+              <Minus size={16} />
+            </button>
+            <input
+              type="number"
+              min="1"
+              value={item.quantity}
+              onChange={(event) => onChange({ quantity: event.target.value })}
+              className={`${inputClass} !h-11 min-w-0 flex-1 !rounded-none !text-center !text-base`}
+              aria-label={`Received quantity for ${item.productName}`}
+            />
+            <button
+              type="button"
+              onClick={() => onChange({ quantity: String(num(item.quantity) + 1) })}
+              className="flex h-11 w-11 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white"
+              aria-label={`One more ${item.productName}`}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Extra Qty
+          <input type="number" min="0" value={item.extraQty} placeholder="0" onChange={(event) => onChange({ extraQty: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Qty
+          <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{units}</div>
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Purchase Price
+          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => onChange({ unitPrice: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Actual Price
+          <div className={`${inputClass} mt-1 flex !h-11 flex-col justify-center leading-tight`}>
+            <span>{money(round2(cost))}</span>
+            {change !== 0 && (
+              <span className={`text-[11px] ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                {change > 0 ? "▲" : "▼"} {money(Math.abs(change))}
+              </span>
+            )}
+          </div>
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Discount
+          <input type="number" min="0" step="0.01" value={item.discount} placeholder="0" onChange={(event) => onChange({ discount: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Subtotal
+          <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{money(round2(lineTotal(item)))}</div>
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Expire Date
+          <input type="date" value={item.expireDate} onChange={(event) => onChange({ expireDate: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          IMEI
+          <button
+            type="button"
+            onClick={onImei}
+            className={`mt-1 flex h-11 w-full items-center justify-center rounded-[6px] text-[13px] font-medium ${
+              item.imeis.length && item.imeis.length === units
+                ? "bg-emerald-100 text-emerald-700"
+                : item.trackSerial
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {item.trackSerial || item.imeis.length ? `${item.imeis.length}/${units}` : "+ IMEI"}
+          </button>
+        </label>
+      </div>
+    </article>
   );
 }
 

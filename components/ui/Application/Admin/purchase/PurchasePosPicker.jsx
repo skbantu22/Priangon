@@ -10,7 +10,7 @@ import { money } from "@/components/ui/Application/Admin/supplier/supplierKit";
 import { RATES } from "./purchaseKit";
 
 const chip = (active) =>
-  `flex h-10 shrink-0 items-center rounded-lg border px-4 text-[13px] font-medium transition ${
+  `flex h-9 shrink-0 items-center rounded-lg border px-3 text-xs font-medium transition sm:h-10 sm:px-4 sm:text-[13px] ${
     active ? "border-primary bg-primary text-white shadow-md shadow-primary/30" : "border-gray-200 bg-white text-gray-700 hover:border-primary/50"
   }`;
 
@@ -99,7 +99,7 @@ export default function PurchasePosPicker({ onPick, showroomId = "", picked = []
   };
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-4 min-w-0 space-y-2">
       <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" aria-label="categories">
         <button type="button" onClick={() => { setCategoryId(""); setSubcategoryId(""); }} className={chip(!categoryId)}>
           All Products
@@ -146,7 +146,7 @@ export default function PurchasePosPicker({ onPick, showroomId = "", picked = []
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search products..."
-              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+              className="min-w-0 flex-1 bg-transparent text-base outline-none sm:text-[13px]"
             />
           </label>
         </div>
@@ -217,7 +217,7 @@ function ProductTile({ product, onAdd, qtyOf }) {
   };
 
   return (
-    <div className={`relative flex flex-col rounded-xl border bg-white p-3 ${added ? "border-emerald-400" : "border-gray-200"}`}>
+    <div className={`relative flex flex-col rounded-xl border bg-white p-2 sm:p-3 ${added ? "border-emerald-400" : "border-gray-200"}`}>
       {added > 0 && (
         <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
           <Check className="size-3" strokeWidth={3} />
@@ -233,7 +233,7 @@ function ProductTile({ product, onAdd, qtyOf }) {
         <Image src={image} alt={product.name} fill sizes="160px" className="object-contain p-2" unoptimized={skipOptimize(image)} />
       </div>
       {product.brand && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{product.brand}</p>}
-      <h3 className="line-clamp-2 min-h-10 text-[14px] font-semibold leading-5">{product.name}</h3>
+      <h3 className="line-clamp-2 min-h-10 text-[13px] font-semibold leading-5 sm:text-[14px]">{product.name}</h3>
       <div className="mt-1 flex items-end justify-between gap-2">
         <p className="text-[12px] text-muted-foreground">Stock {product.totalStock}</p>
         <button
