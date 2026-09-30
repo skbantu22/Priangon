@@ -5,11 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { ADMIN_PRODUCT_ADD, ADMIN_PRODUCT_EDIT } from "@/Route/Adminpannelroute";
-import { posCategoriesQueryOptions, posShowroomsQueryOptions, useOpeningStockTill } from "@/lib/posProducts";
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
+import { posCatalogQueryOptions, posShowroomsQueryOptions, useOpeningStockTill } from "@/lib/posProducts";
 import { skipOptimize } from "@/lib/imageSrc";
 import { showToast } from "@/lib/showToast";
 import {
@@ -30,7 +32,7 @@ import {
   totalRow,
 } from "@/components/ui/Application/Admin/supplier/supplierKit";
 
-const EMPTY_FILTERS = { brand: "", category: "", location: "all", sort: "newest", status: "active", q: "" };
+const EMPTY_FILTERS = { brand: "", category: "", subcategory: "", location: "all", sort: "newest", status: "active", q: "" };
 
 const SORTS = [
   ["newest", "Newest"],
@@ -44,11 +46,11 @@ const SORTS = [
 ];
 
 const TABS = [
-  ["", "All", "all"],
-  ["in", "In Stock", "in"],
-  ["low", "Low Stock", "low"],
-  ["out", "Out of Stock", "out"],
-  ["issue", "Price Issue", "issue"],
+  ["", "All", "সব", "all"],
+  ["in", "In Stock", "স্টকে আছে", "in"],
+  ["low", "Low Stock", "কম স্টক", "low"],
+  ["out", "Out of Stock", "স্টক শেষ", "out"],
+  ["issue", "Price Issue", "দামের সমস্যা", "issue"],
 ];
 
 // the four sale rates, in the order the POS price list uses them
@@ -111,6 +113,8 @@ function RateCell({ line, field }) {
 
 /** Product list, laid out like the 360 product screen, with the dealer price list beside every variant */
 export default function ProductsPage() {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -125,8 +129,11 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const location = till.id || "warehouse";
-    setDraft((current) => ({ ...current, location }));
-    setFilters((current) => ({ ...current, location }));
+    const next = { ...EMPTY_FILTERS, location };
+    setDraft(next);
+    setFilters(next);
+    setStock("");
+    setSelected([]);
     setPage(1);
   }, [till.id]);
 
@@ -137,12 +144,19 @@ export default function ProductsPage() {
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["product-list", filters, stock, limit, page],
+    queryKey: ["product-list", till.id, filters, stock, limit, page],
     queryFn: () => fetchList(params({ page, limit })),
-    placeholderData: keepPreviousData,
   });
 
-  const { data: categories = [] } = useQuery({ ...posCategoriesQueryOptions(), refetchOnWindowFocus: false });
+  const { data: catalog, isSuccess: catalogReady } = useQuery({
+    ...posCatalogQueryOptions(till.id),
+    enabled: !!till.id,
+    refetchOnWindowFocus: false,
+  });
+  const categories = catalogReady ? catalog?.categories || [] : [];
+  const subcategories = catalogReady ? catalog?.subcategories || [] : [];
+  const brands = catalogReady ? catalog?.brands || [] : [];
+  const subOptions = subcategories.filter((row) => !draft.category || String(row.categoryId) === String(draft.category));
   const { data: showrooms = [] } = useQuery({ ...posShowroomsQueryOptions(), refetchOnWindowFocus: false });
 
   const rows = data?.items ?? [];
@@ -210,7 +224,7 @@ export default function ProductsPage() {
             v.label || "",
             v.barcode || "",
             k ? "" : p.brand,
-            k ? "" : p.category,
+            k ? "" : [p.category, p.subcategory].filter(Boolean).join(" / "),
             v.stock ?? 0,
             v.cost ?? 0,
             ...RATES.map(([field]) => v[field] || "Not set"),
@@ -241,7 +255,7 @@ export default function ProductsPage() {
 
   const allChecked = rows.length > 0 && rows.every((p) => selected.includes(p._id));
   const check = (id, on) => setSelected(on ? [...selected, id] : selected.filter((x) => x !== id));
-  const filtered = filters.q || filters.brand || filters.category || filters.location !== "all" || stock;
+  const filtered = filters.q || filters.brand || filters.category || filters.subcategory || filters.location !== "all" || stock;
 
   // profit if every unit in view went to one kind of buyer
   const profits = totals
@@ -256,10 +270,10 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       <ListCard
-        title="Product List"
+        title={t("Product List", "পণ্যের তালিকা")}
         actions={
           <Link href={ADMIN_PRODUCT_ADD} className={btn.primary}>
-            <Plus size={14} /> Add New Product
+            <Plus size={14} /> {t("Add New Product", "পণ্য যোগ")}
           </Link>
         }
       >
@@ -284,7 +298,7 @@ export default function ProductsPage() {
         )}
 
         <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {TABS.map(([key, label, countKey]) => (
+          {TABS.map(([key, label, bn, countKey]) => (
             <button
               key={key || "all"}
               type="button"
@@ -295,7 +309,7 @@ export default function ProductsPage() {
                   : "bg-[#f1f5f9] text-[#495057] hover:bg-[#e2e8f0] dark:bg-muted dark:text-muted-foreground"
               }`}
             >
-              {label}
+              {t(label, bn)}
               <span className={`rounded-full px-1.5 text-[11px] ${stock === key ? "bg-white/25" : "bg-white dark:bg-background"}`}>
                 {counts[countKey] ?? 0}
               </span>
@@ -321,16 +335,21 @@ export default function ProductsPage() {
           </select>
 
           <select value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={`${inputClass} !w-36`} aria-label="Brand">
-            <option value="">All Brands</option>
-            {(data?.brands || []).map((b) => (
+            <option value="">{t("All Brands", "সব ব্র্যান্ড")}</option>
+            {brands.map((b) => (
               <option key={b} value={b}>
                 {b}
               </option>
             ))}
           </select>
 
-          <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={`${inputClass} !w-40`} aria-label="Category">
-            <option value="">All Categories</option>
+          <select
+            value={draft.category}
+            onChange={(e) => setDraft({ ...draft, category: e.target.value, subcategory: "" })}
+            className={`${inputClass} !w-40`}
+            aria-label="Category"
+          >
+            <option value="">{t("All Categories", "সব ক্যাটাগরি")}</option>
             {categories.map((c) => (
               <option key={c._id} value={c._id}>
                 {c.name}
@@ -338,9 +357,23 @@ export default function ProductsPage() {
             ))}
           </select>
 
+          <select
+            value={draft.subcategory}
+            onChange={(e) => setDraft({ ...draft, subcategory: e.target.value })}
+            className={`${inputClass} !w-44`}
+            aria-label={t("Sub Category", "সাব ক্যাটাগরি")}
+          >
+            <option value="">{t("All Sub Categories", "সব সাব ক্যাটাগরি")}</option>
+            {subOptions.map((row) => (
+              <option key={row._id} value={row._id}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+
           <select value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} className={`${inputClass} !w-40`} aria-label="Stock location">
-            <option value="all">All Stock</option>
-            <option value="warehouse">Warehouse / Godown</option>
+            <option value="all">{t("All Stock", "সব স্টক")}</option>
+            <option value="warehouse">{t("Warehouse / Godown", "গোডাউন")}</option>
             {showrooms.map((s) => (
               <option key={s._id} value={s._id}>
                 {s.name}
@@ -368,22 +401,22 @@ export default function ProductsPage() {
             className={`${inputClass} !w-28`}
             aria-label="Status"
           >
-            <option value="active">Active</option>
-            <option value="trash">Trash</option>
+            <option value="active">{t("Active", "সক্রিয়")}</option>
+            <option value="trash">{t("Trash", "ট্র্যাশ")}</option>
           </select>
 
           <input
             value={draft.q}
             onChange={(e) => setDraft({ ...draft, q: e.target.value })}
-            placeholder="Search Name, Code, Barcode, SKU..."
+            placeholder={t("Search Name, Code, Barcode, SKU...", "নাম, কোড, বারকোড, SKU খুঁজুন...")}
             className={`${inputClass} min-w-[220px] flex-1`}
           />
 
           <button type="submit" className={btn.info}>
-            Search
+            {t("Search", "খুঁজুন")}
           </button>
           <button type="button" onClick={clear} className={btn.warning}>
-            Clear
+            {t("Clear", "মুছুন")}
           </button>
         </form>
 
@@ -434,7 +467,7 @@ export default function ProductsPage() {
                     <Link href={ADMIN_PRODUCT_EDIT(p._id)} className="line-clamp-2 text-[15px] font-semibold">
                       {p.name}
                     </Link>
-                    <p className="m-0 truncate text-[12px] text-muted-foreground">{[p.brand, p.category, p.code].filter(Boolean).join(" · ")}</p>
+                    <p className="m-0 truncate text-[12px] text-muted-foreground">{[p.brand, p.category, p.subcategory, p.code].filter(Boolean).join(" · ")}</p>
                     <Flags p={p} />
                   </div>
                   <ActionMenu items={rowActions(p)} />
@@ -476,14 +509,14 @@ export default function ProductsPage() {
                     aria-label="Select all"
                   />
                 </th>
-                <th rowSpan={2} className={thClass}>SL</th>
-                <th rowSpan={2} className={thClass}>Product</th>
-                <th rowSpan={2} className={thClass}>Variant · Barcode</th>
-                <th rowSpan={2} className={thClass}>Stock</th>
-                <th rowSpan={2} className={thClass}>Cost</th>
-                <th colSpan={4} className={`${thClass} text-center`}>Sale Rate (margin)</th>
-                <th rowSpan={2} className={thClass}>Stock Value</th>
-                <th rowSpan={2} className={thClass}>Action</th>
+                <th rowSpan={2} className={thClass}>{t("SL", "ক্রম")}</th>
+                <th rowSpan={2} className={thClass}>{t("Product", "পণ্য")}</th>
+                <th rowSpan={2} className={thClass}>{t("Variant · Barcode", "ভ্যারিয়েন্ট · বারকোড")}</th>
+                <th rowSpan={2} className={thClass}>{t("Stock", "স্টক")}</th>
+                <th rowSpan={2} className={thClass}>{t("Cost", "ক্রয়")}</th>
+                <th colSpan={4} className={`${thClass} text-center`}>{t("Sale Rate (margin)", "বিক্রয় মূল্য (মার্জিন)")}</th>
+                <th rowSpan={2} className={thClass}>{t("Stock Value", "স্টক মূল্য")}</th>
+                <th rowSpan={2} className={thClass}>{t("Action", "অ্যাকশন")}</th>
               </tr>
               <tr className={theadRow}>
                 {RATES.map(([field, label]) => (
@@ -547,7 +580,7 @@ export default function ProductsPage() {
                               {p.name}
                             </Link>
                             <span className="block text-xs text-muted-foreground">
-                              {[p.brand, p.category, p.code].filter(Boolean).join(" · ")}
+                              {[p.brand, p.category, p.subcategory, p.code].filter(Boolean).join(" · ")}
                             </span>
                             <Flags p={p} />
                           </div>

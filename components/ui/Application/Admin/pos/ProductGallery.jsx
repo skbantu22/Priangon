@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 import { formatWarrantyPeriod } from "@/lib/warranty";
-import { POS_DEMO_BRAND_NAMES } from "@/lib/posDemoBrands";
 
 const LOW_STOCK = 5;
 
@@ -309,8 +308,18 @@ export default function ProductGallery({
   const [localFilter, setLocalFilter] = useState("");
   const [view, setView] = useState("grid");
 
-  const brandChips =
-    brands.length > 0 ? brands : POS_DEMO_BRAND_NAMES;
+  const brandChips = useMemo(() => {
+    const seen = new Set();
+    const unique = [];
+    for (const name of brands || []) {
+      const label = String(name || "").trim();
+      const key = label.toLowerCase();
+      if (!label || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(label);
+    }
+    return unique;
+  }, [brands]);
 
   const inShop = useMemo(
     () =>

@@ -1,18 +1,33 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { Settings2, Trash2 } from "lucide-react";
 
 import { printLabels } from "@/lib/barcodeLabel";
 import { showToast } from "@/lib/showToast";
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
+import { useOpeningStockTill } from "@/lib/posProducts";
+import {
+  EmptyRow,
+  ListCard,
+  btn,
+  filterInput,
+  tdClass,
+  thClass,
+  theadClass,
+} from "@/components/ui/Application/Admin/listKit";
 
-const BarcodePrintPage = () => {
+export default function BarcodePrintPage() {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
+  const till = useOpeningStockTill();
+
   const [variants, setVariants] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
-  // Settings → Barcode Print Settings, and the shop name / address it falls back to
   const [labelSettings, setLabelSettings] = useState({ label: {}, shop: {} });
 
   useEffect(() => {
@@ -22,213 +37,179 @@ const BarcodePrintPage = () => {
         if (!data?.success) return;
         setLabelSettings({
           label: data.data.barcodeLabel || {},
-          shop: {
-            name: data.data.companyName || "",
-            address: data.data.address || "",
-          },
+          shop: { name: data.data.companyName || "", address: data.data.address || "" },
         });
       })
       .catch(() => {});
   }, []);
 
-  // FETCH
   useEffect(() => {
-    const fetchVariants = async () => {
-      try {
-        const { data } = await axios.get("/api/product-variant?size=1000");
-        if (data?.success) setVariants(data.data || []);
-      } catch (err) {
-        console.log(err);
-      }
+    let cancelled = false;
+    setVariants([]);
+    setSelectedItems([]);
+    setSearch("");
+    axios
+      .get("/api/product/list", { params: { location: till.id || "warehouse", limit: "all", status: "active" } })
+      .then(({ data }) => {
+        if (cancelled || !data?.success) return;
+        const lines = [];
+        (data.items || []).forEach((product) => {
+          (product.variants || []).forEach((variant) => {
+            lines.push({
+              _id: variant._id,
+              productName: product.name,
+              label: variant.label || "",
+              barcode: variant.barcode || "",
+              sellingPrice: variant.sellingPrice,
+              mrp: variant.mrp,
+              stock: variant.stock,
+            });
+          });
+        });
+        setVariants(lines);
+      })
+      .catch(() => {
+        if (!cancelled) showToast("error", "Could not load products");
+      });
+    return () => {
+      cancelled = true;
     };
-    fetchVariants();
-  }, []);
+  }, [till.id]);
 
-  // FILTER
-  const filteredVariants = useMemo(() => {
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return variants;
     return variants.filter((v) =>
-      `${v.sku} ${v.barcode || ""} ${v.color} ${v.size} ${v.product?.name || ""}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+      `${v.productName} ${v.barcode} ${v.label}`.toLowerCase().includes(needle),
     );
   }, [search, variants]);
 
-  const isAdded = (id) => selectedItems.some((i) => i.variant._id === id);
-
+  const isAdded = (id) => selectedItems.some((item) => item.variant._id === id);
   const addVariant = (variant) => {
     if (isAdded(variant._id)) return;
     setSelectedItems((prev) => [...prev, { variant, qty: 1 }]);
   };
-
   const updateQty = (id, qty) => {
-    setSelectedItems((prev) =>
-      prev.map((item) =>
-        item.variant._id === id ? { ...item, qty: Number(qty) } : item,
-      ),
-    );
+    setSelectedItems((prev) => prev.map((item) => (item.variant._id === id ? { ...item, qty: Number(qty) || 1 } : item)));
   };
+  const removeItem = (id) => setSelectedItems((prev) => prev.filter((item) => item.variant._id !== id));
 
-  const removeItem = (id) => {
-    setSelectedItems((prev) => prev.filter((i) => i.variant._id !== id));
-  };
-
-  // prints at the sticker size set in Barcode Print Settings, with the
-  // variant's own barcode (what the POS scans)
   const generateLabels = () => {
-    if (!selectedItems.length)
-      return showToast("error", "Add products to print first");
+    if (!selectedItems.length) return showToast("error", t("Add products to print first", "আগে প্রিন্টের পণ্য যোগ করুন"));
     const items = selectedItems.map(({ variant, qty }) => ({
-      productName: variant.product?.name || "",
-      variant: [variant.color, variant.size]
-        .filter((v) => v && v !== "Default" && v !== "Standard")
-        .join(" · "),
+      productName: variant.productName,
+      variant: variant.label || "",
       barcode: variant.barcode || variant.sku,
       price: variant.sellingPrice,
       mrp: variant.mrp,
       copies: qty,
     }));
-    if (!printLabels(items, labelSettings.label, labelSettings.shop))
-      showToast("error", "Allow pop-ups to print");
+    if (!printLabels(items, labelSettings.label, labelSettings.shop)) {
+      showToast("error", t("Allow pop-ups to print", "প্রিন্টের জন্য পপ-আপ চালু রাখুন"));
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      {/* HEADER */}
-      <div className="no-print flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold">Barcode Print System</h1>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/settings/barcode"
-            className="flex items-center gap-1.5 rounded border bg-white px-4 py-2 text-sm hover:bg-gray-50"
-          >
-            <Settings2 size={16} /> Label settings
-          </Link>
-          <button
-            onClick={generateLabels}
-            className="bg-black text-white px-5 py-2 rounded hover:bg-gray-800"
-          >
-            Print Labels
-          </button>
-        </div>
-      </div>
-
-      {/* SEARCH */}
-      <div className="no-print mb-4">
+    <div className="space-y-4">
+      <ListCard
+        title={t("Print Barcode/Label", "বারকোড প্রিন্ট")}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/settings/barcode" className={btn.secondary}>
+              <Settings2 size={14} /> {t("Label settings", "লেবেল সেটিংস")}
+            </Link>
+            <button type="button" className={btn.success} onClick={generateLabels}>
+              {t("Print Labels", "লেবেল প্রিন্ট")}
+            </button>
+          </div>
+        }
+      >
+        <p className="mb-3 text-[13px] text-[#868e96]">
+          {t("Stock and barcodes for", "স্টক ও বারকোড")} <span className="font-semibold text-[#212529]">{till.name}</span>
+        </p>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search SKU, product, color..."
-          className="w-full p-3 border rounded"
+          placeholder={t("Search name, barcode, SKU...", "নাম, বারকোড, SKU খুঁজুন...")}
+          className={`${filterInput} mb-4 max-w-xl`}
         />
-      </div>
 
-      {/* PRODUCT TABLE */}
-      <div className="no-print bg-white rounded shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-900 text-white">
-            <tr>
-              <th className="p-3 text-left">Product</th>
-              <th>Color</th>
-              <th>Size</th>
-              <th>SKU</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredVariants.map((v) => (
-              <tr key={v._id} className="border-b hover:bg-gray-50">
-                {/* PRODUCT */}
-                <td className="p-3">
-                  <div className="flex items-center gap-3">
-                    {v.product?.image ? (
-                      <img
-                        src={v.product.image}
-                        className="w-10 h-10 rounded object-cover border"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded" />
-                    )}
-
-                    <div>
-                      <div className="font-medium">{v.product?.name}</div>
-                      <div className="text-xs text-gray-500">SKU: {v.sku}</div>
-                    </div>
-                  </div>
-                </td>
-
-                <td>{v.color}</td>
-                <td>{v.size}</td>
-                <td className="font-bold">{v.sku}</td>
-
-                <td>
-                  {isAdded(v._id) ? (
-                    <span className="text-green-600 text-xs font-semibold">
-                      Added
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => addVariant(v)}
-                      className="bg-black text-white px-3 py-1 rounded"
-                    >
-                      Add
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* SELECTED ITEMS */}
-      {selectedItems.length > 0 && (
-        <div className="no-print mt-6 bg-white rounded shadow p-4">
-          <h2 className="font-bold mb-3">Selected Items</h2>
-
-          <table className="w-full text-sm">
-            <thead className="bg-black text-white">
-              <tr>
-                <th className="p-2">SKU</th>
-                <th>Qty</th>
-                <th>Action</th>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className={theadClass}>
+                <th className={thClass}>{t("Product", "পণ্য")}</th>
+                <th className={thClass}>{t("Barcode", "বারকোড")}</th>
+                <th className={thClass}>{t("Stock", "স্টক")}</th>
+                <th className={thClass}>{t("Action", "অ্যাকশন")}</th>
               </tr>
             </thead>
-
             <tbody>
-              {selectedItems.map((item) => (
-                <tr key={item.variant._id}>
-                  <td className="p-2 font-bold">{item.variant.sku}</td>
-
-                  <td>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.qty}
-                      onChange={(e) =>
-                        updateQty(item.variant._id, e.target.value)
-                      }
-                      className="border w-20 p-1 rounded"
-                    />
+              {filtered.length === 0 && (
+                <EmptyRow colSpan={4} title={t("No products for this branch", "এই শাখায় কোনো পণ্য নেই")} />
+              )}
+              {filtered.slice(0, 80).map((v) => (
+                <tr key={v._id} className="hover:bg-[#f5f7f9] dark:hover:bg-muted/50">
+                  <td className={tdClass}>
+                    <div className="font-medium">{v.productName}</div>
+                    <div className="text-[12px] text-[#868e96]">{v.label}</div>
                   </td>
-
-                  <td>
-                    <button
-                      onClick={() => removeItem(item.variant._id)}
-                      className="text-red-500"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                  <td className={`${tdClass} font-mono text-[12px]`}>{v.barcode}</td>
+                  <td className={tdClass}>{v.stock ?? 0}</td>
+                  <td className={tdClass}>
+                    {isAdded(v._id) ? (
+                      <span className="text-[12px] font-semibold text-[#0e8a4a]">{t("Added", "যোগ হয়েছে")}</span>
+                    ) : (
+                      <button type="button" className={btn.primary} onClick={() => addVariant(v)}>
+                        {t("Add", "যোগ")}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </ListCard>
+
+      {selectedItems.length > 0 && (
+        <ListCard title={t("Selected labels", "নির্বাচিত লেবেল")}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className={theadClass}>
+                  <th className={thClass}>{t("Product", "পণ্য")}</th>
+                  <th className={thClass}>{t("Barcode", "বারকোড")}</th>
+                  <th className={thClass}>{t("Qty", "সংখ্যা")}</th>
+                  <th className={thClass}>{t("Action", "অ্যাকশন")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedItems.map((item) => (
+                  <tr key={item.variant._id}>
+                    <td className={tdClass}>{item.variant.productName}</td>
+                    <td className={`${tdClass} font-mono`}>{item.variant.barcode}</td>
+                    <td className={tdClass}>
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.qty}
+                        onChange={(e) => updateQty(item.variant._id, e.target.value)}
+                        className={`${filterInput} !w-24`}
+                      />
+                    </td>
+                    <td className={tdClass}>
+                      <button type="button" className="text-[#ff5b5b]" onClick={() => removeItem(item.variant._id)} aria-label={t("Remove", "সরান")}>
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ListCard>
       )}
     </div>
   );
-};
-
-export default BarcodePrintPage;
+}

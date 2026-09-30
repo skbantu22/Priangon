@@ -6,13 +6,15 @@ import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { FiEdit2, FiPlus, FiTrash2 } from "react-icons/fi";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { showToast } from "@/lib/showToast";
-import { ADMIN_ATTRIBUTE_SHOW, ADMIN_DASHBOARD } from "@/Route/Adminpannelroute";
+import { ADMIN_ATTRIBUTE_SHOW } from "@/Route/Adminpannelroute";
+import { ListCard, btn } from "@/components/ui/Application/Admin/listKit";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -63,15 +65,18 @@ const TITLES = {
 };
 
 const AttributeList = () => {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
+  const till = useOpeningStockTill();
   const searchParams = useSearchParams();
   const slotFilter = searchParams.get("slot") || "";
   const categoryView = searchParams.get("view") === "categories";
   const colorView = slotFilter === "color";
   const [title, subtitle] = categoryView
-    ? ["Attribute Category List", "Manage categories used to organize product attributes"]
+    ? [t("Attribute Category List", "অ্যাট্রিবিউট ক্যাটাগরি তালিকা"), t("Manage categories used to organize product attributes", "পণ্যের অ্যাট্রিবিউট সাজানোর ক্যাটাগরি")]
     : colorView
-      ? TITLES.color
-      : ["Attribute List", "Manage attribute values used when creating product variants"];
+      ? [t("Color List", "রঙের তালিকা"), t("Handset colours offered while generating variants", "ভ্যারিয়েন্টের জন্য রঙ")]
+      : [t("Attribute List", "অ্যাট্রিবিউট তালিকা"), t("Manage attribute values used when creating product variants", "ভ্যারিয়েন্টের অ্যাট্রিবিউট")];
   const [allAttributes, setAttributes] = useState([]);
   const categories = allAttributes.filter((attribute) => attribute.slot !== "color");
   const visibleCategories = slotFilter && !colorView
@@ -118,8 +123,10 @@ const AttributeList = () => {
   }, []);
 
   useEffect(() => {
+    setOpen(false);
+    setValueOpen(false);
     loadAttributes();
-  }, [loadAttributes]);
+  }, [loadAttributes, till.id]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -319,29 +326,19 @@ const AttributeList = () => {
 
   const slotLabel = (slot) =>
     SLOTS.find((item) => item.value === slot)?.label || slot;
-  const breadcrumbData = [
-    { href: ADMIN_DASHBOARD, label: "Home" },
-    { href: ADMIN_ATTRIBUTE_SHOW, label: categoryView ? "Attribute Categories" : "Attributes" },
-  ];
 
   return (
     <div>
-      <BreadCrumb breadcrumbData={breadcrumbData} />
-
-      <Card className="py-0 rounded shadow-sm">
-        <CardHeader className="pt-3 px-3 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h4 className="text-xl font-semibold">{title}</h4>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          </div>
-
-          <Button onClick={categoryView || colorView ? openCreate : openValueCreate}>
-            <FiPlus className="mr-2" />
-            {categoryView ? "Add New" : colorView ? "New Attribute" : "Add New"}
-          </Button>
-        </CardHeader>
-
-        <CardContent className="px-3 pb-4">
+      <ListCard
+        title={title}
+        actions={
+          <button type="button" className={btn.success} onClick={categoryView || colorView ? openCreate : openValueCreate}>
+            <FiPlus className="mr-1" />
+            {categoryView ? t("Add New", "নতুন যোগ") : colorView ? t("Add Color", "রঙ যোগ") : t("Add New", "নতুন যোগ")}
+          </button>
+        }
+      >
+        <p className="mb-3 text-[13px] text-[#868e96]">{subtitle}</p>
           {loading ? (
             <div className="space-y-2 py-4">
               {[...Array(3)].map((_, i) => (
@@ -499,8 +496,7 @@ const AttributeList = () => {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </ListCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">

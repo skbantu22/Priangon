@@ -11,7 +11,7 @@ import InventoryTransaction from "@/models/InventoryTransaction.model";
 import StockAdjustment from "@/models/StockAdjustment.model";
 import Purchase from "@/models/Purchase.model";
 import Product from "@/models/Product.model";
-import Category from "@/models/category.model";
+import { catalogForTill } from "@/lib/tillCatalog";
 
 import "@/models/ProductVariant.model ";
 import "@/models/Showroom.model";
@@ -366,10 +366,7 @@ export async function GET(req) {
 
     for (const field of Object.keys(totals)) totals[field] = round(totals[field]);
 
-    const [brands, categories] = await Promise.all([
-      Product.distinct("brand", { deletedAt: null, brand: { $nin: ["", null] } }),
-      Category.find({ deletedAt: null }).select("name").sort({ name: 1 }).lean(),
-    ]);
+    const catalog = await catalogForTill(location === "all" ? "all" : location);
 
     const start = exportAll ? 0 : (page - 1) * limit;
     const data = exportAll ? lines : lines.slice(start, start + limit);
@@ -383,8 +380,8 @@ export async function GET(req) {
       total: lines.length,
       pages: exportAll ? 1 : Math.max(1, Math.ceil(lines.length / limit)),
       filters: {
-        brands: brands.sort((a, b) => a.localeCompare(b)),
-        categories: categories.map((item) => ({ id: String(item._id), name: item.name })),
+        brands: catalog.brands,
+        categories: catalog.categories.map((item) => ({ id: item._id, name: item.name })),
       },
     });
   } catch (error) {

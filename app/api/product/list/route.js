@@ -7,8 +7,10 @@ import ProductVariant from "@/models/ProductVariant.model ";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import CategoryModel from "@/models/category.model";
+import SubCategoryModel from "@/models/subcategory.model";
 import Media from "@/models/Media.model";
 import { ratesFor } from "@/lib/priceTiers";
+import { catalogForTill } from "@/lib/tillCatalog";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isId = (v) => !!v && mongoose.Types.ObjectId.isValid(v);
@@ -55,6 +57,7 @@ export async function GET(request) {
     const q = (sp.get("q") || "").trim();
     const brand = (sp.get("brand") || "").trim();
     const category = sp.get("category");
+    const subcategory = sp.get("subcategory");
     const location = sp.get("location") || "all";
     const shopOnly = location !== "all";
     const status = sp.get("status") || "active";
@@ -64,6 +67,7 @@ export async function GET(request) {
     const query = { deletedAt: status === "trash" ? { $ne: null } : null };
     if (brand) query.brand = { $regex: `^${escapeRegex(brand)}$`, $options: "i" };
     if (isId(category)) query.category = category;
+    if (isId(subcategory)) query.subcategory = subcategory;
 
     if (q) {
       const rx = { $regex: escapeRegex(q), $options: "i" };
@@ -79,28 +83,31 @@ export async function GET(request) {
 
     // Tabs, totals and stock sorts need every matching product, so the page
     // is cut after the rows are built
-    const [products, brands] = await Promise.all([
+    const [products, catalog] = await Promise.all([
       ProductModel.find(query)
         .select(
-          "name brand category code unit mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice minSalePrice alertQuantity media variants deletedAt",
+          "name brand category subcategory code unit mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice minSalePrice alertQuantity media variants deletedAt",
         )
         .lean(),
-      ProductModel.distinct("brand", { deletedAt: null, brand: { $nin: ["", null] } }),
+      catalogForTill(location === "all" ? "all" : location),
     ]);
+    const brands = catalog.brands;
 
     const variantIds = products.flatMap((p) => p.variants || []);
     const catIds = [...new Set(products.map((p) => String(p.category)).filter(isId))];
+    const subIds = [...new Set(products.map((p) => String(p.subcategory || "")).filter(isId))];
 
     const wantWarehouse = location === "all" || location === "warehouse";
     const wantShowroom = location !== "warehouse";
     const showroomQuery = { variantId: { $in: variantIds } };
     if (isId(location)) showroomQuery.showroomId = location;
 
-    const [variants, cats, whStock, srStock] = await Promise.all([
+    const [variants, cats, subs, whStock, srStock] = await Promise.all([
       ProductVariant.find({ _id: { $in: variantIds }, deletedAt: null })
         .select("color size sku barcode mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice")
         .lean(),
       CategoryModel.find({ _id: { $in: catIds } }).select("name").lean(),
+      SubCategoryModel.find({ _id: { $in: subIds } }).select("name").lean(),
       wantWarehouse
         ? WarehouseStock.find({ variantId: { $in: variantIds } }).select("variantId stock").lean()
         : [],
@@ -110,6 +117,7 @@ export async function GET(request) {
     const byId = (list) => new Map(list.map((d) => [String(d._id), d]));
     const variantMap = byId(variants);
     const catMap = byId(cats);
+    const subMap = byId(subs);
 
     const stockMap = new Map();
     for (const s of [...whStock, ...srStock]) {
@@ -148,6 +156,7 @@ export async function GET(request) {
         unit: p.unit || "Pcs",
         brand: p.brand || "",
         category: catMap.get(String(p.category))?.name || "",
+        subcategory: subMap.get(String(p.subcategory || ""))?.name || "",
         media: p.media?.[0] || null,
         minSalePrice: p.minSalePrice || 0,
         alertQuantity: p.alertQuantity || 0,

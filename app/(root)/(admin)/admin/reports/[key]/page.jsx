@@ -7,6 +7,7 @@ import axios from "axios";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { DateRange, EmptyRow, btn, exportExcel, exportPdf, fmtDate, inputClass, money, printTable, tdClass, thClass, theadRow, totalRow } from "@/components/ui/Application/Admin/supplier/supplierKit";
 import { toInputDate } from "@/components/ui/Application/Admin/purchase/purchaseKit";
 
@@ -130,6 +131,7 @@ function Filter({ k, q, set, options }) {
 /** Any report from the report engine, laid out like 360's report pages */
 export default function ReportPage() {
   const { key } = useParams();
+  const till = useOpeningStockTill();
   const [draft, setDraft] = useState(() => defaultQuery(key));
   const [query, setQuery] = useState(() => defaultQuery(key));
   const [data, setData] = useState(null);
@@ -153,6 +155,22 @@ export default function ReportPage() {
       setLoading(false);
     }
   }, [key, query]);
+
+  useEffect(() => {
+    const fresh = {
+      ...defaultQuery(key),
+      showroomId: till.id && till.id !== "warehouse" ? till.id : "",
+      location: till.id || "",
+      categoryId: "",
+      brand: "",
+      search: "",
+    };
+    setDraft(fresh);
+    setQuery(fresh);
+    setData(null);
+    setFind("");
+    setPage(1);
+  }, [till.id, key]);
 
   useEffect(() => {
     load();

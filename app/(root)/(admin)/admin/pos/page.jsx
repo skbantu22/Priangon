@@ -206,6 +206,11 @@ export default function POSPage() {
   useEffect(() => {
     if (tillRef.current && tillRef.current !== selectedTill) {
       dispatch(clearCart());
+      setSearch("");
+      setDebouncedSearch("");
+      setSelectedCategoryId("");
+      setSelectedBrand("");
+      setSort("latest");
     }
     tillRef.current = selectedTill;
   }, [selectedTill, dispatch]);
@@ -315,15 +320,50 @@ export default function POSPage() {
   // a spinner only on a truly empty cache (first ever visit)
   const isLoading = baseIsPlaceholder || (!baseData && (isRestoring || baseFetching || !showroomsFetched));
 
-  const { data: categories = [] } = useQuery({
-    ...posCategoriesQueryOptions(),
+  const categoryQuery = useQuery({
+    ...posCategoriesQueryOptions(selectedShowroomId),
+    enabled: !!selectedShowroomId,
     refetchOnWindowFocus: false,
   });
+  const brandQuery = useQuery({
+    ...posBrandsQueryOptions(selectedShowroomId),
+    enabled: !!selectedShowroomId,
+    refetchOnWindowFocus: false,
+  });
+  // This till has finished loading and has nothing on the shelf. Chips must
+  // not keep Grocery / ANKER from another store while the grid says empty.
+  const emptyTill =
+    shopSelected &&
+    baseQuery.isSuccess &&
+    !baseIsPlaceholder &&
+    !isRestoring &&
+    allProducts.length === 0 &&
+    !baseHasNext;
+  // Hide chips until this till's catalog has loaded. Do not keep the previous
+  // showroom's categories and brands on screen.
+  const categories =
+    categoryQuery.isSuccess && !emptyTill ? categoryQuery.data || [] : [];
+  const brands = brandQuery.isSuccess && !emptyTill ? brandQuery.data || [] : [];
 
-  const { data: brands = [] } = useQuery({
-    ...posBrandsQueryOptions(),
-    refetchOnWindowFocus: false,
-  });
+  useEffect(() => {
+    if (!categoryQuery.isSuccess) return;
+    if (
+      selectedCategoryId &&
+      !categories.some((row) => String(row._id) === String(selectedCategoryId))
+    ) {
+      setSelectedCategoryId("");
+    }
+  }, [categoryQuery.isSuccess, categories, selectedCategoryId]);
+
+  useEffect(() => {
+    if (!brandQuery.isSuccess) return;
+    if (
+      selectedBrand &&
+      !brands.some((name) => String(name).toLowerCase() === selectedBrand.toLowerCase())
+    ) {
+      setSelectedBrand("");
+    }
+  }, [brandQuery.isSuccess, brands, selectedBrand]);
 
   // 🚀 Optimized Handlers with useCallback
   const addToCart = useCallback(

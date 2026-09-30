@@ -40,6 +40,12 @@ export default function PosPrefetch() {
       }
     };
 
+    const warmCatalog = (showroomId) => {
+      if (!showroomId || showroomId === WAREHOUSE_TILL) return;
+      queryClient.prefetchQuery(posCategoriesQueryOptions(showroomId));
+      queryClient.prefetchQuery(posBrandsQueryOptions(showroomId));
+    };
+
     const showroomsOptions = posShowroomsQueryOptions();
     const picked = readPosShowroom();
     const cached = queryClient.getQueryData(showroomsOptions.queryKey);
@@ -48,22 +54,24 @@ export default function PosPrefetch() {
       showrooms: cached || [],
       currentUser,
     });
-    if (guess) prefetchProducts(guess);
+
+    if (guess) {
+      prefetchProducts(guess);
+      warmCatalog(guess);
+    }
 
     queryClient
       .fetchQuery(showroomsOptions)
       .then((showrooms) => {
         const id = resolvePosTill({ picked, showrooms, currentUser });
         if (id && id !== guess) prefetchProducts(id);
+        warmCatalog(id);
       })
       .catch(() => {
         prefetchProducts(
           currentUser.posTill === "warehouse" ? WAREHOUSE_TILL : guess || WAREHOUSE_TILL,
         );
       });
-
-    queryClient.prefetchQuery(posCategoriesQueryOptions());
-    queryClient.prefetchQuery(posBrandsQueryOptions());
   }, [isRestoring, currentUser, queryClient]);
 
   return null;

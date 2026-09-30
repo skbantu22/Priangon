@@ -8,6 +8,7 @@ import { FiEye, FiFileText } from "react-icons/fi";
 import { showToast } from "@/lib/showToast";
 import { formatNumberBD } from "@/lib/bdFormat";
 import { useLocations } from "@/components/ui/Application/Admin/inventory/useInventory";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import {
   EmptyRow,
   ExportButtons,
@@ -99,6 +100,7 @@ const escapeHtml = (value) =>
 
 const StockPage = () => {
   const { locations } = useLocations();
+  const till = useOpeningStockTill();
 
   const [rows, setRows] = useState([]);
   const [totals, setTotals] = useState(null);
@@ -160,6 +162,17 @@ const StockPage = () => {
       setLoading(false);
     }
   }, [filterParams, page, limit]);
+
+  useEffect(() => {
+    setLocation(till.id || "warehouse");
+    setBrand("");
+    setCategory("");
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+    setFilterOptions({ brands: [], categories: [] });
+    setRows([]);
+  }, [till.id]);
 
   useEffect(() => {
     loadStock();

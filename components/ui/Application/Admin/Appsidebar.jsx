@@ -137,13 +137,13 @@ export default function Appsidebar() {
                 <span className="text-xl font-extrabold tracking-wide text-white">
                   SB <span className="text-[#e0415e]">Telecom</span>
                 </span>
-                <span className="truncate text-[12px] font-bold text-white/90">
+                <span key={selectedShowroomId} className="truncate text-[12px] font-bold text-white/90">
                   {isWarehouseUser ? "Warehouse" : `Sale Center · ${branchName}`}
                 </span>
               </span>
             </Link>
 
-            <p className="mt-2 truncate rounded-lg bg-white/10 px-2 py-1.5 text-[12px] font-bold text-white">
+            <p key={`branch-${selectedShowroomId}`} className="mt-2 truncate rounded-lg bg-white/10 px-2 py-1.5 text-[12px] font-bold text-white">
               {branchName}
             </p>
           </div>

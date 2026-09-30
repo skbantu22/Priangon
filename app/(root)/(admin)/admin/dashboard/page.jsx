@@ -5,13 +5,14 @@ import { MotionConfig, animate, motion, useMotionValue, useTransform } from "fra
 import Image from "next/image";
 import { skipOptimize } from "@/lib/imageSrc";
 import Link from "next/link";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import {
   WAREHOUSE_TILL,
   getPosCurrentUser,
   posShowroomsQueryOptions,
   useOpeningStockTill,
+  writePosShowroom,
 } from "@/lib/posProducts";
 import {
   Area,
@@ -176,55 +177,52 @@ export default function Dashboard() {
   const [from, setFrom] = useState(isoDay(new Date(today.getTime() - 29 * 864e5)));
   const [to, setTo] = useState(isoDay(today));
   const [limit, setLimit] = useState(10);
-  // Top-bar switch is the shop. The card can narrow this page only.
+  // One switch for the whole screen. The card writes the same till as the top bar.
   const till = useOpeningStockTill();
   const switchedId = till.id || "";
   const auth = useSelector((state) => state.authStore.auth);
   const isAdmin = getPosCurrentUser(auth)?.role === "admin";
-  const [cardBranch, setCardBranch] = useState(null);
-  const [cardFollows, setCardFollows] = useState("");
-  const scope =
-    !isAdmin
-      ? switchedId
-      : cardBranch !== null && cardFollows === switchedId
-        ? cardBranch
-        : switchedId;
   const { data: branches = [] } = useQuery(posShowroomsQueryOptions());
   const branchName =
-    scope === WAREHOUSE_TILL
+    switchedId === WAREHOUSE_TILL
       ? "Warehouse"
-      : branches.find((s) => String(s._id) === String(scope))?.name || till.name;
+      : branches.find((s) => String(s._id) === String(switchedId))?.name || till.name;
 
-  const params = new URLSearchParams({
-    chart,
-    period,
-    from,
-    to,
-    limit: String(limit),
-    ...(scope ? { showroomId: scope } : {}),
-  });
-
-  const { data, isLoading, isFetching, isError } = useQuery({
-    queryKey: ["dashboard-mobile", params.toString()],
-    queryFn: async () => {
-      const res = await fetch(`/api/dashboard/mobile?${params}`);
+  const { data, isFetching, isError, error } = useQuery({
+    queryKey: ["dashboard-mobile", switchedId, chart, period, from, to, limit],
+    queryFn: async ({ queryKey }) => {
+      const [, showroomId, chartMode, chartPeriod, rangeFrom, rangeTo, rowLimit] = queryKey;
+      const search = new URLSearchParams({
+        chart: chartMode,
+        period: chartPeriod,
+        from: rangeFrom,
+        to: rangeTo,
+        limit: String(rowLimit),
+        showroomId: showroomId || "",
+      });
+      const res = await fetch(`/api/dashboard/mobile?${search}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
       return json;
     },
-    placeholderData: keepPreviousData,
     refetchInterval: 60_000,
   });
 
-  if (isLoading) {
+  const fresh = data?.showroomId === switchedId;
+
+  if (!fresh) {
     return (
-      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 size-5 animate-spin" /> Loading dashboard...
+      <div className="flex h-[60vh] flex-col items-center justify-center gap-2 text-muted-foreground">
+        <p className="text-lg font-semibold text-[#343a40] dark:text-white">{branchName}</p>
+        {isError ? (
+          <p>{error?.message || "Could not load the dashboard. Please refresh."}</p>
+        ) : (
+          <p className="flex items-center">
+            <Loader2 className="mr-2 size-5 animate-spin" /> Loading {branchName}...
+          </p>
+        )}
       </div>
     );
-  }
-  if (isError || !data) {
-    return <Empty>Could not load the dashboard. Please refresh.</Empty>;
   }
 
   const k = data.kpis;
@@ -243,7 +241,7 @@ export default function Dashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="dash-viz space-y-5">
+    <div key={switchedId} className="dash-viz space-y-5">
       <motion.div
         initial={{ opacity: 0, y: -24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -252,6 +250,7 @@ export default function Dashboard() {
       >
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm font-semibold text-[#343a40] dark:text-white">{branchName}</p>
           <p className="text-sm text-muted-foreground">
             Sales, stock, dues and warranty at a glance
             {isFetching && <Loader2 className="ml-2 inline size-3.5 animate-spin" />}
@@ -276,22 +275,22 @@ export default function Dashboard() {
         <Kpi icon={Store} tone="orange" label="">
           <p className="text-xl font-bold text-gray-900 dark:text-white">Select Branch</p>
           <select
-            value={scope}
+            key={switchedId}
+            value={switchedId}
             disabled={!isAdmin}
             onChange={(e) => {
-              setCardFollows(switchedId);
-              setCardBranch(e.target.value);
+              const next = e.target.value;
+              if (next && next !== switchedId) writePosShowroom(next);
             }}
             className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm disabled:cursor-default dark:border-white/10 dark:bg-card"
           >
-            {isAdmin && <option value="">All Branch</option>}
-            {scope === WAREHOUSE_TILL && (
+            {switchedId === WAREHOUSE_TILL && (
               <option value={WAREHOUSE_TILL}>Warehouse</option>
             )}
-            {scope &&
-              scope !== WAREHOUSE_TILL &&
-              !branches.some((s) => String(s._id) === String(scope)) && (
-                <option value={scope}>{branchName}</option>
+            {switchedId &&
+              switchedId !== WAREHOUSE_TILL &&
+              !branches.some((s) => String(s._id) === String(switchedId)) && (
+                <option value={switchedId}>{branchName}</option>
               )}
             {branches.map((s) => (
               <option key={s._id} value={String(s._id)}>
@@ -585,7 +584,7 @@ export default function Dashboard() {
           ) : (
             <div style={{ height: Math.max(180, data.topBrands.length * 42) }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.topBrands} layout="vertical" margin={{ top: 0, right: 64, left: 8, bottom: 0 }} barCategoryGap={8}>
+                <BarChart key={switchedId} data={data.topBrands} layout="vertical" margin={{ top: 0, right: 64, left: 8, bottom: 0 }} barCategoryGap={8}>
                   <CartesianGrid stroke="var(--viz-grid)" strokeDasharray="4 4" horizontal={false} />
                   <XAxis type="number" tickFormatter={compact} tick={{ fill: "var(--viz-axis)", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis type="category" dataKey="name" width={80} tick={{ fill: "var(--viz-axis)", fontSize: 13 }} axisLine={false} tickLine={false} />

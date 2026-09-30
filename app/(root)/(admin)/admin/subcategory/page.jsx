@@ -1,192 +1,241 @@
 "use client";
 
-import BreadCrumb from "@/components/ui/Application/Admin/Breadcrubm";
-import {
-  ADMIN_CATEGORY_EDIT,
-  ADMIN_CATEGORY_SHOW,
-  ADMIN_DASHBOARD,
-} from "@/Route/Adminpannelroute";
-import React, { useEffect, useState } from "react";
-
-import { Form } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import {
-  FormField,
-  FormLabel,
-  FormItem,
-  FormControl,
-  FormMessage,
-} from "@/components/ui/form";
-
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import ButtonLoading from "@/components/ui/Application/ButtonLoading";
-import { zSchema } from "@/lib/zodschema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Input } from "@/components/ui/input";
-import { showToast } from "@/lib/showToast";
-import slugify from "slugify";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import useFetch from "@/hooks/useFetch";
-import Select from "@/components/ui/Select";
-import { Button } from "@/components/ui/button";
+import slugify from "slugify";
+import { Plus } from "lucide-react";
 
-const breadcrumbData = [
-  { href: ADMIN_DASHBOARD, label: "Home" },
-  { href: ADMIN_CATEGORY_SHOW, label: "Category" },
-  { href: ADMIN_CATEGORY_EDIT, label: "Add Sub Category" },
-];
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
+import { useOpeningStockTill } from "@/lib/posProducts";
+import { showToast } from "@/lib/showToast";
+import {
+  EmptyRow,
+  ListCard,
+  Pagination,
+  btn,
+  filterInput,
+  tdClass,
+  thClass,
+  theadClass,
+} from "@/components/ui/Application/Admin/listKit";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-const AddSubCategory = () => {
-  // ✅ EXACT MATCH WITH ZOD + API
-  const formSchema = zSchema.pick({
-    categoryId: true,
-    subcategory: true,
-    slug: true,
-  });
+const emptyForm = { categoryId: "", subcategory: "", slug: "" };
 
-  const [loading, setLoading] = useState(false);
-  const [categoryOption, setCategoryOption] = useState([]);
+export default function SubCategoryPage() {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
+  const till = useOpeningStockTill();
 
-  // Fetch categories
-  const { data: getCategory } = useFetch(
-    "/api/category?deleteType=SD&size=10000"
-  );
+  const [rows, setRows] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      categoryId: "",
-      subcategory: "",
-      slug: "",
-    },
-  });
-
-  // Category dropdown options
-  useEffect(() => {
-    if (getCategory?.success) {
-      const options = getCategory.data.map((cat) => ({
-        label: cat.name,
-        value: cat._id,
-      }));
-      setCategoryOption(options);
-    }
-  }, [getCategory]);
-
-  // ✅ Auto-generate slug from subcategory
-  useEffect(() => {
-    const name = form.getValues("subcategory");
-    if (name) {
-      form.setValue("slug", slugify(name, { lower: true }));
-    }
-  }, [form.watch("subcategory")]); // eslint-disable-line
-
-  const onSubmit = async (values) => {
+  const load = async () => {
     setLoading(true);
-
     try {
-      const { data } = await axios.post(
-        "/api/subcategory/create",
-        values
-      );
-
-      if (!data.success) throw new Error(data.message);
-
-      showToast("success", data.message);
-      form.reset();
+      const [subRes, catRes] = await Promise.all([
+        axios.get("/api/subcategory", { params: { deleteType: "SD", size: 10000, start: 0 } }),
+        axios.get("/api/category", { params: { deleteType: "SD", size: 10000, start: 0 } }),
+      ]);
+      if (subRes.data.success) setRows(subRes.data.data || []);
+      else showToast("error", subRes.data.message || t("Could not load sub categories", "সাব ক্যাটাগরি লোড হয়নি"));
+      if (catRes.data.success) setCategories(catRes.data.data || []);
     } catch (error) {
-      showToast("error", error.response?.data?.message || error.message);
+      showToast("error", error.response?.data?.message || t("Could not load sub categories", "সাব ক্যাটাগরি লোড হয়নি"));
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    setQ("");
+    setCategoryId("");
+    setPage(1);
+    load();
+  }, [language, till.id]);
+
+  const categoryName = (id) => categories.find((cat) => String(cat._id) === String(id))?.name || "—";
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (categoryId && String(row.categoryId) !== categoryId) return false;
+      if (!needle) return true;
+      return `${row.name} ${categoryName(row.categoryId)}`.toLowerCase().includes(needle);
+    });
+  }, [rows, q, categoryId, categories]);
+
+  const pageSize = 10;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pages);
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const save = async () => {
+    if (!form.categoryId || !form.subcategory.trim()) {
+      showToast("error", t("Category and sub category name are required", "ক্যাটাগরি ও সাব ক্যাটাগরির নাম লাগবে"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await axios.post("/api/subcategory/create", {
+        categoryId: form.categoryId,
+        subcategory: form.subcategory.trim(),
+        slug: form.slug.trim() || slugify(form.subcategory, { lower: true, strict: true }),
+      });
+      if (!data.success) throw new Error(data.message);
+      showToast("success", data.message || t("Sub category created", "সাব ক্যাটাগরি তৈরি হয়েছে"));
+      setOpen(false);
+      setForm(emptyForm);
+      load();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || error.message || t("Could not save sub category", "সাব ক্যাটাগরি সেভ হয়নি"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div>
-      <BreadCrumb breadcrumbData={breadcrumbData} />
+    <div className="space-y-4">
+      <ListCard
+        title={t("Sub Category List", "সাব ক্যাটাগরি তালিকা")}
+        actions={
+          <button
+            type="button"
+            className={btn.success}
+            onClick={() => {
+              setForm(emptyForm);
+              setOpen(true);
+            }}
+          >
+            <Plus size={14} /> {t("Add New Sub Category", "নতুন সাব ক্যাটাগরি")}
+          </button>
+        }
+      >
+        <form className="mb-4 flex flex-wrap items-center gap-2" onSubmit={(event) => event.preventDefault()}>
+          <select
+            value={categoryId}
+            onChange={(event) => {
+              setCategoryId(event.target.value);
+              setPage(1);
+            }}
+            className={`${filterInput} !w-48`}
+            aria-label={t("Category", "ক্যাটাগরি")}
+          >
+            <option value="">{t("All Categories", "সব ক্যাটাগরি")}</option>
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat._id}>{cat.name}</option>
+            ))}
+          </select>
+          <input
+            value={q}
+            onChange={(event) => {
+              setQ(event.target.value);
+              setPage(1);
+            }}
+            placeholder={t("Search sub category", "সাব ক্যাটাগরি খুঁজুন")}
+            className={`${filterInput} min-w-[220px] flex-1`}
+          />
+          <button type="submit" className={btn.info}>{t("Search", "খুঁজুন")}</button>
+          <button type="button" className={btn.warning} onClick={() => { setQ(""); setCategoryId(""); setPage(1); }}>
+            {t("Clear", "মুছুন")}
+          </button>
+        </form>
 
-      <Card className="p-0 rounded shadow-sm">
-        <CardHeader>
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold">Sub Category Setup</h1>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className={theadClass}>
+                <th className={thClass}>{t("SL", "ক্রম")}</th>
+                <th className={thClass}>{t("Sub Category", "সাব ক্যাটাগরি")}</th>
+                <th className={thClass}>{t("Category", "ক্যাটাগরি")}</th>
+                <th className={thClass}>{t("Slug", "স্লাগ")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={4} className={`${tdClass} py-8 text-center`}>{t("Loading...", "লোড হচ্ছে...")}</td></tr>}
+              {!loading && pageRows.length === 0 && (
+                <EmptyRow
+                  colSpan={4}
+                  title={q || categoryId ? t("No sub category matched", "এই খোঁজে কোনো সাব ক্যাটাগরি নেই") : t("No sub category yet", "এখনো কোনো সাব ক্যাটাগরি নেই")}
+                />
+              )}
+              {!loading &&
+                pageRows.map((row, index) => (
+                  <tr key={row._id} className="hover:bg-[#f5f7f9] dark:hover:bg-muted/50">
+                    <td className={tdClass}>{(safePage - 1) * pageSize + index + 1}</td>
+                    <td className={`${tdClass} font-medium`}>{row.name}</td>
+                    <td className={tdClass}>{categoryName(row.categoryId)}</td>
+                    <td className={tdClass}>{row.slug}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination
+          page={safePage}
+          pages={pages}
+          from={filtered.length ? (safePage - 1) * pageSize + 1 : 0}
+          count={pageRows.length}
+          total={filtered.length}
+          onPage={setPage}
+        />
+      </ListCard>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("New Sub Category", "নতুন সাব ক্যাটাগরি")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="block space-y-1 text-[13px] text-[#495057]">
+              {t("Category", "ক্যাটাগরি")}
+              <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className={filterInput}>
+                <option value="">{t("Select category", "ক্যাটাগরি বাছুন")}</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1 text-[13px] text-[#495057]">
+              {t("Sub Category Name", "সাব ক্যাটাগরির নাম")}
+              <input
+                value={form.subcategory}
+                onChange={(e) => setForm({
+                  ...form,
+                  subcategory: e.target.value,
+                  slug: slugify(e.target.value, { lower: true, strict: true }),
+                })}
+                placeholder={t("Enter sub category name", "সাব ক্যাটাগরির নাম লিখুন")}
+                className={filterInput}
+              />
+            </label>
+            <label className="block space-y-1 text-[13px] text-[#495057]">
+              {t("Slug", "স্লাগ")}
+              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} className={filterInput} />
+            </label>
           </div>
-        </CardHeader>
-
-        
-
-        <CardContent className="pb-5">
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="grid gap-5 max-w-md mx-auto"
-            >
-              {/* Category */}
-              <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Select
-                        options={categoryOption}
-                        selected={field.value}
-                        setSelected={field.onChange}
-                        isMulti={false}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Subcategory Name */}
-              <FormField
-                control={form.control}
-                name="subcategory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sub Category Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter sub category name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Slug */}
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Slug</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="Auto generated slug"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <ButtonLoading
-                type="submit"
-                loading={loading}
-                text="Add Sub Category"
-              />
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <button type="button" className={btn.secondary} onClick={() => setOpen(false)}>{t("Cancel", "বাতিল")}</button>
+            <button type="button" className={btn.success} onClick={save} disabled={saving}>
+              {saving ? t("Saving...", "সেভ হচ্ছে...") : t("Save", "সেভ")}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-};
-
-export default AddSubCategory;
+}

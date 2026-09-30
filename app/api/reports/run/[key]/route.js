@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { REPORTS } from "@/lib/reportEngine";
+import { catalogForTill } from "@/lib/tillCatalog";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const id = (value) => (mongoose.isValidObjectId(value) ? String(value) : "");
@@ -17,7 +18,7 @@ const monthRange = (month) => {
 };
 
 /** What each filter's dropdown lists, fetched only for filters the report shows */
-async function optionsFor(filters) {
+async function optionsFor(filters, showroomId) {
   const db = mongoose.connection.db;
   const list = (collection, query, fields = { name: 1 }) =>
     db.collection(collection).find(query).project(fields).sort({ name: 1 }).toArray();
@@ -36,9 +37,13 @@ async function optionsFor(filters) {
   }
   if (filters.includes("supplier")) options.suppliers = await list("suppliers", { deletedAt: null });
   if (filters.includes("expense_type")) options.expenseTypes = await list("expensecategories", { deletedAt: null });
-  if (filters.includes("category")) options.categories = await list("categories", {});
-  if (filters.includes("brand")) {
-    options.brands = (await db.collection("products").distinct("brand", { deletedAt: null, brand: { $nin: ["", null] } })).sort();
+  if (filters.includes("category") || filters.includes("brand")) {
+    const scope = showroomId || "all";
+    const catalog = await catalogForTill(scope);
+    if (filters.includes("category")) {
+      options.categories = catalog.categories.map((row) => ({ _id: row._id, name: row.name }));
+    }
+    if (filters.includes("brand")) options.brands = catalog.brands;
   }
   if (filters.includes("user")) {
     options.users = (await db.collection("posorders").distinct("soldBy", { soldBy: { $nin: ["", null] } })).sort();
@@ -110,7 +115,7 @@ export async function GET(req, { params }) {
       title: report.title,
       group: report.group,
       filters,
-      options: await optionsFor(filters),
+      options: await optionsFor(filters, id(q.get("showroomId")) || (q.get("location") === "warehouse" ? "warehouse" : id(q.get("location")))),
       columns,
       rows,
       totals,

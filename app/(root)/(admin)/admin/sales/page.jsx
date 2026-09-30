@@ -39,7 +39,7 @@ const TABS = [
 ];
 const TYPE_LABEL = { retail: "Buyer", dealer: "Dealer", subDealer: "Sub Dealer", wholesaler: "Wholesaler" };
 const STATUS = { Paid: "bg-[#e8f7f0] text-[#0b8a45]", "Partial Due": "bg-[#fff6dd] text-[#9a6a00]", Due: "bg-[#fff1f1] text-[#d63939]" };
-const EMPTY = { paymentStatus: "", soldBy: "", from: "", to: "", search: "" };
+const EMPTY = { paymentStatus: "", soldBy: "", from: "", to: "", search: "", subcategory: "" };
 
 const fmt = (v) => {
   const d = new Date(v);
@@ -73,16 +73,52 @@ function SaleList() {
   const [result, setResult] = useState(null);
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [subcategories, setSubcategories] = useState([]);
   const till = useOpeningStockTill();
+  const partyTab = tab === "dealer" || tab === "subDealer";
 
   const query = (extra) => ({
     ...(tab === "exchange" ? { exchange: 1 } : tab && { customerType: tab }),
     ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
+    showroomId: till.id,
     ...extra,
   });
 
   useEffect(() => {
+    setDraft((current) => ({ ...current, search: "", subcategory: "" }));
+    setFilters((current) => ({ ...current, search: "", subcategory: "" }));
+    setPage(1);
+  }, [till.id]);
+
+  useEffect(() => {
+    if (partyTab) return undefined;
+    setDraft((current) => (current.subcategory ? { ...current, subcategory: "" } : current));
+    setFilters((current) => (current.subcategory ? { ...current, subcategory: "" } : current));
+  }, [partyTab]);
+
+  useEffect(() => {
+    if (!till.id) {
+      setSubcategories([]);
+      return undefined;
+    }
     let cancelled = false;
+    setSubcategories([]);
+    fetch(`/api/pos/catalog?showroomId=${encodeURIComponent(till.id)}`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.success) setSubcategories(data.subcategories || []);
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [till.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setResult(null);
     const params = {
       ...(tab === "exchange" ? { exchange: 1 } : tab && { customerType: tab }),
       ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
@@ -219,6 +255,21 @@ function SaleList() {
           <option value="due">Due</option>
         </select>
         <DateRange className="w-full sm:w-[300px]" start={draft.from} end={draft.to} onStart={(v) => setDraft({ ...draft, from: v })} onEnd={(v) => setDraft({ ...draft, to: v })} />
+        {partyTab && (
+          <select
+            value={draft.subcategory}
+            onChange={(e) => setDraft({ ...draft, subcategory: e.target.value })}
+            className={`${inputClass} !w-48`}
+            aria-label={tab === "subDealer" ? "Sub Dealer sub category" : "Dealer sub category"}
+          >
+            <option value="">All Sub Categories</option>
+            {subcategories.map((row) => (
+              <option key={row._id} value={row._id}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           value={draft.search}
           onChange={(e) => setDraft({ ...draft, search: e.target.value })}

@@ -415,6 +415,7 @@ export async function GET(req) {
 
     return NextResponse.json({
       success: true,
+      showroomId: scope || "",
       kpis: {
         todaySales: t.sales || 0,
         todayOrders: t.orders || 0,
@@ -437,6 +438,7 @@ export async function GET(req) {
         expiringSoon: orderFacets.expiring.length,
         pendingDealerOrders: await PartnerOrder.countDocuments({
           status: { $in: ["pending", "confirmed"] },
+          ...(showroom ? { showroomId: showroom } : isWarehouse ? { showroomId: null } : {}),
         }),
       },
       salesChart,

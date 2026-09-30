@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import POSOrder from "@/models/posorder.model";
+import ProductModel from "@/models/Product.model";
 import SaleReturn from "@/models/SaleReturn.model";
 import Showroom from "@/models/Showroom.model";
 import { connectDB } from "@/lib/databaseconnection";
@@ -54,6 +55,15 @@ export async function GET(req) {
       }
     }
     if (q.get("soldBy")) filter.soldBy = q.get("soldBy");
+    if (mongoose.isValidObjectId(q.get("subcategory"))) {
+      const inGroup = await ProductModel.find({
+        subcategory: new mongoose.Types.ObjectId(q.get("subcategory")),
+        deletedAt: null,
+      })
+        .select("_id")
+        .lean();
+      filter["items.productId"] = { $in: inGroup.map((product) => product._id) };
+    }
     Object.assign(filter, PAYMENT[q.get("paymentStatus")] || {});
 
     const from = q.get("from");

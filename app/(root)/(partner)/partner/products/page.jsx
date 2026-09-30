@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import axios from "axios";
-import { useInfiniteQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Search, Loader2, Plus, Minus, ShoppingCart, ShieldCheck, PackageSearch } from "lucide-react";
 import { usePartnerCart } from "@/components/ui/Application/Partner/PartnerCart";
-import { posBrandsQueryOptions, posCategoriesQueryOptions } from "@/lib/posProducts";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { formatWarrantyPeriod } from "@/lib/warranty";
 import { skipOptimize } from "@/lib/imageSrc";
 import { money } from "@/lib/partnerQueries";
@@ -122,10 +122,20 @@ function ProductCard({ product }) {
 
 export default function PartnerProducts() {
   const cart = usePartnerCart();
+  const till = useOpeningStockTill();
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [brand, setBrand] = useState("");
+
+  useEffect(() => {
+    setSearch("");
+    setQ("");
+    setCategoryId("");
+    setSubcategoryId("");
+    setBrand("");
+  }, [till.id]);
 
   // search waits until typing stops
   useEffect(() => {
@@ -133,23 +143,46 @@ export default function PartnerProducts() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: categories = [] } = useQuery({ ...posCategoriesQueryOptions(), refetchOnWindowFocus: false });
-  const { data: brands = [] } = useQuery({ ...posBrandsQueryOptions(), refetchOnWindowFocus: false });
-
-  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["partner-products", q, categoryId, brand],
+  const { data, isLoading, isSuccess, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["partner-products", till.id, q, categoryId, subcategoryId, brand],
     queryFn: async ({ pageParam }) => {
-      const params = new URLSearchParams({ page: String(pageParam), q, categoryId, brand });
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        q,
+        categoryId,
+        subcategoryId,
+        brand,
+        showroomId: till.id && till.id !== "warehouse" ? till.id : "",
+      });
       const { data } = await axios.get(`/api/partner/products?${params}`);
       if (!data.success) throw new Error(data.message);
       return data;
     },
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
-    placeholderData: keepPreviousData,
+    enabled: !!till.id,
   });
 
-  const products = data?.pages.flatMap((p) => p.items) ?? [];
+  const head = isSuccess ? data?.pages?.[0] : null;
+  const categories = head?.categories || [];
+  const brands = head?.brands || [];
+  const subcategories = (head?.subcategories || []).filter(
+    (row) => !categoryId || String(row.categoryId) === String(categoryId),
+  );
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    if (brand && !brands.some((name) => name.toLowerCase() === brand.toLowerCase())) setBrand("");
+    if (categoryId && !categories.some((row) => String(row._id) === String(categoryId))) {
+      setCategoryId("");
+      setSubcategoryId("");
+    }
+    if (subcategoryId && !subcategories.some((row) => String(row._id) === String(subcategoryId))) {
+      setSubcategoryId("");
+    }
+  }, [isSuccess, brands, categories, subcategories, brand, categoryId, subcategoryId]);
+
+  const products = isSuccess ? data?.pages.flatMap((p) => p.items) ?? [] : [];
   const selectClass = "h-10 rounded-lg border bg-card px-3 text-sm outline-none focus:border-primary";
 
   return (
@@ -166,21 +199,34 @@ export default function PartnerProducts() {
         )}
       </div>
 
-      <div className="grid gap-2 rounded-2xl border bg-card p-3 sm:grid-cols-[1fr_200px_200px]">
-        <label className="flex h-10 items-center gap-2 rounded-lg border px-3 focus-within:border-primary">
+      <div className="grid gap-2 rounded-2xl border bg-card p-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="flex h-10 items-center gap-2 rounded-lg border px-3 focus-within:border-primary sm:col-span-2 xl:col-span-1">
           <Search className="size-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </label>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={selectClass}>
+        <select
+          value={categoryId}
+          onChange={(e) => {
+            setCategoryId(e.target.value);
+            setSubcategoryId("");
+          }}
+          className={selectClass}
+        >
           <option value="">All Categories</option>
           {categories.map((c) => (
             <option key={c._id} value={c._id}>{c.name}</option>
           ))}
         </select>
+        <select value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} className={selectClass}>
+          <option value="">All Sub Categories</option>
+          {subcategories.map((row) => (
+            <option key={row._id} value={row._id}>{row.name}</option>
+          ))}
+        </select>
         <select value={brand} onChange={(e) => setBrand(e.target.value)} className={selectClass}>
           <option value="">All Brands</option>
           {brands.map((b) => (
-            <option key={b}>{b}</option>
+            <option key={b} value={b}>{b}</option>
           ))}
         </select>
       </div>

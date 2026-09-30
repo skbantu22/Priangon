@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
+import { oneLine } from "@/lib/labels";
 import { createPortal } from "react-dom";
 import {
   ChevronDown,
@@ -85,18 +87,20 @@ export function DateRange({ start, end, onStart, onEnd, className = "" }) {
 
 /** PDF · Excel · Print as small coloured icon boxes */
 export function ExportButtons({ onPdf, onExcel, onPrint, disabled }) {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
   const box =
     "flex h-[34px] w-[34px] items-center justify-center rounded-[4px] text-white shadow-sm transition hover:brightness-110 disabled:opacity-60";
 
   return (
     <div className="flex items-center gap-[6px]">
-      <button type="button" disabled={disabled} onClick={onPdf} title="PDF" aria-label="Export PDF" className={`${box} bg-[#e74c3c]`}>
+      <button type="button" disabled={disabled} onClick={onPdf} title={t("PDF", "পিডিএফ")} aria-label={t("Export PDF", "পিডিএফ এক্সপোর্ট")} className={`${box} bg-[#e74c3c]`}>
         <FileText size={17} />
       </button>
-      <button type="button" disabled={disabled} onClick={onExcel} title="Excel" aria-label="Export Excel" className={`${box} bg-[#1d6f42]`}>
+      <button type="button" disabled={disabled} onClick={onExcel} title={t("Excel", "এক্সেল")} aria-label={t("Export Excel", "এক্সেল এক্সপোর্ট")} className={`${box} bg-[#1d6f42]`}>
         <FileSpreadsheet size={17} />
       </button>
-      <button type="button" disabled={disabled} onClick={onPrint} title="Print" aria-label="Print" className={`${box} bg-[#3d5afe]`}>
+      <button type="button" disabled={disabled} onClick={onPrint} title={t("Print", "প্রিন্ট")} aria-label={t("Print", "প্রিন্ট")} className={`${box} bg-[#3d5afe]`}>
         <Printer size={17} />
       </button>
     </div>
@@ -105,6 +109,8 @@ export function ExportButtons({ onPdf, onExcel, onPrint, disabled }) {
 
 /** "Showing 1 To 10 Of 58 Entries" and the page buttons */
 export function Pagination({ page, pages, from, count, total, onPage }) {
+  const { language } = useLanguage();
+  const t = (en, bn) => oneLine(en, bn, language);
   const numbers = [];
 
   for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) numbers.push(p);
@@ -115,7 +121,7 @@ export function Pagination({ page, pages, from, count, total, onPage }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 pt-[14px] text-[14px]">
       <span>
-        Showing {total ? from : 0} To {total ? from + count - 1 : 0} Of {total} Entries
+        {t("Showing", "দেখাচ্ছে")} {total ? from : 0} {t("To", "থেকে")} {total ? from + count - 1 : 0} {t("Of", "মোট")} {total} {t("Entries", "টি")}
       </span>
 
       {pages > 1 && (
