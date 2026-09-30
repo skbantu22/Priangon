@@ -988,16 +988,13 @@ export default function POSPage() {
         showroomId={activeShowroomId}
         currentPosCart={cart}
         onOpenCheckout={(checkoutPayload) => {
-          setIsExchangeMode(true);
-          setLocalExchangeTotal(checkoutPayload?.total ?? 0);
-          setExchangePayloadCache(checkoutPayload);
-
           if (checkoutPayload?.exchangeData) {
             handleExchange(checkoutPayload.exchangeData);
           }
-
           setIsExchangeOpen(false);
-          setIsCheckoutOpen(true);
+          setIsExchangeMode(false);
+          setIsCheckoutOpen(false);
+          setExchangePayloadCache(null);
         }}
       />
     </div>

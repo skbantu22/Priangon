@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
@@ -22,6 +22,7 @@ import {
   today,
   useSuppliers,
 } from "@/components/ui/Application/Admin/purchase/purchaseKit";
+import PurchasePosPicker from "@/components/ui/Application/Admin/purchase/PurchasePosPicker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -83,6 +84,7 @@ function AddPurchase() {
   const [imeiRow, setImeiRow] = useState(null);
   const [imeiText, setImeiText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(params.get("po") ? "form" : "pick");
 
   useEffect(() => {
     axios
@@ -95,6 +97,15 @@ function AddPurchase() {
   useEffect(() => {
     setStockInTo(till.name);
   }, [till.name]);
+
+  const tillSeen = useRef(till.id);
+  useEffect(() => {
+    if (tillSeen.current === till.id) return;
+    tillSeen.current = till.id;
+    if (params.get("po")) return;
+    setItems([]);
+    setStep("pick");
+  }, [till.id, params]);
 
   // "Receive" on a purchase order opens this screen with ?po=<id>
   useEffect(() => {
@@ -109,6 +120,7 @@ function AddPurchase() {
         if (po.status !== "pending") return showToast("error", `${po.orderNumber} is already ${po.status}`);
 
         setOrder(po);
+        setStep("form");
         setHead((h) => ({ ...h, supplierId: String(po.supplierId?._id || po.supplierId), referenceNo: po.orderNumber }));
         setItems(
           po.items.map((item) => ({
@@ -242,6 +254,33 @@ function AddPurchase() {
 
   const setH = (key) => (e) => setHead({ ...head, [key]: e.target.value });
 
+  if (step === "pick") {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold">Add products</h1>
+            <p className="text-sm text-muted-foreground">Tap a product, the same way as the POS. The purchase form opens after that.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href={ADMIN_PURCHASE_SHOW} className={btn.primary}>
+              <List size={14} /> Purchase List
+            </Link>
+            <button
+              type="button"
+              disabled={!items.length}
+              onClick={() => setStep("form")}
+              className={`${btn.success} disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              Add product to Purchase Product{items.length ? ` · ${items.length}` : ""}
+            </button>
+          </div>
+        </div>
+        <PurchasePosPicker onPick={addItem} showroomId={till.id} picked={items} />
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={save} noValidate className="space-y-4">
       <ListCard
@@ -306,6 +345,11 @@ function AddPurchase() {
           </p>
         )}
 
+        <div className="mb-3 flex justify-end">
+          <button type="button" onClick={() => setStep("pick")} className={btn.warning}>
+            Add more products
+          </button>
+        </div>
         <ProductSearch onPick={addItem} />
 
         <div className="mt-3 overflow-x-auto">

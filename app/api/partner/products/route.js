@@ -5,6 +5,7 @@ import { partnerPrice } from "@/lib/priceTiers";
 import { catalogForTill } from "@/lib/tillCatalog";
 import Product from "@/models/Product.model";
 import ProductVariant from "@/models/ProductVariant.model ";
+import Showroom from "@/models/Showroom.model";
 import ShowroomStock from "@/models/ShowroomStock";
 import Media from "@/models/Media.model";
 
@@ -12,13 +13,14 @@ const PAGE_SIZE = 24;
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isId = (value) => mongoose.Types.ObjectId.isValid(String(value || ""));
 
-const emptyPage = (page, showroomId) =>
+const emptyPage = (page, showroomId, branches = []) =>
   NextResponse.json({
     success: true,
     items: [],
     page,
     hasMore: false,
     showroomId: showroomId || "",
+    branches,
     brands: [],
     categories: [],
     subcategories: [],
@@ -40,10 +42,15 @@ export async function GET(req) {
     const subcategoryId = sp.get("subcategoryId");
     const brand = (sp.get("brand") || "").trim();
 
+    const branches = (
+      await Showroom.find({ isActive: { $ne: false } }).select("name").sort({ name: 1 }).lean()
+    ).map((row) => ({ _id: String(row._id), name: row.name }));
+    const open = new Set(branches.map((row) => row._id));
     const home = partner.user?.showroomId ? String(partner.user.showroomId) : "";
     const asked = sp.get("showroomId") || "";
-    const showroomId = home || (isId(asked) ? asked : "");
-    if (!showroomId) return emptyPage(page, "");
+    // The dropdown can pick any open branch. A missing pick stays on their own branch.
+    const showroomId = open.has(asked) ? asked : open.has(home) ? home : branches[0]?._id || "";
+    if (!showroomId) return emptyPage(page, "", branches);
 
     const stockRows = await ShowroomStock.find({ showroomId, stock: { $gt: 0 } })
       .select("productId variantId stock")
@@ -52,13 +59,41 @@ export async function GET(req) {
     const productIds = [...new Set(stockRows.map((row) => row.productId).filter(Boolean))];
     const catalog = await catalogForTill(showroomId);
 
-    if (!productIds.length) return emptyPage(page, showroomId);
+    if (!productIds.length) return emptyPage(page, showroomId, branches);
 
-    const query = { deletedAt: null, _id: { $in: productIds } };
+    // A search looks through the whole branch, the way POS search does.
+    // Category, subcategory and brand only narrow the list when the box is empty.
+    let matchedIds = productIds;
+    if (q) {
+      const like = { $regex: escapeRegex(q), $options: "i" };
+      const [named, coded] = await Promise.all([
+        Product.find({
+          deletedAt: null,
+          _id: { $in: productIds },
+          $or: [{ name: like }, { brand: like }],
+        })
+          .select("_id")
+          .lean(),
+        ProductVariant.find({
+          deletedAt: null,
+          _id: { $in: stockRows.map((row) => row.variantId) },
+          $or: [{ barcode: like }, { sku: like }],
+        })
+          .select("product")
+          .lean(),
+      ]);
+      matchedIds = [
+        ...new Set([
+          ...named.map((row) => String(row._id)),
+          ...coded.map((row) => String(row.product)),
+        ]),
+      ];
+    }
+
+    const query = { deletedAt: null, _id: { $in: matchedIds } };
     if (isId(categoryId)) query.category = categoryId;
     if (isId(subcategoryId)) query.subcategory = subcategoryId;
     if (brand) query.brand = { $regex: `^${escapeRegex(brand)}$`, $options: "i" };
-    if (q) query.name = { $regex: escapeRegex(q), $options: "i" };
 
     const products = await Product.find(query)
       .select("name brand category subcategory sellingPrice mrp dealerPrice subDealerPrice wholesalerPrice media variants warranty")
@@ -122,6 +157,7 @@ export async function GET(req) {
       page,
       hasMore,
       showroomId,
+      branches,
       partnerType: partner.type,
       brands: catalog.brands,
       categories: catalog.categories,

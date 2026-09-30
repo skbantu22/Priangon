@@ -104,6 +104,7 @@ export async function GET() {
     type,
     typeLabel: CUSTOMER_TYPES[type].short,
     canOrder: user.canOrder !== false,
+    showroomId: user.showroomId ? String(user.showroomId) : "",
     stats: {
       invoices: t.invoices || 0,
       spent: t.spent || 0,

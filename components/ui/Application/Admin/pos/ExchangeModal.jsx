@@ -386,7 +386,7 @@ export default function ExchangeModal({
       <div className="bg-white w-full max-w-7xl shadow-2xl rounded-none flex flex-col max-h-[92vh]">
         {/* HEADER */}
         <div className="bg-orange-500 text-white p-4 text-center font-bold text-xl flex-shrink-0 relative">
-          🔄 Showroom Product Exchange Terminal
+          Exchange
           <button
             type="button"
             onClick={onClose}
@@ -703,7 +703,7 @@ export default function ExchangeModal({
                 : "bg-orange-600 hover:bg-orange-700"
             }`}
           >
-            Proceed to Payment / Refund ➔
+            Complete Exchange
           </button>
         </div>
       </div>

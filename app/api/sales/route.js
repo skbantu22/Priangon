@@ -85,7 +85,7 @@ export async function GET(req) {
 
     const [orders, total, sums] = await Promise.all([
       POSOrder.find(filter)
-        .select("orderNumber createdAt customerId customerName customerType phone soldBy items.qty total paidAmount dueAmount remark orderType exchange.returnedTotal showroomId soldFrom locationName")
+        .select("orderNumber createdAt customerId customerName customerType phone soldBy items.qty total paidAmount dueAmount remark orderType status exchange.originalOrderId exchange.returnedTotal showroomId soldFrom locationName")
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -115,6 +115,12 @@ export async function GET(req) {
       ).map((r) => [String(r._id), r.total]),
     );
 
+    const originalIds = orders.map((o) => o.exchange?.originalOrderId).filter(Boolean);
+    const originals = originalIds.length
+      ? await POSOrder.find({ _id: { $in: originalIds } }).select("orderNumber").lean()
+      : [];
+    const originalNumber = new Map(originals.map((row) => [String(row._id), row.orderNumber]));
+
     const missingName = [...new Set(orders.filter((o) => !o.locationName && o.showroomId).map((o) => String(o.showroomId)))];
     const named = missingName.length
       ? await Showroom.find({ _id: { $in: missingName } }).select("name").lean()
@@ -129,6 +135,9 @@ export async function GET(req) {
         itemCount: (o.items || []).reduce((sum, i) => sum + (i.qty || 0), 0),
         paymentStatus: paymentStatus(o.paidAmount, o.dueAmount),
         returned: returned.get(String(o._id)) || 0,
+        fromInvoice: originalNumber.get(String(o.exchange?.originalOrderId || "")) || "",
+        toInvoice: o.orderNumber,
+        exchangeStatus: o.orderType === "exchange" ? "Approved" : "",
         locationName:
           o.locationName ||
           showroomName.get(String(o.showroomId || "")) ||

@@ -199,14 +199,14 @@ function SaleList() {
 
   return (
     <ListCard
-      title={title === "All Sales" ? "Sale List" : `${title} Sales`}
+      title={tab === "exchange" ? "Exchanges" : title === "All Sales" ? "Sale List" : `${title} Sales`}
       actions={
         <Link href="/admin/pos" className={btn.primary}>
           <ShoppingCart size={14} /> POS
         </Link>
       }
     >
-      <div className="mb-4 flex flex-wrap gap-[6px]" role="tablist">
+      {tab !== "exchange" && <div className="mb-4 flex flex-wrap gap-[6px]" role="tablist">
         {TABS.map(([key, label]) => (
           <button
             key={label}
@@ -223,7 +223,7 @@ function SaleList() {
             {label}
           </button>
         ))}
-      </div>
+      </div>}
 
       <form
         onSubmit={(e) => {
@@ -312,7 +312,7 @@ function SaleList() {
         )}
       </div>
 
-      <div className="mt-3 space-y-2.5 md:hidden">
+      {tab !== "exchange" && <div className="mt-3 space-y-2.5 md:hidden">
         {!result && [1, 2, 3].map((n) => <div key={n} className="h-[96px] animate-pulse rounded-[6px] bg-slate-100 dark:bg-muted" />)}
         {result && !rows.length && (
           <div className="rounded-[6px] border border-dashed border-[#d4dae0] px-4 py-8 text-center text-[15px] font-medium text-[#495057]">
@@ -349,8 +349,65 @@ function SaleList() {
             </dl>
           </article>
         ))}
-      </div>
+      </div>}
 
+      {tab === "exchange" ? (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="bg-[#00801a] text-white">
+                {["SL", "From Invoice No", "To Invoice No", "Sale Date", "Customer", "Amount", "Status", "Action"].map((h) => (
+                  <th key={h} className="px-3 py-2 text-[13px] font-semibold">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {!result &&
+                [1, 2, 3].map((n) => (
+                  <tr key={n}>
+                    <td colSpan={8} className={tdClass}>
+                      <div className="h-4 animate-pulse bg-slate-100 dark:bg-muted" />
+                    </td>
+                  </tr>
+                ))}
+              {result && !rows.length && <EmptyRow colSpan={8} title="No exchanges found" hint="Complete an exchange from the POS." />}
+              {rows.map((row, i) => (
+                <tr key={row._id} className="border-b border-[#e6efe8] hover:bg-[#f5f7f9] dark:hover:bg-muted/50">
+                  <td className={tdClass}>{result.from + i}</td>
+                  <td className={tdClass}>{row.fromInvoice || ""}</td>
+                  <td className={tdClass}>
+                    <a href={saleInvoiceHref(row)} target="_blank" rel="noopener noreferrer" className={SALE_INVOICE_LINK_CLASS}>
+                      {row.toInvoice || row.orderNumber}
+                    </a>
+                  </td>
+                  <td className={`${tdClass} whitespace-nowrap`}>
+                    {new Date(row.createdAt).toLocaleDateString("en-CA")}
+                  </td>
+                  <td className={tdClass}>{row.customerName || "Guest"}</td>
+                  <td className={tdClass}>{money(row.total)}</td>
+                  <td className={tdClass}>
+                    <span className="px-2 py-0.5 text-[12px] font-semibold text-[#0b8a45]">{row.exchangeStatus || "Approved"}</span>
+                  </td>
+                  <td className={tdClass}>
+                    <ActionMenu items={actions(row)} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            {rows.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={5} className={tdClass} />
+                  <td className={`${tdClass} font-semibold`}>Total {money(result.summary.total)}</td>
+                  <td colSpan={2} className={tdClass} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      ) : (
       <div className="mt-3 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
           <thead>
@@ -421,6 +478,7 @@ function SaleList() {
           )}
         </table>
       </div>
+      )}
 
       {result && <Pagination page={page} pages={result.pages} from={result.from} count={rows.length} total={result.total} onPage={setPage} />}
     </ListCard>

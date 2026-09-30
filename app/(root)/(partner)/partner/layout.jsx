@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/Application/Partner/PartnerCart";
 import sbtMark from "@/public/assets/sbt-mark.png";
 import { partnerMeQuery } from "@/lib/partnerQueries";
+import { posShowroomsQueryOptions } from "@/lib/posProducts";
+import { usePartnerBranchId, writePartnerBranch } from "@/lib/partnerBranch";
 
 const NAV = [
   { href: "/partner", label: "Dashboard", icon: LayoutDashboard },
@@ -38,6 +40,19 @@ function Header() {
   const dispatch = useDispatch();
   const cart = usePartnerCart();
   const { data: me } = useQuery(partnerMeQuery);
+  const { data: showrooms = [] } = useQuery(posShowroomsQueryOptions());
+  const picked = usePartnerBranchId();
+  const branches = showrooms.filter((row) => row?._id && row.isActive !== false);
+  const home = me?.showroomId && branches.some((row) => String(row._id) === String(me.showroomId))
+    ? String(me.showroomId)
+    : "";
+  const branchId = branches.some((row) => String(row._id) === picked)
+    ? picked
+    : home || (branches[0] ? String(branches[0]._id) : "");
+
+  useEffect(() => {
+    if (branchId && branchId !== picked) writePartnerBranch(branchId);
+  }, [branchId, picked]);
 
   const signOut = async () => {
     try {
@@ -82,6 +97,22 @@ function Header() {
             </Link>
           ))}
         </nav>
+
+        {branches.length > 0 && (
+          <select
+            value={branchId}
+            onChange={(event) => writePartnerBranch(event.target.value)}
+            aria-label="Branch"
+            title="Branch"
+            className="h-9 max-w-[160px] shrink-0 rounded-lg bg-white px-2 text-sm font-bold text-gray-900 outline-none sm:max-w-[220px]"
+          >
+            {branches.map((branch) => (
+              <option key={branch._id} value={String(branch._id)}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <Link
           href="/partner/cart"

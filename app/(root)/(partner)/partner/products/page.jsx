@@ -5,9 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import axios from "axios";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Search, Loader2, Plus, Minus, ShoppingCart, ShieldCheck, PackageSearch } from "lucide-react";
+import { Search, Plus, Minus, ShoppingCart, ShieldCheck, PackageSearch } from "lucide-react";
 import { usePartnerCart } from "@/components/ui/Application/Partner/PartnerCart";
-import { useOpeningStockTill } from "@/lib/posProducts";
+import { usePartnerBranchId } from "@/lib/partnerBranch";
 import { formatWarrantyPeriod } from "@/lib/warranty";
 import { skipOptimize } from "@/lib/imageSrc";
 import { money } from "@/lib/partnerQueries";
@@ -89,45 +89,101 @@ function VariantRow({ product, variant }) {
   );
 }
 
-function ProductCard({ product }) {
-  const w = product.warranty;
-  const totalStock = product.variants.reduce((s, v) => s + v.stock, 0);
+function PosTile({ product, open, onOpen }) {
+  const cart = usePartnerCart();
+  const stock = product.variants.reduce((sum, variant) => sum + variant.stock, 0);
+  const prices = product.variants.map((variant) => variant.price).filter((price) => price > 0);
+  const minPrice = prices.length ? Math.min(...prices) : 0;
+  const maxPrice = prices.length ? Math.max(...prices) : 0;
+  const warranty = product.warranty;
+  const warrantyText = warranty?.type !== "none" && warranty?.months > 0 ? formatWarrantyPeriod(warranty.months) : "";
+  const stockText = stock <= 0 ? "Out of stock" : stock <= 5 ? `Low Stock (${stock})` : `In Stock (${stock})`;
+  const stockClass = stock <= 0 ? "text-red-500" : stock <= 5 ? "text-amber-600" : "text-emerald-600";
+
+  const add = (event) => {
+    event.stopPropagation();
+    const inStock = product.variants.filter((variant) => variant.stock > 0);
+    if (inStock.length !== 1) {
+      onOpen();
+      return;
+    }
+    const variant = inStock[0];
+    const inCart = cart?.items.find((item) => item.variantId === variant._id)?.qty || 0;
+    if (variant.stock - inCart <= 0) return;
+    cart.add(
+      {
+        variantId: variant._id,
+        productId: product._id,
+        name: product.name,
+        image: variant.image || product.image,
+        color: variant.color,
+        size: variant.size,
+        price: variant.price,
+        stock: variant.stock,
+      },
+      1,
+    );
+    showToast("success", `${product.name} added to your order`);
+  };
+
   return (
-    <div className="flex flex-col rounded-2xl border bg-card p-4">
-      <div className="flex gap-3">
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-linear-to-b from-violet-50 to-white">
-          <Image src={product.image} alt={product.name} fill sizes="80px" className="object-contain p-1" unoptimized={skipOptimize(product.image)} />
-        </div>
+    <div
+      onClick={onOpen}
+      className="group relative flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5"
+    >
+      {product.variants.length > 1 && (
+        <span className="absolute right-2 top-2 z-10 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+          {product.variants.length} options
+        </span>
+      )}
+      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-linear-to-b from-violet-50 to-white">
+        <Image src={product.image} alt={product.name} fill sizes="180px" className="object-contain p-2" unoptimized={skipOptimize(product.image)} />
+      </div>
+      {warrantyText && (
+        <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+          <ShieldCheck className="size-3" /> {warrantyText}
+        </span>
+      )}
+      {product.brand && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{product.brand}</p>}
+      <h3 className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 ${product.brand ? "" : "mt-2"}`}>{product.name}</h3>
+      <div className="mt-1 flex items-end justify-between gap-2">
         <div className="min-w-0">
-          {product.brand && <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{product.brand}</p>}
-          <h3 className="line-clamp-2 font-semibold leading-5">{product.name}</h3>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{totalStock} pcs in stock</span>
-            {w?.type !== "none" && w?.months > 0 && (
-              <span className="flex items-center gap-1 text-emerald-700">
-                <ShieldCheck className="size-3.5" /> {formatWarrantyPeriod(w.months)} warranty
-              </span>
-            )}
+          <p className="truncate text-[17px] font-bold text-primary">
+            {money(minPrice)}
+            {maxPrice > minPrice && <span className="text-[12px] font-normal"> – {money(maxPrice)}</span>}
           </p>
+          <p className={`mt-0.5 text-[12px] font-medium ${stockClass}`}>{stockText}</p>
         </div>
+        <button
+          type="button"
+          onClick={add}
+          disabled={stock <= 0}
+          title="Add to order"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-md shadow-primary/30 hover:brightness-110 disabled:bg-gray-300"
+        >
+          <Plus className="size-4" strokeWidth={3} />
+        </button>
       </div>
-      <div className="mt-3">
-        {product.variants.map((v) => (
-          <VariantRow key={v._id} product={product} variant={v} />
-        ))}
-      </div>
+      {open && (
+        <div className="mt-2" onClick={(event) => event.stopPropagation()}>
+          {product.variants.map((variant) => (
+            <VariantRow key={variant._id} product={product} variant={variant} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function PartnerProducts() {
   const cart = usePartnerCart();
-  const till = useOpeningStockTill();
+  const branchId = usePartnerBranchId();
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [brand, setBrand] = useState("");
+  const [openId, setOpenId] = useState("");
 
   useEffect(() => {
     setSearch("");
@@ -135,7 +191,7 @@ export default function PartnerProducts() {
     setCategoryId("");
     setSubcategoryId("");
     setBrand("");
-  }, [till.id]);
+  }, [branchId]);
 
   // search waits until typing stops
   useEffect(() => {
@@ -144,7 +200,7 @@ export default function PartnerProducts() {
   }, [search]);
 
   const { data, isLoading, isSuccess, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["partner-products", till.id, q, categoryId, subcategoryId, brand],
+    queryKey: ["partner-products", branchId, q, categoryId, subcategoryId, brand],
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({
         page: String(pageParam),
@@ -152,7 +208,7 @@ export default function PartnerProducts() {
         categoryId,
         subcategoryId,
         brand,
-        showroomId: till.id && till.id !== "warehouse" ? till.id : "",
+        showroomId: branchId && branchId !== "warehouse" ? branchId : "",
       });
       const { data } = await axios.get(`/api/partner/products?${params}`);
       if (!data.success) throw new Error(data.message);
@@ -160,7 +216,7 @@ export default function PartnerProducts() {
     },
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
-    enabled: !!till.id,
+    enabled: true,
   });
 
   const head = isSuccess ? data?.pages?.[0] : null;
@@ -183,14 +239,19 @@ export default function PartnerProducts() {
   }, [isSuccess, brands, categories, subcategories, brand, categoryId, subcategoryId]);
 
   const products = isSuccess ? data?.pages.flatMap((p) => p.items) ?? [] : [];
-  const selectClass = "h-10 rounded-lg border bg-card px-3 text-sm outline-none focus:border-primary";
+  const chip = (active) =>
+    `flex h-10 shrink-0 items-center rounded-lg border px-4 text-[13px] font-medium transition ${
+      active ? "border-primary bg-primary text-white shadow-md shadow-primary/30" : "border-gray-200 bg-white text-gray-700 hover:border-primary/50"
+    }`;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Products &amp; Stock</h1>
-          <p className="text-sm text-muted-foreground">Prices shown are your own price list.</p>
+          <p className="text-sm text-muted-foreground">
+            Prices shown are your own price list. The branch at the top decides which stock you see.
+          </p>
         </div>
         {cart?.count > 0 && (
           <Link href="/partner/cart" className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:brightness-110">
@@ -199,65 +260,93 @@ export default function PartnerProducts() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-2 rounded-2xl border bg-card p-3 sm:grid-cols-4">
-        <label className="flex h-10 items-center gap-2 rounded-lg border px-3 focus-within:border-primary">
-          <Search className="size-4 text-gray-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-        </label>
-        <select
-          value={categoryId}
-          onChange={(e) => {
-            setCategoryId(e.target.value);
-            setSubcategoryId("");
-          }}
-          className={selectClass}
-          aria-label="Category"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c._id} value={c._id}>{c.name}</option>
-          ))}
-        </select>
-        <select value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} className={selectClass} aria-label="Sub Category">
-          <option value="">All Sub Categories</option>
-          {subcategories.map((row) => (
-            <option key={row._id} value={row._id}>{row.name}</option>
-          ))}
-        </select>
-        <select value={brand} onChange={(e) => setBrand(e.target.value)} className={selectClass} aria-label="Brand">
-          <option value="">All Brands</option>
-          {brands.map((b) => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-        </select>
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" aria-label="categories">
+        <button type="button" onClick={() => { setCategoryId(""); setSubcategoryId(""); }} className={chip(!categoryId)}>
+          All Products
+        </button>
+        {categories.map((row) => (
+          <button
+            key={row._id}
+            type="button"
+            onClick={() => { setCategoryId(String(row._id)); setSubcategoryId(""); }}
+            className={chip(String(categoryId) === String(row._id))}
+          >
+            {row.name}
+          </button>
+        ))}
       </div>
 
-      {isLoading ? (
-        <div className="flex h-60 items-center justify-center text-muted-foreground">
-          <Loader2 className="mr-2 size-5 animate-spin" /> Loading products...
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" aria-label="subcategories">
+        <button type="button" onClick={() => setSubcategoryId("")} className={chip(!subcategoryId)}>
+          All Sub Categories
+        </button>
+        {subcategories.map((row) => (
+          <button
+            key={row._id}
+            type="button"
+            onClick={() => setSubcategoryId(String(row._id))}
+            className={chip(String(subcategoryId) === String(row._id))}
+          >
+            {row.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" aria-label="brands">
+        <button type="button" onClick={() => setBrand("")} className={chip(!brand)}>
+          All Brands
+        </button>
+        {brands.map((name) => (
+          <button key={name} type="button" onClick={() => setBrand(name)} className={chip(brand.toLowerCase() === name.toLowerCase())}>
+            {name}
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-gray-200/70 bg-white/60">
+        <div className="p-2 sm:p-3">
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary">
+            <Search className="size-4 text-gray-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." className="min-w-0 flex-1 bg-transparent text-[13px] outline-none" />
+          </label>
         </div>
-      ) : isError ? (
-        <p className="py-20 text-center text-muted-foreground">Could not load products.</p>
-      ) : products.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-20 text-muted-foreground">
-          <PackageSearch className="size-10" /> No products found
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {products.map((p) => (
-              <ProductCard key={p._id} product={p} />
-            ))}
-          </div>
-          {hasNextPage && (
-            <div className="flex justify-center">
-              <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage} className="h-10 rounded-lg border bg-card px-5 text-sm font-semibold hover:border-primary">
-                {isFetchingNextPage ? "Loading..." : "Load more"}
-              </button>
+        <div className="px-2 pb-3 sm:px-3">
+          {isLoading ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="h-64 animate-pulse rounded-xl bg-white" />
+              ))}
             </div>
+          ) : isError ? (
+            <p className="py-20 text-center text-sm text-red-500">Could not load products.</p>
+          ) : products.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-20 text-gray-400">
+              <PackageSearch className="size-10" />
+              <p className="text-sm">No products found</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] sm:gap-3">
+                {products.map((product) => (
+                  <PosTile
+                    key={product._id}
+                    product={product}
+                    open={openId === String(product._id)}
+                    onOpen={() => setOpenId((current) => (current === String(product._id) ? "" : String(product._id)))}
+                  />
+                ))}
+              </div>
+              {hasNextPage && (
+                <div className="flex justify-center py-4">
+                  <button type="button" onClick={() => fetchNextPage()} disabled={isFetchingNextPage} className="text-xs text-gray-400 hover:text-primary">
+                    {isFetchingNextPage ? "Loading more products..." : "Load more"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
