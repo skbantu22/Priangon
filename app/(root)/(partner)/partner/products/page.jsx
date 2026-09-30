@@ -199,8 +199,8 @@ export default function PartnerProducts() {
         )}
       </div>
 
-      <div className="grid gap-2 rounded-2xl border bg-card p-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="flex h-10 items-center gap-2 rounded-lg border px-3 focus-within:border-primary sm:col-span-2 xl:col-span-1">
+      <div className="grid grid-cols-1 gap-2 rounded-2xl border bg-card p-3 sm:grid-cols-4">
+        <label className="flex h-10 items-center gap-2 rounded-lg border px-3 focus-within:border-primary">
           <Search className="size-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products..." className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </label>
@@ -211,19 +211,20 @@ export default function PartnerProducts() {
             setSubcategoryId("");
           }}
           className={selectClass}
+          aria-label="Category"
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
             <option key={c._id} value={c._id}>{c.name}</option>
           ))}
         </select>
-        <select value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} className={selectClass}>
+        <select value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} className={selectClass} aria-label="Sub Category">
           <option value="">All Sub Categories</option>
           {subcategories.map((row) => (
             <option key={row._id} value={row._id}>{row.name}</option>
           ))}
         </select>
-        <select value={brand} onChange={(e) => setBrand(e.target.value)} className={selectClass}>
+        <select value={brand} onChange={(e) => setBrand(e.target.value)} className={selectClass} aria-label="Brand">
           <option value="">All Brands</option>
           {brands.map((b) => (
             <option key={b} value={b}>{b}</option>
