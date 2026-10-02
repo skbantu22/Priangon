@@ -45,7 +45,8 @@ export async function GET(req) {
     const limit = Math.min(200, Math.max(10, Number(searchParams.get("limit")) || 20));
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
 
-    const filter = {};
+    // a deleted customer waits in the trash, out of everybody's list
+    const filter = { deletedAt: null };
 
     // customers saved before isActive existed count as active
     if (status === "active") filter.isActive = { $ne: false };

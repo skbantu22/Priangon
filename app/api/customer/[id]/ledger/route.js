@@ -26,6 +26,7 @@ export async function GET(req, { params }) {
     const ledger = await customerLedger(customer, {
       start: searchParams.get("start_date") || "",
       end: searchParams.get("end_date") || "",
+      withProducts: searchParams.get("products") === "1",
     });
 
     return NextResponse.json({

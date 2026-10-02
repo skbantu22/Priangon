@@ -16,6 +16,7 @@ import {
   purchaseLocationForAuth,
 } from "@/lib/purchaseService";
 import { ensureSystemRoles } from "@/models/Role.model";
+import { recordMoney } from "@/lib/accounts";
 
 const METHODS = ["cash", "bkash", "nagad", "card", "bank", "cheque", "other"];
 
@@ -209,6 +210,22 @@ export async function POST(req) {
     if (purchase.status === "received") purchase.receivedAt = new Date();
 
     await purchase.save();
+
+    // what was paid goes out of its account (Cash, bKash, bank...)
+    for (const raw of rawPayments) {
+      await recordMoney({
+        showroomId: purchase.showroomId,
+        accountId: raw?.accountId,
+        method: METHODS.includes(raw?.method) ? raw.method : "cash",
+        direction: "out",
+        amount: raw?.amount,
+        source: "purchase",
+        sourceId: String(purchase._id),
+        reference: purchase.purchaseNumber,
+        date: purchase.purchaseDate,
+        createdBy,
+      });
+    }
 
     // Stock moves only after the purchase itself is safely stored. If that
     // fails part way the purchase must not stay marked received, or the

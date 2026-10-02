@@ -2,8 +2,6 @@ import { connectDB } from "@/lib/databaseconnection";
 import { response } from "@/lib/helperfunction";
 
 import ProductVariantModel from "@/models/ProductVariant.model ";
-import WarehouseStock from "@/models/WarehouseStock.model";
-import ShowroomStock from "@/models/ShowroomStock"; // থাকলে
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 
 export async function DELETE(request, { params }) {
@@ -25,20 +23,17 @@ export async function DELETE(request, { params }) {
       return response(false, 404, "Variant not found");
     }
 
-    // Delete warehouse stock
-    await WarehouseStock.deleteMany({
-      variantId: id,
-    });
+    if (variant.deletedAt) {
+      return response(false, 404, "Variant not found");
+    }
 
-    // Delete showroom stock (if exists)
-    await ShowroomStock.deleteMany({
-      variantId: id,
-    });
+    // Moved to the trash, not wiped: the stock rows stay put, so restoring
+    // the variant brings its quantities back with it. The trash clears both
+    // for good after 30 days.
+    variant.deletedAt = new Date();
+    await variant.save();
 
-    // Delete variant
-    await ProductVariantModel.findByIdAndDelete(id);
-
-    return response(true, 200, "Variant deleted successfully");
+    return response(true, 200, "Variant moved to trash");
   } catch (error) {
     console.log(error);
     return response(false, 500, error.message);

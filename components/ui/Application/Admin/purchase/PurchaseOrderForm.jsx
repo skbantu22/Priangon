@@ -6,13 +6,13 @@ import axios from "axios";
 import { Trash2 } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import PurchasePosPicker from "@/components/ui/Application/Admin/purchase/PurchasePosPicker";
 import { ADMIN_PURCHASE_ORDER_SHOW } from "@/Route/Adminpannelroute";
 import { ListCard, btn, filterInput as inputClass, tdClass, thClass, theadClass, totalRowClass } from "@/components/ui/Application/Admin/listKit";
 import { money } from "@/components/ui/Application/Admin/supplier/supplierKit";
 import {
   AttachmentInput,
   Field,
-  ProductSearch,
   RATES,
   SupplierPicker,
   cell,
@@ -223,7 +223,7 @@ export default function PurchaseOrderForm({ id }) {
       </ListCard>
 
       <ListCard title="Products">
-        <ProductSearch onPick={addLine} placeholder="Enter Product Name / SKU / scan barcode" />
+        <PurchasePosPicker onPick={addLine} picked={lines} />
 
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[1500px] border-collapse text-left text-sm">
@@ -256,7 +256,7 @@ export default function PurchaseOrderForm({ id }) {
               {!lines.length && (
                 <tr>
                   <td colSpan={14} className={`${tdClass} py-10 text-center text-muted-foreground`}>
-                    Search above to add products to this order.
+                    Choose a brand or category above to add products.
                   </td>
                 </tr>
               )}

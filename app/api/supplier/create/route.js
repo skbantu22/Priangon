@@ -1,3 +1,4 @@
+import { isValidObjectId } from "mongoose";
 import { NextResponse } from "next/server";
 import SupplierModel from "@/models/Supplier.model";
 import { connectDB } from "@/lib/databaseconnection";
@@ -46,6 +47,8 @@ export async function POST(req) {
       companyName: body.companyName?.trim() || "",
       email: body.email?.trim() || "",
       address: body.address?.trim() || "",
+      area: body.area?.trim() || "",
+      showroomId: isValidObjectId(body.showroomId) ? body.showroomId : null,
       openingBalance: Number(body.openingBalance) || 0,
       initialAdvance: Math.max(0, Number(body.initialAdvance) || 0),
       openingDate: body.openingDate ? new Date(body.openingDate) : null,

@@ -19,7 +19,10 @@ export async function GET(req) {
     const status = searchParams.get("status") || "pending";
     const supplierId = searchParams.get("supplierId");
 
-    const base = mongoose.isValidObjectId(supplierId) ? { supplierId } : {};
+    const base = {
+      deletedAt: null,
+      ...(mongoose.isValidObjectId(supplierId) ? { supplierId } : {}),
+    };
 
     const [rows, pending, done] = await Promise.all([
       SupplierSchedule.find({ ...base, ...(status !== "all" && { status }) })

@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/databaseconnection";
 import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
-import { catalogForTill } from "@/lib/tillCatalog";
+import { catalogAll, catalogForTill } from "@/lib/tillCatalog";
 
 // Categories, brands, and subcategories that have stock at this till only.
 export async function GET(request) {
@@ -10,8 +10,9 @@ export async function GET(request) {
 
     await connectDB();
 
-    const showroomId = new URL(request.url).searchParams.get("showroomId") || "";
-    const catalog = await catalogForTill(showroomId);
+    const { searchParams } = new URL(request.url);
+    const showroomId = searchParams.get("showroomId") || "";
+    const catalog = searchParams.get("scope") === "all" ? await catalogAll() : await catalogForTill(showroomId);
 
     return Response.json({ success: true, showroomId, ...catalog });
   } catch (error) {

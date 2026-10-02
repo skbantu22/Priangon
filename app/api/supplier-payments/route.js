@@ -30,6 +30,41 @@ export async function GET(req) {
 
     if (PAYMENT_TYPES.includes(type)) filter.type = type;
 
+    // Every shop keeps its own suppliers, so a receipt belongs to the
+    // shop its supplier is kept under
+    const branch = searchParams.get("branch") || "all";
+
+    if (branch !== "all") {
+      const branchFilter =
+        branch === "warehouse"
+          ? { showroomId: null }
+          : mongoose.isValidObjectId(branch)
+            ? { showroomId: branch }
+            : null;
+
+      if (!branchFilter) {
+        return NextResponse.json(
+          { success: false, message: "Unknown branch" },
+          { status: 400 },
+        );
+      }
+
+      const branchSuppliers = await SupplierModel.find({
+        ...branchFilter,
+        deletedAt: null,
+      })
+        .select("_id")
+        .lean();
+
+      filter.supplierId = {
+        $in: branchSuppliers.map((supplier) => supplier._id),
+      };
+    }
+
+    const by = (searchParams.get("by") || "").trim();
+
+    if (by) filter.createdBy = by;
+
     if (start || end) {
       filter.date = {
         ...(start && { $gte: new Date(`${start}T00:00:00`) }),
@@ -52,12 +87,16 @@ export async function GET(req) {
       ];
     }
 
-    const [total, sum] = await Promise.all([
+    // Everyone who recorded one of these, for the "Received by" filter
+    const { createdBy: _by, ...withoutBy } = filter;
+
+    const [total, sum, people] = await Promise.all([
       SupplierPayment.countDocuments(filter),
       SupplierPayment.aggregate([
         { $match: filter },
         { $group: { _id: null, amount: { $sum: "$amount" } } },
       ]),
+      SupplierPayment.distinct("createdBy", withoutBy),
     ]);
 
     const size = showAll ? total || 1 : limit;
@@ -73,6 +112,7 @@ export async function GET(req) {
       success: true,
       data: rows,
       summary: { amount: Math.round((sum[0]?.amount || 0) * 100) / 100 },
+      people: people.filter(Boolean).sort(),
       total,
       page: showAll ? 1 : page,
       pages: Math.max(1, Math.ceil(total / size)),

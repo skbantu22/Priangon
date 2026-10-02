@@ -12,6 +12,7 @@ import { requireRoles, STAFF_ROLES } from "@/lib/apiAuth";
 import { longNumber } from "@/lib/documentNumber";
 import { onHandAt, deductAtLocation } from "@/lib/posShelf";
 import { resolveLockedTill } from "@/lib/posTillAuth";
+import { recordMoney } from "@/lib/accounts";
 /* =========================
    GET ORDER
 ========================= */
@@ -101,11 +102,11 @@ export async function POST(req) {
       createdBy,
       soldBy,
       customerName,
-      phone,
       address,
       saleDate,
       isExchangeMode,
     } = body;
+    let phone = body.phone;
     const customerType = normalizeCustomerType(body.customerType);
 
     /* =========================
@@ -213,7 +214,11 @@ export async function POST(req) {
 
     // a due (বাকি) sale must be traceable to a customer; checked before an
     // invoice number is taken so a rejected sale leaves no gap in the numbers
-    if (dueAmount > 0 && !phone?.trim()) {
+    if (dueAmount > 0 && !String(phone || "").trim() && mongoose.isValidObjectId(body.customerId)) {
+      const known = await Customer.findById(body.customerId).select("phone").session(session);
+      if (known?.phone) phone = known.phone;
+    }
+    if (dueAmount > 0 && !String(phone || "").trim()) {
       throw new Error("Customer phone is required for a due sale");
     }
 
@@ -239,16 +244,29 @@ export async function POST(req) {
     ========================= */
 
     let customer = null;
+    // the invoice type follows the customer we actually kept
+    let saleType = customerType;
 
-    if (phone?.trim()) {
+    if (mongoose.isValidObjectId(body.customerId)) {
+      customer = await Customer.findById(body.customerId).session(session);
+    }
+    if (!customer && phone?.trim()) {
       customer = await Customer.findOne({ phone }).session(session);
+      // selling to a trashed number brings that customer back
+      if (customer?.deletedAt) customer.deletedAt = null;
+    }
 
+    if (customer || phone?.trim()) {
       if (customer) {
+        const stored = normalizeCustomerType(customer.type);
+        // a sale that only knows "retail" must not turn a dealer into retail
+        saleType = customerType === "retail" && stored !== "retail" ? stored : customerType;
         customer.name = customerName || customer.name;
         customer.address = address || customer.address;
-        customer.type = customerType;
+        customer.type = saleType;
         customer.totalOrders += 1;
         customer.totalSpent += Number(total || 0);
+        if (!String(phone || "").trim() && customer.phone) phone = customer.phone;
 
         await customer.save({ session });
       } else {
@@ -258,7 +276,7 @@ export async function POST(req) {
               name: customerName || "Walk In Customer",
               phone,
               address,
-              type: customerType,
+              type: saleType,
               totalOrders: 1,
               totalSpent: Number(total || 0),
             },
@@ -334,7 +352,7 @@ export async function POST(req) {
       soldBy: soldBy || "Counter Guest",
 
       customerName,
-      customerType,
+      customerType: saleType,
       phone,
       address,
 
@@ -371,6 +389,23 @@ export async function POST(req) {
     await session.commitTransaction();
 
     session.endSession();
+
+    // every payment lands on its account (Cash, bKash, card, bank); a problem here never undoes the sale
+    for (const [index, payment] of cleanPayments.entries()) {
+      await recordMoney({
+        showroomId: till.orderShowroomId,
+        accountId: payments?.[index]?.accountId,
+        method: payment.type,
+        option: payment.option,
+        direction: "in",
+        amount: payment.amount,
+        source: "sale",
+        sourceId: String(order[0]._id),
+        reference: orderNumber,
+        date: sellDate,
+        createdBy: soldBy || "",
+      });
+    }
 
     return NextResponse.json({
       success: true,

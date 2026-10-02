@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImageIcon, Loader2, Pencil, Search, UserPlus } from "lucide-react";
+import {
+  CalendarDays,
+  Hash,
+  ImageIcon,
+  List,
+  Loader2,
+  Mail,
+  Map as MapIcon,
+  MapPin,
+  Paperclip,
+  Pencil,
+  Search,
+  User,
+  UserPlus,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +28,28 @@ import { showToast } from "@/lib/showToast";
 
 const isPhone = (s) => /^01\d{9}$/.test(String(s).replace(/[\s-]/g, ""));
 
-const EMPTY_FORM = { name: "", phone: "", address: "", type: "retail", password: "", photo: "" };
+const EMPTY_FORM = {
+  name: "",
+  businessName: "",
+  phone: "",
+  email: "",
+  area: "",
+  address: "",
+  type: "retail",
+  password: "",
+  openingDue: "",
+  openingDate: "",
+  photo: "",
+  attachment: "",
+  membershipNumber: "",
+  note: "",
+};
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
+
+// bare control that sits inside an IconBox
+const bareClass = "h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none";
 
 const TypeBadge = ({ type }) => {
   const t = normalizeCustomerType(type);
@@ -32,6 +64,26 @@ const TypeBadge = ({ type }) => {
   );
 };
 
+// label + a field with a grey icon cell on the left (one column on a phone, two from sm up)
+const Field = ({ label, required, className = "", children }) => (
+  <div className={`min-w-0 space-y-1 ${className}`}>
+    <span className="text-sm font-medium">
+      {label}
+      {required && <span className="text-red-500">*</span>}
+    </span>
+    {children}
+  </div>
+);
+
+const IconBox = ({ icon: Icon, text, children }) => (
+  <div className="flex min-w-0 overflow-hidden rounded-lg border border-gray-200 focus-within:border-primary dark:border-white/10">
+    <span className="flex min-w-10 shrink-0 items-center justify-center bg-muted px-2 text-sm font-semibold text-muted-foreground">
+      {Icon ? <Icon className="size-4" /> : text}
+    </span>
+    {children}
+  </div>
+);
+
 // POS customer modal: find a customer, or add / edit one with its type.
 // The picked customer's type sets the rate the cart charges (dealer price...).
 export default function CustomerModal({ open, onOpenChange, onPick, initialQuery = "" }) {
@@ -42,7 +94,11 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
+  const [attachFile, setAttachFile] = useState(null);
   const photoInputRef = useRef(null);
+  const attachInputRef = useRef(null);
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   // every open starts on "find", seeded with what was typed in the cart box
   useEffect(() => {
@@ -51,6 +107,7 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     setQuery(initialQuery);
     setForm(EMPTY_FORM);
     setPhotoFile(null);
+    setAttachFile(null);
   }, [open, initialQuery]);
 
   useEffect(() => {
@@ -92,14 +149,31 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     const q = query.trim();
     setForm({ ...EMPTY_FORM, ...(isPhone(q) ? { phone: q } : { name: q }) });
     setPhotoFile(null);
+    setAttachFile(null);
     setTab("form");
   };
 
   const startEdit = (c) => {
     const type = normalizeCustomerType(c.type);
     // a dealer / wholesaler already has a login: the password is only for changing it
-    setForm({ name: c.name || "", phone: c.phone || "", address: c.address || "", photo: c.photo || "", type, password: "", hadLogin: type !== "retail" });
+    setForm({
+      ...EMPTY_FORM,
+      name: c.name || "",
+      businessName: c.businessName || "",
+      phone: c.phone || "",
+      email: c.email || "",
+      area: c.area || "",
+      address: c.address || "",
+      photo: c.photo || "",
+      attachment: c.attachment || "",
+      membershipNumber: c.membershipNumber || "",
+      note: c.note || "",
+      type,
+      hadLogin: type !== "retail",
+      existing: true,
+    });
     setPhotoFile(null);
+    setAttachFile(null);
     setTab("form");
   };
 
@@ -117,28 +191,32 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     }
 
     setSaving(true);
-    let uploadedPhotoId = null;
-    const dropUpload = () => {
-      if (!uploadedPhotoId) return;
-      fetch("/api/media/delete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [uploadedPhotoId], deleteType: "PD" }),
-      }).catch(() => {});
+    const uploadedIds = [];
+    const dropUploads = () => {
+      uploadedIds.forEach((id) => {
+        fetch("/api/media/delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: [id], deleteType: "PD" }),
+        }).catch(() => {});
+      });
     };
-    try {
-      let payload = form;
-      if (photoFile?.file) {
-        const body = new FormData();
-        body.append("file", photoFile.file);
-        const up = await fetch("/api/media/upload", { method: "POST", body });
-        const upData = await up.json().catch(() => ({}));
-        if (!upData?.success || !upData.media?.secure_url) {
-          throw new Error(upData?.message || "Could not upload the picture");
-        }
-        uploadedPhotoId = upData.media._id;
-        payload = { ...form, photo: upData.media.secure_url };
+    const upload = async (file, what) => {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/media/upload", { method: "POST", body });
+      const data = await res.json().catch(() => ({}));
+      if (!data?.success || !data.media?.secure_url) {
+        throw new Error(data?.message || `Could not upload the ${what}`);
       }
+      uploadedIds.push(data.media._id);
+      return data.media.secure_url;
+    };
+
+    try {
+      const payload = { ...form };
+      if (photoFile?.file) payload.photo = await upload(photoFile.file, "picture");
+      if (attachFile?.file) payload.attachment = await upload(attachFile.file, "attachment");
 
       const res = await fetch("/api/customer/create", {
         method: "POST",
@@ -150,7 +228,7 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
       showToast("success", data.message);
       pick(data.customer);
     } catch (err) {
-      dropUpload();
+      dropUploads();
       showToast("error", err.message || "Could not save customer");
     } finally {
       setSaving(false);
@@ -159,9 +237,9 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-3 sm:max-w-lg">
+      <DialogContent className="max-h-[92vh] gap-3 overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Customer</DialogTitle>
+          <DialogTitle>{tab === "form" ? "Create new customer" : "Customer"}</DialogTitle>
           <DialogDescription>
             Dealer, sub dealer and wholesaler customers get their own rate in the cart.
           </DialogDescription>
@@ -255,105 +333,147 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
             </button>
           </div>
         ) : (
-          <form onSubmit={save} className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm font-medium">
-                <span>Name *</span>
-                <input
-                  autoFocus
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Customer / shop name"
-                  className={inputClass}
-                />
-              </label>
-              <label className="space-y-1 text-sm font-medium">
-                <span>Phone *</span>
-                <input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="01XXXXXXXXX"
-                  inputMode="tel"
-                  className={inputClass}
-                />
-              </label>
-            </div>
+          <form onSubmit={save} className="space-y-4">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              <Field label="Name" required>
+                <IconBox icon={User}>
+                  <input autoFocus value={form.name} onChange={set("name")} placeholder="Name" className={bareClass} />
+                </IconBox>
+              </Field>
+              <Field label="Business Name">
+                <IconBox icon={User}>
+                  <input value={form.businessName} onChange={set("businessName")} placeholder="Business Name" className={bareClass} />
+                </IconBox>
+              </Field>
 
-            <div className="space-y-1 text-sm font-medium">
-              <span>Picture</span>
-              <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-2 dark:border-white/10">
-                {photoFile?.preview || form.photo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoFile?.preview || form.photo} alt="" className="size-12 shrink-0 rounded-full border bg-white object-cover" />
-                ) : (
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <ImageIcon className="size-5" />
-                  </span>
-                )}
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setPhotoFile({ file, preview: URL.createObjectURL(file) });
-                    e.target.value = "";
-                  }}
+              <Field label="Customer Group (sets the price)">
+                <IconBox icon={List}>
+                  <select value={form.type} onChange={set("type")} className={bareClass}>
+                    {Object.entries(CUSTOMER_TYPES).map(([key, t]) => (
+                      <option key={key} value={key}>{t.label}</option>
+                    ))}
+                  </select>
+                </IconBox>
+              </Field>
+              <Field label="Email">
+                <IconBox icon={Mail}>
+                  <input type="email" value={form.email} onChange={set("email")} placeholder="Email" className={bareClass} />
+                </IconBox>
+              </Field>
+
+              <Field label="Mobile" required>
+                <IconBox text="+88">
+                  <input value={form.phone} onChange={set("phone")} placeholder="01XXXXXXXXX" inputMode="tel" className={bareClass} />
+                </IconBox>
+              </Field>
+              <Field label="Area">
+                <IconBox icon={MapPin}>
+                  <input value={form.area} onChange={set("area")} placeholder="Area" className={bareClass} />
+                </IconBox>
+              </Field>
+
+              <Field label="Address">
+                <IconBox icon={MapIcon}>
+                  <input value={form.address} onChange={set("address")} placeholder="Address" className={bareClass} />
+                </IconBox>
+              </Field>
+              <Field label="Due">
+                <IconBox text="৳">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.openingDue}
+                    onChange={set("openingDue")}
+                    placeholder="Amount"
+                    disabled={form.existing}
+                    className={`${bareClass} disabled:opacity-50`}
+                  />
+                </IconBox>
+              </Field>
+
+              <Field label="Date">
+                <IconBox icon={CalendarDays}>
+                  <input
+                    type="date"
+                    value={form.openingDate}
+                    onChange={set("openingDate")}
+                    disabled={form.existing}
+                    className={`${bareClass} disabled:opacity-50`}
+                  />
+                </IconBox>
+              </Field>
+              <Field label="Picture">
+                <IconBox icon={ImageIcon}>
+                  <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
+                    {photoFile?.preview || form.photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoFile?.preview || form.photo} alt="" className="size-7 shrink-0 rounded-full border object-cover" />
+                    ) : null}
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="min-w-0 flex-1 text-xs file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1.5 file:text-xs"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        setPhotoFile(file ? { file, preview: URL.createObjectURL(file) } : null);
+                      }}
+                    />
+                    {(photoFile?.file || form.photo) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setForm((f) => ({ ...f, photo: "" }));
+                          if (photoInputRef.current) photoInputRef.current.value = "";
+                        }}
+                        className="shrink-0 text-xs text-muted-foreground hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </IconBox>
+              </Field>
+
+              <Field label="Attachment">
+                <IconBox icon={Paperclip}>
+                  <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
+                    <input
+                      ref={attachInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,application/pdf"
+                      className="min-w-0 flex-1 text-xs file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1.5 file:text-xs"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        setAttachFile(file ? { file } : null);
+                      }}
+                    />
+                    {form.attachment && !attachFile?.file && (
+                      <a href={form.attachment} target="_blank" rel="noreferrer" className="shrink-0 text-xs text-primary underline">
+                        View
+                      </a>
+                    )}
+                  </div>
+                </IconBox>
+              </Field>
+              <Field label="Membership Number">
+                <IconBox icon={Hash}>
+                  <input value={form.membershipNumber} onChange={set("membershipNumber")} placeholder="Membership Number" className={bareClass} />
+                </IconBox>
+              </Field>
+
+              <Field label="Note" className="sm:col-span-2">
+                <textarea
+                  rows={3}
+                  value={form.note}
+                  onChange={set("note")}
+                  placeholder="Note"
+                  maxLength={2000}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-transparent"
                 />
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  className="h-8 rounded-md bg-muted px-3 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/10"
-                >
-                  {photoFile?.file || form.photo ? "Change picture" : "Choose picture"}
-                </button>
-                {(photoFile?.file || form.photo) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhotoFile(null);
-                      setForm((f) => ({ ...f, photo: "" }));
-                    }}
-                    className="h-8 rounded-md px-2 text-xs text-muted-foreground hover:text-red-500"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <label className="block space-y-1 text-sm font-medium">
-              <span>Address</span>
-              <input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Area, city"
-                className={inputClass}
-              />
-            </label>
-
-            <div className="space-y-1.5">
-              <span className="text-sm font-medium">Customer type (sets the price)</span>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(CUSTOMER_TYPES).map(([key, t]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setForm({ ...form, type: key })}
-                    className={`rounded-lg border px-3 py-2 text-left text-sm transition ${
-                      form.type === key
-                        ? "border-primary bg-primary/10 font-semibold text-primary ring-1 ring-primary"
-                        : "border-gray-200 hover:border-primary/50 dark:border-white/10"
-                    }`}
-                  >
-                    {t.label}
-                    <span className="block text-[11px] font-normal text-muted-foreground">
-                      {key === "retail" ? "Normal sale price" : `${t.short} price from the price list`}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              </Field>
             </div>
 
             {normalizeCustomerType(form.type) !== "retail" && (
@@ -365,7 +485,7 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
                   type="password"
                   autoComplete="new-password"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={set("password")}
                   placeholder={form.hadLogin ? "Leave blank to keep the current one" : "At least 4 characters"}
                   className={inputClass}
                 />
@@ -381,12 +501,12 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
                 onClick={() => setTab("find")}
                 className="h-10 rounded-lg border px-4 text-sm font-medium hover:bg-muted"
               >
-                Back
+                Close
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                className="flex h-10 items-center gap-2 rounded-lg bg-green-600 px-5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
               >
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 Save &amp; Select

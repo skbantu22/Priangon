@@ -17,7 +17,6 @@ import {
   PAYMENT_METHODS,
   PAYMENT_TITLES,
   btn,
-  fmtDate,
   inputClass,
   money,
   tdClass,
@@ -60,7 +59,9 @@ export default function SupplierPaymentPage({ params }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const withInvoices = type === "pay" || type === "dismiss";
+  // Pay, dismiss and receive all list the supplier's invoices; only an
+  // advance has nothing to show them against
+  const withInvoices = type !== "advance";
   const title = PAYMENT_TITLES[type];
 
   useEffect(() => {
@@ -230,7 +231,7 @@ export default function SupplierPaymentPage({ params }) {
                             Invoice No.
                           </label>
                         </th>
-                        {["Date", "Invoice Amount", "Due Amount", `${noun} Amount`].map((head) => (
+                        {["Invoice Amount", "Due Amount", `${noun} Amount`].map((head) => (
                           <th key={head} className={thClass}>
                             {head}
                           </th>
@@ -240,7 +241,7 @@ export default function SupplierPaymentPage({ params }) {
                     <tbody>
                       {invoices === null && (
                         <tr>
-                          <td colSpan={5} className={tdClass}>
+                          <td colSpan={4} className={tdClass}>
                             <Skeleton className="h-5 w-full" />
                           </td>
                         </tr>
@@ -248,7 +249,7 @@ export default function SupplierPaymentPage({ params }) {
 
                       {invoices?.length === 0 && (
                         <tr>
-                          <td colSpan={5} className={`${tdClass} text-center text-muted-foreground`}>
+                          <td colSpan={4} className={`${tdClass} text-center text-muted-foreground`}>
                             No purchase has a due. The amount is recorded against the supplier&apos;s balance.
                           </td>
                         </tr>
@@ -272,7 +273,6 @@ export default function SupplierPaymentPage({ params }) {
                                 {invoice.purchaseNumber}
                               </label>
                             </td>
-                            <td className={tdClass}>{fmtDate(invoice.date)}</td>
                             <td className={tdClass}>{money(invoice.total)}</td>
                             <td className={`${tdClass} font-semibold text-red-600`}>{money(invoice.due)}</td>
                             <td className={`${tdClass} py-1`}>
@@ -294,7 +294,7 @@ export default function SupplierPaymentPage({ params }) {
                     {allocated > 0 && (
                       <tfoot>
                         <tr className="bg-muted font-semibold">
-                          <td colSpan={4} className={tdClass}>
+                          <td colSpan={3} className={tdClass}>
                             Selected invoices
                           </td>
                           <td className={tdClass}>{money(allocated)}</td>

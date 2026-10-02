@@ -35,6 +35,22 @@ const supplierSchema = new mongoose.Schema(
       default: "",
     },
 
+    // The market or thana the supplier sells in — how a rep finds them
+    area: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    // Which branch keeps this supplier. Null is the warehouse, the way
+    // purchases themselves are stocked.
+    showroomId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Showroom",
+      default: null,
+      index: true,
+    },
+
     // Due carried over from before this software was used
     openingBalance: {
       type: Number,

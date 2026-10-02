@@ -8,7 +8,7 @@ import { Plus } from "lucide-react";
 import { showToast } from "@/lib/showToast";
 import { bdOperator, isValidBdMobile } from "@/lib/bdFormat";
 import { CUSTOMER_TYPES } from "@/lib/priceTiers";
-import { ADMIN_CUSTOMER_LEDGER, ADMIN_CUSTOMER_PAYMENT } from "@/Route/Adminpannelroute";
+import { ADMIN_CUSTOMER_LEDGER, ADMIN_CUSTOMER_PAYMENT, ADMIN_SALES } from "@/Route/Adminpannelroute";
 
 import {
   ActionMenu,
@@ -377,12 +377,14 @@ export default function CustomersPage() {
   const rowActions = (row) => [
     ["Show", () => setDetails(row)],
     ["Edit", () => openEdit(row)],
-    ["Receive", () => go(row, "receive")],
     ["Pay", () => go(row, "pay")],
-    ["Due Dismiss", () => go(row, "dismiss")],
-    ["Advance", () => go(row, "advance")],
+    ["Receive", () => go(row, "receive")],
+    ["Dismiss", () => go(row, "dismiss")],
     [row.isActive ? "Deactivated" : "Active", () => toggle(row)],
+    ["Sales", () => router.push(`${ADMIN_SALES}?customerId=${row._id}`)],
     ["Ledger", () => router.push(ADMIN_CUSTOMER_LEDGER(row._id))],
+    ["Ledger with product", () => router.push(`${ADMIN_CUSTOMER_LEDGER(row._id)}?products=1`)],
+    ["Advance", () => go(row, "advance")],
     ["Delete", () => remove(row), "danger"],
   ];
 

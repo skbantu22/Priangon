@@ -45,6 +45,8 @@ const menuButtonClass =
 
 const ICON_TONE = {
   Dashboard: "bg-[#ff6a1f]",
+  Telekhata: "bg-[#f9a825]",
+  Accounts: "bg-[#2e9b4a]",
   "POS (Sales)": "bg-[#00b293]",
   Sales: "bg-[#4429ff]",
   Products: "bg-[#851eec]",

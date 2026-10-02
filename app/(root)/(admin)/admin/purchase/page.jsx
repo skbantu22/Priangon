@@ -7,7 +7,6 @@ import { useSelector } from "react-redux";
 import { Plus } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
-import { useOpeningStockTill } from "@/lib/posProducts";
 import { ADMIN_PURCHASE_ADD, ADMIN_PURCHASE_RETURN_ADD, ADMIN_PURCHASE_VIEW } from "@/Route/Adminpannelroute";
 import {
   ActionMenu,
@@ -86,7 +85,6 @@ export default function PurchasePage() {
   // cancelling is admin only on the API side
   const auth = useSelector((state) => state.authStore.auth);
   const isAdmin = (auth?.data?.user || auth?.user)?.role === "admin";
-  const till = useOpeningStockTill();
   const suppliers = useSupplierOptions();
 
   const [rows, setRows] = useState([]);
@@ -104,7 +102,6 @@ export default function PurchasePage() {
 
   const params = useCallback(
     (extra) => ({
-      showroomId: till.id,
       status: filters.status,
       paymentStatus: filters.paymentStatus,
       ...(filters.supplierId && { supplierId: filters.supplierId }),
@@ -113,7 +110,7 @@ export default function PurchasePage() {
       ...(filters.end && { to: filters.end }),
       ...extra,
     }),
-    [filters, till.id],
+    [filters],
   );
 
   const load = useCallback(async () => {

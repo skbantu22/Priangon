@@ -24,6 +24,9 @@ const supplierScheduleSchema = new mongoose.Schema(
     doneAt: { type: Date, default: null },
 
     createdBy: { type: String, trim: true, default: "" },
+
+    // deleting a reminder only stamps this; the trash wipes it after 30 days
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true },
 );

@@ -14,9 +14,8 @@ const chip = (active) =>
     active ? "border-primary bg-primary text-white shadow-md shadow-primary/30" : "border-gray-200 bg-white text-gray-700 hover:border-primary/50"
   }`;
 
-const fetchCatalog = async (showroomId) => {
-  if (!showroomId) return { brands: [], categories: [], subcategories: [] };
-  const { data } = await axios.get("/api/pos/catalog", { params: { showroomId } });
+const fetchCatalog = async () => {
+  const { data } = await axios.get("/api/pos/catalog", { params: { scope: "all" } });
   if (!data.success) return { brands: [], categories: [], subcategories: [] };
   return {
     brands: data.brands || [],
@@ -25,8 +24,8 @@ const fetchCatalog = async (showroomId) => {
   };
 };
 
-const fetchProducts = async ({ q, category, subcategory, brand, page, showroomId }) => {
-  const params = { page, limit: 24, status: "active", location: showroomId || "all", sort: "name" };
+const fetchProducts = async ({ q, category, subcategory, brand, page }) => {
+  const params = { page, limit: 24, status: "active", location: "all", sort: "name" };
   if (q) params.q = q;
   if (category) params.category = category;
   if (subcategory) params.subcategory = subcategory;
@@ -65,13 +64,11 @@ export default function PurchasePosPicker({ onPick, showroomId = "", picked = []
 
   const catalog = useQuery({
     queryKey: ["purchase-pos-catalog", showroomId],
-    queryFn: () => fetchCatalog(showroomId),
-    enabled: !!showroomId,
+    queryFn: fetchCatalog,
   });
   const products = useQuery({
-    queryKey: ["purchase-pos-products", showroomId, q, categoryId, subcategoryId, brand, page],
-    queryFn: () => fetchProducts({ q, category: categoryId, subcategory: subcategoryId, brand, page, showroomId }),
-    enabled: !!showroomId,
+    queryKey: ["purchase-pos-products", q, categoryId, subcategoryId, brand, page],
+    queryFn: () => fetchProducts({ q, category: categoryId, subcategory: subcategoryId, brand, page }),
   });
 
   const items = products.data?.items || [];

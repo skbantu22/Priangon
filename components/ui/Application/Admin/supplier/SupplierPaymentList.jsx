@@ -5,6 +5,7 @@ import axios from "axios";
 import { Eye, FileSpreadsheet, FileText, Printer, Trash2 } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 
 import {
   EmptyRow,
@@ -30,8 +31,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const EMPTY_DATES = { start: "", end: "" };
-
 /** Due Received / Due Paid / Due Dismiss lists */
 export default function SupplierPaymentList({ type, title }) {
   const byLabel = type === "receive" ? "Received By" : "Paid By";
@@ -43,13 +42,13 @@ export default function SupplierPaymentList({ type, title }) {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
-  const [draft, setDraft] = useState(EMPTY_DATES);
-  const [dates, setDates] = useState(EMPTY_DATES);
   const [term, setTerm] = useState("");
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState("10");
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState(null);
+  const [by, setBy] = useState("");
+  const [people, setPeople] = useState([]);
 
   // The search box filters as you type
   useEffect(() => {
@@ -61,15 +60,19 @@ export default function SupplierPaymentList({ type, title }) {
     return () => clearTimeout(timer);
   }, [term]);
 
+  // Receipts follow the shop in the top branch switch, the same way the
+  // supplier list does — every shop keeps its own suppliers
+  const till = useOpeningStockTill();
+
   const params = useCallback(
     (extra) => ({
       type,
-      ...(dates.start && { start_date: dates.start }),
-      ...(dates.end && { end_date: dates.end }),
+      branch: till.id || "all",
       ...(search && { search }),
+      ...(by && { by }),
       ...extra,
     }),
-    [type, dates, search],
+    [type, till.id, search, by],
   );
 
   const load = useCallback(async () => {
@@ -85,6 +88,7 @@ export default function SupplierPaymentList({ type, title }) {
 
       setRows(data.data);
       setSummary(data.summary.amount);
+      setPeople(data.people || []);
       setMeta({ total: data.total, pages: data.pages, from: data.from });
     } catch (error) {
       showToast("error", error.response?.data?.message || "Could not load payments");
@@ -96,20 +100,6 @@ export default function SupplierPaymentList({ type, title }) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const apply = (event) => {
-    event.preventDefault();
-    setPage(1);
-    setDates({ ...draft });
-  };
-
-  const clear = () => {
-    setDraft(EMPTY_DATES);
-    setDates(EMPTY_DATES);
-    setTerm("");
-    setSearch("");
-    setPage(1);
-  };
 
   const remove = async (row) => {
     if (!confirm(`Delete ${row.invoiceNo}? The supplier's due will change accordingly.`)) return;
@@ -154,45 +144,26 @@ export default function SupplierPaymentList({ type, title }) {
   return (
     <div>
       <section className="rounded-[8px] border border-[#e6ebf1] bg-white px-[16px] py-[20px] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_2px_8px_rgba(16,24,40,0.04)] sm:px-[24px] dark:border-border dark:bg-card">
-          <form onSubmit={apply} className="flex flex-wrap items-center gap-[12px]">
-            <h1 className="m-0 w-full text-[22px] font-semibold tracking-[-0.01em] text-[#212529] lg:mr-[16px] lg:w-auto dark:text-foreground">
-              {title}
-            </h1>
+          <h1 className="m-0 text-[20px] font-semibold text-[#212529] dark:text-foreground">{title}</h1>
 
-            <div className="flex w-full items-stretch sm:w-auto">
-              <input
-                type="date"
-                aria-label="Start date"
-                value={draft.start}
-                onChange={(event) => setDraft({ ...draft, start: event.target.value })}
-                className={`${inputClass} !h-[46px] min-w-0 flex-1 !rounded-r-none !text-[15px] sm:w-[168px]`}
-              />
-              <span className="flex items-center bg-[#188ae2] px-[16px] text-[16px] text-white">to</span>
-              <input
-                type="date"
-                aria-label="End date"
-                value={draft.end}
-                onChange={(event) => setDraft({ ...draft, end: event.target.value })}
-                className={`${inputClass} !h-[46px] min-w-0 flex-1 !rounded-l-none !text-[15px] sm:w-[168px]`}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="h-[46px] min-w-[104px] rounded-[4px] bg-[#35b8e0] px-[20px] text-[15px] font-medium text-white transition hover:bg-[#22a6cf] active:translate-y-px"
+          <div className="mt-[26px] flex flex-wrap items-center gap-[10px]">
+            <select
+              value={by}
+              onChange={(event) => {
+                setBy(event.target.value);
+                setPage(1);
+              }}
+              aria-label={byLabel}
+              className={`${inputClass} !h-[40px] !w-[200px] !text-[14px]`}
             >
-              Search
-            </button>
-            <button
-              type="button"
-              onClick={clear}
-              className="h-[46px] min-w-[104px] rounded-[4px] bg-[#f9c851] px-[20px] text-[15px] font-medium text-white transition hover:bg-[#f0b93a] active:translate-y-px"
-            >
-              Clear
-            </button>
-          </form>
+              <option value="">{byLabel}</option>
+              {people.map((person) => (
+                <option key={person} value={person}>
+                  {person}
+                </option>
+              ))}
+            </select>
 
-          <div className="mt-[26px] flex justify-center">
             <div className="inline-flex overflow-hidden rounded-[4px] bg-[#868e96] text-[15px] text-white">
               {[
                 ["PDF", FileText, (body, foot) => exportPdf(title, head, body, foot)],
@@ -315,13 +286,12 @@ export default function SupplierPaymentList({ type, title }) {
                   ))}
               </tbody>
 
-              {!loading && rows.length > 0 && (
+              {!loading && (
                 <tfoot>
                   <tr className={totalRow}>
-                    <td colSpan={4} className={`${tdClass} text-right`}>
-                      Total:
-                    </td>
-                    <td className={tdClass}>BDT {money(summary)}</td>
+                    <td colSpan={3} className={tdClass} />
+                    <td className={`${tdClass} font-semibold`}>Total</td>
+                    <td className={`${tdClass} font-semibold`}>{money(summary)}</td>
                     <td colSpan={2} className={tdClass} />
                   </tr>
                 </tfoot>

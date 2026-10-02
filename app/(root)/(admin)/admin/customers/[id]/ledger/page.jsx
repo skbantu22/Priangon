@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, use, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { BookOpen } from "lucide-react";
 
@@ -24,13 +24,24 @@ import {
 } from "@/components/ui/Application/Admin/supplier/supplierKit";
 
 const HEAD = ["SL", "Date", "Type", "Invoice No", "Note", "Amount", "Due"];
+const PRODUCT_HEAD = ["SL", "Date", "Type", "Invoice No", "Product", "Note", "Amount", "Due"];
 
 const signed = (value) => `${value > 0 ? "+" : value < 0 ? "-" : ""}৳${money(Math.abs(value))}`;
 
 /** A customer's account statement */
 export default function CustomerLedgerPage({ params }) {
+  return (
+    <Suspense fallback={<div className="h-[420px] animate-pulse rounded-[8px] bg-white dark:bg-card" />}>
+      <CustomerLedger params={params} />
+    </Suspense>
+  );
+}
+
+function CustomerLedger({ params }) {
   const { id } = use(params);
   const router = useRouter();
+  const withProducts = useSearchParams().get("products") === "1";
+  const columns = withProducts ? PRODUCT_HEAD : HEAD;
 
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({ start: "", end: "" });
@@ -45,6 +56,7 @@ export default function CustomerLedgerPage({ params }) {
         params: {
           ...(dates.start && { start_date: dates.start }),
           ...(dates.end && { end_date: dates.end }),
+          ...(withProducts && { products: "1" }),
         },
       })
       .then(({ data: result }) => {
@@ -60,7 +72,7 @@ export default function CustomerLedgerPage({ params }) {
     return () => {
       cancelled = true;
     };
-  }, [id, dates]);
+  }, [id, dates, withProducts]);
 
   const rows = useMemo(() => {
     const needle = term.trim().toLowerCase();
@@ -74,9 +86,13 @@ export default function CustomerLedgerPage({ params }) {
   }, [data, term]);
 
   const exportBody = () =>
-    rows.map((row) => [row.sl, fmtDate(row.date), row.type, row.invoiceNo, row.note, row.amount, row.balance]);
+    rows.map((row) =>
+      withProducts
+        ? [row.sl, fmtDate(row.date), row.type, row.invoiceNo, row.details || "", row.note, row.amount, row.balance]
+        : [row.sl, fmtDate(row.date), row.type, row.invoiceNo, row.note, row.amount, row.balance],
+    );
 
-  const title = `Customer Ledger — ${data?.customer.name || ""}`;
+  const title = `${withProducts ? "Customer Ledger with product" : "Customer Ledger"} — ${data?.customer.name || ""}`;
   const s = data?.summary;
 
   const period =
@@ -95,7 +111,7 @@ export default function CustomerLedgerPage({ params }) {
       >
         <h1 className="m-0 mr-auto flex items-center gap-[10px] text-[21px] font-bold text-[#212529] dark:text-foreground">
           <BookOpen size={24} className="fill-[#16a34a]/20 text-[#16a34a]" />
-          Customer Ledger
+          {withProducts ? "Ledger with product" : "Customer Ledger"}
         </h1>
 
         <div className="flex items-stretch">
@@ -209,10 +225,10 @@ export default function CustomerLedgerPage({ params }) {
           <section className="mt-[18px] rounded-[10px] border border-[#e6ebf1] bg-white p-[18px] dark:border-border dark:bg-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ExportButtons
-                onPdf={() => exportPdf(title, HEAD, exportBody())}
-                onExcel={() => exportExcel("Customer-Ledger.xlsx", HEAD, exportBody())}
+                onPdf={() => exportPdf(title, columns, exportBody())}
+                onExcel={() => exportExcel("Customer-Ledger.xlsx", columns, exportBody())}
                 onPrint={() => {
-                  if (!printTable(title, HEAD, exportBody())) showToast("error", "Allow pop-ups to print");
+                  if (!printTable(title, columns, exportBody())) showToast("error", "Allow pop-ups to print");
                 }}
               />
 
@@ -223,7 +239,7 @@ export default function CustomerLedgerPage({ params }) {
               <table className="w-full min-w-[820px] border-collapse text-sm">
                 <thead>
                   <tr className={theadRow}>
-                    {HEAD.map((column) => (
+                    {columns.map((column) => (
                       <th key={column} className={thClass}>
                         {column}
                       </th>
@@ -233,7 +249,7 @@ export default function CustomerLedgerPage({ params }) {
                 <tbody>
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={HEAD.length} className={`${tdClass} py-10 text-center text-muted-foreground`}>
+                      <td colSpan={columns.length} className={`${tdClass} py-10 text-center text-muted-foreground`}>
                         No entries in this period
                       </td>
                     </tr>
@@ -248,6 +264,7 @@ export default function CustomerLedgerPage({ params }) {
                         {row.method && <span className="block text-xs text-muted-foreground">{methodLabel(row.method)}</span>}
                       </td>
                       <td className={tdClass}>{row.invoiceNo}</td>
+                      {withProducts && <td className={`${tdClass} max-w-72 text-xs`}>{row.details || "—"}</td>}
                       <td className={`${tdClass} max-w-60 text-xs text-muted-foreground`}>{row.note}</td>
                       <td className={`${tdClass} whitespace-nowrap font-semibold ${row.amount > 0 ? "text-red-600" : "text-green-600"}`}>
                         {signed(row.amount)}

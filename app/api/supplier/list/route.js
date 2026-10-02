@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import SupplierModel from "@/models/Supplier.model";
+import "@/models/Showroom.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { escapeRegex } from "@/lib/escapeRegex";
@@ -15,7 +17,18 @@ const SORTS = {
   due_asc: (a, b) => a.balance.due - b.balance.due,
 };
 
-const TOTAL_KEYS = ["total", "paid", "tradeDue", "advance", "dismiss", "received", "due"];
+const TOTAL_KEYS = [
+  "total",
+  "paid",
+  "tradeDue",
+  "returned",
+  "returnPaid",
+  "returnDue",
+  "advance",
+  "dismiss",
+  "received",
+  "due",
+];
 
 /** Supplier list with every supplier's balance and the totals row */
 export async function GET(req) {
@@ -44,7 +57,22 @@ export async function GET(req) {
     if (search) {
       const pattern = { $regex: escapeRegex(search), $options: "i" };
 
-      filter.$or = [{ name: pattern }, { companyName: pattern }, { phone: pattern }, { email: pattern }];
+      filter.$or = [
+        { name: pattern },
+        { companyName: pattern },
+        { phone: pattern },
+        { email: pattern },
+        { area: pattern },
+      ];
+    }
+
+    // "warehouse" is the mother stock, which has no showroom row
+    const branch = searchParams.get("branch") || "all";
+
+    if (branch === "warehouse") {
+      filter.showroomId = null;
+    } else if (branch !== "all" && mongoose.isValidObjectId(branch)) {
+      filter.showroomId = branch;
     }
 
     if (start || end) {
@@ -54,11 +82,19 @@ export async function GET(req) {
       };
     }
 
-    const suppliers = await SupplierModel.find(filter).lean();
+    const suppliers = await SupplierModel.find(filter)
+      .populate({ path: "showroomId", select: "name" })
+      .lean();
+
     const balances = await supplierBalances(suppliers);
 
     const rows = suppliers
-      .map((supplier) => ({ ...supplier, balance: balances.get(String(supplier._id)) }))
+      .map((supplier) => ({
+        ...supplier,
+        showroomId: supplier.showroomId?._id || null,
+        branchName: supplier.showroomId?.name || "Warehouse",
+        balance: balances.get(String(supplier._id)),
+      }))
       .sort(SORTS[sort]);
 
     const totals = Object.fromEntries(

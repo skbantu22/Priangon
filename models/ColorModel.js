@@ -10,6 +10,9 @@ const colorSchema = new mongoose.Schema(
       lowercase: true,
       minlength: [2, "Color name must be at least 2 characters"],
     },
+
+    // deleting a colour only stamps this; the trash screen wipes it later
+    deletedAt: { type: Date, default: null, index: true },
   },
   {
     timestamps: true,

@@ -13,6 +13,11 @@ const CustomerSchema = new mongoose.Schema(
     // customer photo (media URL)
     photo: { type: String, trim: true, default: "" },
 
+    area: { type: String, trim: true, default: "" },
+    membershipNumber: { type: String, trim: true, default: "" },
+    // attachment (media URL: image or PDF)
+    attachment: { type: String, trim: true, default: "" },
+
     phone: {
       type: String,
       unique: true,
@@ -52,6 +57,9 @@ const CustomerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // deleting a customer only stamps this; the trash wipes it after 30 days
+    deletedAt: { type: Date, default: null, index: true },
   },
   {
     timestamps: true,

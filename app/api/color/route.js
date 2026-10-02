@@ -10,7 +10,7 @@ export async function GET() {
 
     await connectDB();
 
-    const colors = await ColorModel.find().sort({ name: 1 });
+    const colors = await ColorModel.find({ deletedAt: null }).sort({ name: 1 });
 
     return NextResponse.json({
       success: true,

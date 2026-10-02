@@ -13,6 +13,8 @@ const EMPTY = {
   email: "",
   phone: "",
   address: "",
+  area: "",
+  showroomId: "",
   initialAdvance: "",
   openingBalance: "",
   openingDate: "",
@@ -59,12 +61,29 @@ export default function SupplierFormModal({ onClose, onSaved }) {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState([]);
   const first = useRef(null);
   const closeRef = useRef(onClose);
 
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
+
+  // Branches to keep the supplier under; blank is the warehouse
+  useEffect(() => {
+    let cancelled = false;
+
+    axios
+      .get("/api/showrooms")
+      .then(({ data }) => {
+        if (!cancelled && data.success) setBranches(data.showrooms || []);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     first.current?.focus();
@@ -156,6 +175,27 @@ export default function SupplierFormModal({ onClose, onSaved }) {
 
           <Field label="Address" className="sm:col-span-6" htmlFor="s-address">
             <Addon icon={<MapPin size={15} />}>{text("address", "Address", { maxLength: 500 })}</Addon>
+          </Field>
+
+          <Field label="Branch" className="sm:col-span-3" htmlFor="s-showroomId">
+            <select
+              id="s-showroomId"
+              value={form.showroomId}
+              onChange={set("showroomId")}
+              className={input}
+            >
+              <option value="">Ware House</option>
+
+              {branches.map((branch) => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Area" className="sm:col-span-3" htmlFor="s-area">
+            {text("area", "Area", { maxLength: 255 })}
           </Field>
 
           <Field label="Initial Advance" className="sm:col-span-2" htmlFor="s-initialAdvance">

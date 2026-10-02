@@ -5,6 +5,7 @@ import ExpenseModel from "@/models/Expense.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
 import { readExpense } from "@/lib/expenseService";
+import { recordMoney } from "@/lib/accounts";
 
 export async function POST(req) {
   try {
@@ -23,6 +24,21 @@ export async function POST(req) {
       ...data,
       voucherNumber: longNumber(),
       createdBy: await actorFullName(auth),
+    });
+
+    // an expense is money out of the account it was paid from
+    await recordMoney({
+      showroomId: expense.showroomId,
+      accountId: data.accountId,
+      method: expense.paymentMethod,
+      direction: "out",
+      amount: expense.amount,
+      source: "expense",
+      sourceId: String(expense._id),
+      reference: expense.voucherNumber,
+      note: expense.title,
+      date: expense.expenseDate,
+      createdBy: expense.createdBy,
     });
 
     return NextResponse.json(

@@ -32,6 +32,14 @@ export async function GET(req) {
     if (type === "advance") filter.type = { $in: ["advance", "advance_refund"] };
     else if (PAYMENT_TYPES.includes(type)) filter.type = type;
 
+    const method = (searchParams.get("method") || "").trim();
+    const by = (searchParams.get("by") || "").trim();
+    const customer = searchParams.get("customer") || "";
+
+    if (method) filter.method = method;
+    if (by) filter.createdBy = by;
+    if (mongoose.isValidObjectId(customer)) filter.customerId = customer;
+
     if (start || end) {
       filter.date = {
         ...(start && { $gte: new Date(`${start}T00:00:00`) }),
@@ -43,6 +51,7 @@ export async function GET(req) {
       const pattern = { $regex: escapeRegex(search), $options: "i" };
 
       const customers = await Customer.find({
+        deletedAt: null,
         $or: [{ name: pattern }, { businessName: pattern }, { phone: pattern }],
       })
         .select("_id")
@@ -54,7 +63,10 @@ export async function GET(req) {
       ];
     }
 
-    const [total, sum] = await Promise.all([
+    // Who can be picked in the "Select Customer" and "Received by" filters
+    const typeFilter = { deletedAt: null, ...(filter.type && { type: filter.type }) };
+
+    const [total, sum, people, customerIds] = await Promise.all([
       CustomerPayment.countDocuments(filter),
       CustomerPayment.aggregate([
         { $match: filter },
@@ -68,7 +80,14 @@ export async function GET(req) {
           },
         },
       ]),
+      CustomerPayment.distinct("createdBy", typeFilter),
+      CustomerPayment.distinct("customerId", typeFilter),
     ]);
+
+    const customerOptions = await Customer.find({ _id: { $in: customerIds } })
+      .select("name phone")
+      .sort({ name: 1 })
+      .lean();
 
     const size = showAll ? total || 1 : limit;
 
@@ -83,6 +102,8 @@ export async function GET(req) {
       success: true,
       data: rows,
       summary: { amount: Math.round((sum[0]?.amount || 0) * 100) / 100 },
+      people: people.filter(Boolean).sort(),
+      customers: customerOptions.map((row) => ({ _id: String(row._id), name: row.name, phone: row.phone })),
       total,
       page: showAll ? 1 : page,
       pages: Math.max(1, Math.ceil(total / size)),

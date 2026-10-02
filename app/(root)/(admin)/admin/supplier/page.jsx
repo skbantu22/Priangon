@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
-import { bdOperator, isValidBdMobile } from "@/lib/bdFormat";
-import { ADMIN_SUPPLIER_LEDGER, ADMIN_SUPPLIER_PAYMENT } from "@/Route/Adminpannelroute";
+import { useOpeningStockTill } from "@/lib/posProducts";
+import {
+  ADMIN_SUPPLIER_EDIT,
+  ADMIN_SUPPLIER_LEDGER,
+  ADMIN_SUPPLIER_PAYMENT,
+  ADMIN_SUPPLIER_PRODUCT_LEDGER,
+} from "@/Route/Adminpannelroute";
 
 import {
   ActionMenu,
@@ -27,6 +32,11 @@ import {
   theadRow,
   totalRow,
 } from "@/components/ui/Application/Admin/supplier/supplierKit";
+import SupplierImportExport from "@/components/ui/Application/Admin/supplier/SupplierImportExport";
+import SupplierFields, {
+  emptySupplierForm,
+  supplierFormError,
+} from "@/components/ui/Application/Admin/supplier/SupplierFields";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,77 +47,76 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 const SORTS = [
-  ["created_desc", "Created DESC"],
   ["created_asc", "Created ASC"],
+  ["created_desc", "Created DESC"],
   ["name_asc", "Name A-Z"],
   ["name_desc", "Name Z-A"],
-  ["due_desc", "Due DESC"],
-  ["due_asc", "Due ASC"],
 ];
 
-const EMPTY_FILTERS = { sort: "created_desc", status: "all", start: "", end: "", search: "" };
+const PAGE_SIZES = ["10", "20", "50", "100", "250", "500", "all"];
 
-const emptyForm = {
-  name: "",
-  companyName: "",
-  phone: "",
-  email: "",
-  address: "",
-  openingBalance: "",
-  initialAdvance: "",
-  openingDate: "",
-  srName: "",
-  srMobile: "",
-  dsrName: "",
-  dsrMobile: "",
-  note: "",
-  isActive: true,
+const EMPTY_FILTERS = {
+  sort: "created_desc",
+  status: "all",
+  branch: "",
+  start: "",
+  end: "",
+  search: "",
 };
 
 const COLUMNS = [
   "SL",
+  "Branch",
   "Name",
   "Business Name",
   "Mobile",
+  "Area",
   "Purchase Total",
   "Purchase Paid",
   "Purchase Due",
+  "Return Total",
+  "Return Paid",
+  "Return Due",
   "Advance",
   "Due Dismiss",
-  "Received",
   "Total Due",
 ];
 
 const exportRow = (row, index) => [
   index + 1,
+  row.branchName || "Ware House",
   row.name,
   row.companyName || "",
   row.phone,
+  row.area || "",
   row.balance.total,
   row.balance.paid,
   row.balance.tradeDue,
+  row.balance.returned,
+  row.balance.returnPaid,
+  row.balance.returnDue,
   row.balance.advance,
   row.balance.dismiss,
-  row.balance.received,
   row.balance.due,
 ];
 
 const exportFoot = (totals) => [
   "",
+  "",
   "Total",
+  "",
   "",
   "",
   totals.total,
   totals.paid,
   totals.tradeDue,
+  totals.returned,
+  totals.returnPaid,
+  totals.returnDue,
   totals.advance,
   totals.dismiss,
-  totals.received,
   totals.due,
 ];
 
@@ -126,15 +135,64 @@ const SupplierPage = () => {
   const [page, setPage] = useState(1);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(emptySupplierForm);
   const [saving, setSaving] = useState(false);
   const [details, setDetails] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Every shop keeps its own suppliers, so the list opens on the shop in
+  // the top branch switch and follows it when the user switches
+  const till = useOpeningStockTill();
+
+  useEffect(() => {
+    if (!till.id) return;
+
+    setDraft((current) => ({ ...current, branch: till.id }));
+    setFilters((current) => ({ ...current, branch: till.id }));
+    setPage(1);
+  }, [till.id]);
+
+  // Branches for the filter and the form; blank means the warehouse
+  useEffect(() => {
+    let cancelled = false;
+
+    axios
+      .get("/api/showrooms")
+      .then(({ data }) => {
+        if (!cancelled && data.success) setBranches(data.showrooms || []);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Areas belong to the shop being worked in, like the suppliers do
+  useEffect(() => {
+    if (!till.id) return undefined;
+
+    let cancelled = false;
+
+    axios
+      .get("/api/areas", { params: { branch: till.id } })
+      .then(({ data }) => {
+        if (!cancelled && data.success) setAreas(data.data || []);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [till.id]);
 
   const params = useCallback(
     (extra) => ({
       sort: filters.sort,
       status: filters.status,
+      branch: filters.branch || "all",
       ...(filters.search && { search: filters.search }),
       ...(filters.start && { start_date: filters.start }),
       ...(filters.end && { end_date: filters.end }),
@@ -177,8 +235,11 @@ const SupplierPage = () => {
   };
 
   const clear = () => {
-    setDraft(EMPTY_FILTERS);
-    setFilters(EMPTY_FILTERS);
+    // Clearing drops the filters but stays in the shop being worked in
+    const reset = { ...EMPTY_FILTERS, branch: till.id || "all" };
+
+    setDraft(reset);
+    setFilters(reset);
     setPage(1);
   };
 
@@ -199,52 +260,38 @@ const SupplierPage = () => {
   };
 
   const openCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm);
+    // A supplier added while working in a shop belongs to that shop
+    setForm({ ...emptySupplierForm, showroomId: till.id === "warehouse" ? "" : till.id });
     setFormOpen(true);
   };
 
+  // Editing has its own page, so the whole form is in view instead of a popup
   const openEdit = (supplier) => {
-    setEditingId(supplier._id);
-    setForm({
-      ...emptyForm,
-      ...Object.fromEntries(
-        Object.keys(emptyForm).map((key) => [key, supplier[key] ?? emptyForm[key]]),
-      ),
-      openingBalance: supplier.openingBalance || "",
-      initialAdvance: supplier.initialAdvance || "",
-      openingDate: supplier.openingDate ? supplier.openingDate.slice(0, 10) : "",
-    });
     setDetails(null);
-    setFormOpen(true);
+    router.push(ADMIN_SUPPLIER_EDIT(supplier._id));
   };
 
   const saveSupplier = async (event) => {
     event.preventDefault();
 
-    if (!form.name.trim() || !form.phone.trim()) {
-      showToast("error", "Supplier name and mobile are required");
-      return;
-    }
+    const invalid = supplierFormError(form);
 
-    if (!isValidBdMobile(form.phone)) {
-      showToast("error", "Enter a Bangladeshi mobile number (01XXXXXXXXX)");
+    if (invalid) {
+      showToast("error", invalid);
       return;
     }
 
     setSaving(true);
 
     try {
-      const { data } = editingId
-        ? await axios.put(`/api/supplier/update/${editingId}`, form)
-        : await axios.post("/api/supplier/create", form);
+      const { data } = await axios.post("/api/supplier/create", form);
 
       if (!data.success) {
         showToast("error", data.message || "Could not save supplier");
         return;
       }
 
-      showToast("success", editingId ? "Supplier updated" : "Supplier created");
+      showToast("success", "Supplier created");
       setFormOpen(false);
       loadSuppliers();
     } catch (error) {
@@ -278,8 +325,6 @@ const SupplierPage = () => {
     }
   };
 
-  const set = (key) => (event) => setForm({ ...form, [key]: event.target.value });
-
   const go = (supplier, type) => router.push(ADMIN_SUPPLIER_PAYMENT(supplier._id, type));
 
   return (
@@ -287,9 +332,15 @@ const SupplierPage = () => {
       <ListCard
         title="Supplier List"
         actions={
-          <button type="button" onClick={openCreate} className={btn.primary}>
-            <Plus size={14} /> Add New Supplier
-          </button>
+          <>
+            <button type="button" onClick={() => setImportOpen(true)} className={btn.info}>
+              <Upload size={14} /> Import/Export
+            </button>
+
+            <button type="button" onClick={openCreate} className={btn.primary}>
+              <Plus size={14} /> Add New Supplier
+            </button>
+          </>
         }
       >
           <form onSubmit={search} className="flex flex-wrap items-center gap-2">
@@ -301,7 +352,7 @@ const SupplierPage = () => {
               }}
               className={`${inputClass} !w-20`}
             >
-              {["10", "20", "50", "100", "all"].map((size) => (
+              {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
                   {size === "all" ? "All" : size}
                 </option>
@@ -320,15 +371,6 @@ const SupplierPage = () => {
               ))}
             </select>
 
-            <select
-              value={draft.status}
-              onChange={(event) => setDraft({ ...draft, status: event.target.value })}
-              className={`${inputClass} !w-32`}
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
 
             <DateRange
               className="w-full sm:w-[300px]"
@@ -371,22 +413,24 @@ const SupplierPage = () => {
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[1000px] border-collapse text-sm">
+            <table className="w-full min-w-[1280px] border-collapse text-sm">
               <thead>
                 <tr className={theadRow}>
                   <th rowSpan={2} className={thClass}>SL</th>
+                  <th rowSpan={2} className={thClass}>Branch</th>
                   <th rowSpan={2} className={thClass}>Name</th>
                   <th rowSpan={2} className={thClass}>Mobile</th>
+                  <th rowSpan={2} className={thClass}>Area</th>
                   <th colSpan={3} className={`${thClass} text-center`}>Purchase</th>
+                  <th colSpan={3} className={`${thClass} text-center`}>Purchase Return</th>
                   <th rowSpan={2} className={thClass}>Advance</th>
                   <th rowSpan={2} className={thClass}>Due Dismiss</th>
-                  <th rowSpan={2} className={thClass}>Received</th>
                   <th rowSpan={2} className={thClass}>Total Due</th>
                   <th rowSpan={2} className={thClass}>Action</th>
                 </tr>
                 <tr className={theadRow}>
-                  {["Total", "Paid", "Due"].map((head) => (
-                    <th key={head} className={thClass}>
+                  {["Total", "Paid", "Due", "Total", "Paid", "Due"].map((head, index) => (
+                    <th key={`${head}-${index}`} className={thClass}>
                       {head}
                     </th>
                   ))}
@@ -397,7 +441,7 @@ const SupplierPage = () => {
                 {loading &&
                   Array.from({ length: 5 }).map((_, index) => (
                     <tr key={index}>
-                      <td colSpan={11} className={tdClass}>
+                      <td colSpan={15} className={tdClass}>
                         <div className="h-4 animate-pulse rounded bg-slate-100 dark:bg-muted" />
                       </td>
                     </tr>
@@ -405,7 +449,7 @@ const SupplierPage = () => {
 
                 {!loading && rows.length === 0 && (
                   <EmptyRow
-                    colSpan={11}
+                    colSpan={15}
                     title={
                       filters.search || filters.start || filters.end || filters.status !== "all"
                         ? "No suppliers match these filters"
@@ -422,6 +466,7 @@ const SupplierPage = () => {
                       className={row.isActive ? "hover:bg-[#f5f7f9] dark:hover:bg-muted/50" : "bg-[#fff7f7] text-[#98a6ad] dark:bg-red-950/30"}
                     >
                       <td className={tdClass}>{meta.from + index}</td>
+                      <td className={tdClass}>{row.branchName || "Ware House"}</td>
                       <td className={tdClass}>
                         <button
                           type="button"
@@ -436,12 +481,15 @@ const SupplierPage = () => {
                         )}
                       </td>
                       <td className={tdClass}>{row.phone}</td>
+                      <td className={tdClass}>{row.area || ""}</td>
                       <td className={tdClass}>{money(row.balance.total)}</td>
                       <td className={tdClass}>{money(row.balance.paid)}</td>
                       <td className={tdClass}>{money(row.balance.tradeDue)}</td>
+                      <td className={tdClass}>{money(row.balance.returned)}</td>
+                      <td className={tdClass}>{money(row.balance.returnPaid)}</td>
+                      <td className={tdClass}>{money(row.balance.returnDue)}</td>
                       <td className={tdClass}>{money(row.balance.advance)}</td>
                       <td className={tdClass}>{money(row.balance.dismiss)}</td>
-                      <td className={tdClass}>{money(row.balance.received)}</td>
                       <td
                         className={`${tdClass} font-semibold ${
                           row.balance.due > 0 ? "text-red-600" : row.balance.due < 0 ? "text-green-600" : ""
@@ -460,6 +508,10 @@ const SupplierPage = () => {
                             ["Advance", () => go(row, "advance")],
                             [row.isActive ? "Deactivated" : "Active", () => toggle(row)],
                             ["Ledger", () => router.push(ADMIN_SUPPLIER_LEDGER(row._id))],
+                            [
+                              "Product with Ledger",
+                              () => router.push(ADMIN_SUPPLIER_PRODUCT_LEDGER(row._id)),
+                            ],
                             ["Delete", () => remove(row), "danger"],
                           ]}
                         />
@@ -471,13 +523,15 @@ const SupplierPage = () => {
               {!loading && totals && rows.length > 0 && (
                 <tfoot>
                   <tr className={totalRow}>
-                    <td colSpan={3} className={tdClass}>Total</td>
+                    <td colSpan={5} className={tdClass}>Total</td>
                     <td className={tdClass}>{money(totals.total)}</td>
                     <td className={tdClass}>{money(totals.paid)}</td>
                     <td className={tdClass}>{money(totals.tradeDue)}</td>
+                    <td className={tdClass}>{money(totals.returned)}</td>
+                    <td className={tdClass}>{money(totals.returnPaid)}</td>
+                    <td className={tdClass}>{money(totals.returnDue)}</td>
                     <td className={tdClass}>{money(totals.advance)}</td>
                     <td className={tdClass}>{money(totals.dismiss)}</td>
-                    <td className={tdClass}>{money(totals.received)}</td>
                     <td className={tdClass}>{money(totals.due)}</td>
                     <td className={tdClass} />
                   </tr>
@@ -495,6 +549,16 @@ const SupplierPage = () => {
             onPage={setPage}
           />
       </ListCard>
+
+      {importOpen && (
+        <SupplierImportExport
+          onClose={() => setImportOpen(false)}
+          onImported={loadSuppliers}
+          exportRows={() =>
+            withAllRows((body, foot) => exportExcel("Suppliers.xlsx", COLUMNS, body, foot))
+          }
+        />
+      )}
 
       <Dialog open={!!details} onOpenChange={(open) => !open && setDetails(null)}>
         <DialogContent>
@@ -541,67 +605,11 @@ const SupplierPage = () => {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <form onSubmit={saveSupplier} noValidate>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Update Supplier" : "Create New Supplier"}</DialogTitle>
+              <DialogTitle>Create New Supplier</DialogTitle>
             </DialogHeader>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
-              <Field label="Name" required className="sm:col-span-3">
-                <Input value={form.name} onChange={set("name")} placeholder="Name" />
-              </Field>
-              <Field label="Business Name" className="sm:col-span-3">
-                <Input value={form.companyName} onChange={set("companyName")} placeholder="Business Name" />
-              </Field>
-
-              <Field label="Email" className="sm:col-span-3">
-                <Input type="email" value={form.email} onChange={set("email")} placeholder="Email" />
-              </Field>
-              <Field label="Mobile" required className="sm:col-span-3">
-                <Input value={form.phone} onChange={set("phone")} placeholder="01XXXXXXXXX" />
-                {form.phone && bdOperator(form.phone) && (
-                  <p className="mt-1 text-xs text-muted-foreground">{bdOperator(form.phone)}</p>
-                )}
-              </Field>
-
-              <Field label="Address" className="sm:col-span-6">
-                <Input value={form.address} onChange={set("address")} placeholder="Address" />
-              </Field>
-
-              <Field label="Initial Advance (৳)" className="sm:col-span-2">
-                <Input type="number" min="0" step="0.01" value={form.initialAdvance} onChange={set("initialAdvance")} placeholder="Amount" />
-              </Field>
-              <Field label="Due (৳)" className="sm:col-span-2">
-                <Input type="number" min="0" step="0.01" value={form.openingBalance} onChange={set("openingBalance")} placeholder="Amount" />
-              </Field>
-              <Field label="Date" className="sm:col-span-2">
-                <Input type="date" value={form.openingDate} onChange={set("openingDate")} />
-              </Field>
-
-              <Field label="SR Name" className="sm:col-span-3">
-                <Input value={form.srName} onChange={set("srName")} placeholder="Name" />
-              </Field>
-              <Field label="SR Mobile" className="sm:col-span-3">
-                <Input value={form.srMobile} onChange={set("srMobile")} placeholder="Mobile" />
-              </Field>
-              <Field label="DSR Name" className="sm:col-span-3">
-                <Input value={form.dsrName} onChange={set("dsrName")} placeholder="Name" />
-              </Field>
-              <Field label="DSR Mobile" className="sm:col-span-3">
-                <Input value={form.dsrMobile} onChange={set("dsrMobile")} placeholder="Mobile" />
-              </Field>
-
-              <Field label="Note" className="sm:col-span-6">
-                <Textarea rows={3} value={form.note} onChange={set("note")} placeholder="Note" />
-              </Field>
-
-              <label className="flex items-center gap-2 text-sm sm:col-span-6">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-                  className="size-4"
-                />
-                Active (show while creating a purchase)
-              </label>
+            <div className="mt-4">
+              <SupplierFields form={form} setForm={setForm} areas={areas} branches={branches} />
             </div>
 
             <DialogFooter className="mt-6">
@@ -609,7 +617,7 @@ const SupplierPage = () => {
                 Close
               </Button>
               <Button type="submit" disabled={saving} className="bg-green-600 text-white hover:bg-green-700">
-                {saving ? "Saving..." : editingId ? "Update" : "Save"}
+                {saving ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>
           </form>
@@ -618,17 +626,5 @@ const SupplierPage = () => {
     </div>
   );
 };
-
-function Field({ label, required, className = "", children }) {
-  return (
-    <div className={`space-y-2 ${className}`}>
-      <Label>
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </Label>
-      {children}
-    </div>
-  );
-}
 
 export default SupplierPage;

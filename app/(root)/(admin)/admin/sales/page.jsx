@@ -65,6 +65,7 @@ function SaleList() {
   const router = useRouter();
   const params = useSearchParams();
   const tab = params.get("type") || "";
+  const customerId = params.get("customerId") || "";
 
   const [draft, setDraft] = useState(EMPTY);
   const [filters, setFilters] = useState(EMPTY);
@@ -79,6 +80,7 @@ function SaleList() {
 
   const query = (extra) => ({
     ...(tab === "exchange" ? { exchange: 1 } : tab && { customerType: tab }),
+    ...(customerId && { customerId }),
     ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
     showroomId: till.id,
     ...extra,
@@ -121,6 +123,7 @@ function SaleList() {
     setResult(null);
     const params = {
       ...(tab === "exchange" ? { exchange: 1 } : tab && { customerType: tab }),
+      ...(customerId && { customerId }),
       ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
       page,
       limit,
@@ -139,7 +142,7 @@ function SaleList() {
     return () => {
       cancelled = true;
     };
-  }, [tab, filters, page, limit, version, till.id]);
+  }, [tab, customerId, filters, page, limit, version, till.id]);
 
   const rows = result?.data || [];
   const title = TABS.find(([k]) => k === tab)?.[1] || "Sale List";

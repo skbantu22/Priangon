@@ -21,11 +21,19 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ success: false, message: "Color not found" }, { status: 404 });
     }
 
-    await ColorModel.findByIdAndDelete(id);
+    // moved to the trash, not wiped — the trash clears it after 30 days
+    const color = await ColorModel.findOneAndUpdate(
+      { _id: id, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+    );
+
+    if (!color) {
+      return NextResponse.json({ success: false, message: "Color not found" }, { status: 404 });
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Color deleted successfully",
+      message: "Color moved to trash",
     });
   } catch (error) {
     return NextResponse.json(

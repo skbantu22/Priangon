@@ -23,9 +23,10 @@ export async function GET(req) {
     if (q) {
       const rx = { $regex: escapeRegex(q), $options: "i" };
       const customers = await Customer.find({
+        deletedAt: null,
         $or: [{ name: rx }, { phone: rx }],
       })
-        .select("name phone address photo type totalOrders totalSpent")
+        .select("name phone address photo businessName email area membershipNumber attachment note type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(8)
         .lean();
@@ -35,8 +36,8 @@ export async function GET(req) {
 
     // ?recent=1 -> latest customers (POS customer modal before typing)
     if (searchParams.get("recent")) {
-      const customers = await Customer.find({})
-        .select("name phone address photo type totalOrders totalSpent")
+      const customers = await Customer.find({ deletedAt: null })
+        .select("name phone address photo businessName email area membershipNumber attachment note type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(10)
         .lean();
@@ -53,6 +54,7 @@ export async function GET(req) {
 
     const customer = await Customer.findOne({
       phone,
+      deletedAt: null,
     });
 
     if (!customer) {

@@ -14,7 +14,9 @@ import { customerBalance, readCustomer } from "@/lib/customerService";
 const notFound = () =>
   NextResponse.json({ success: false, message: "Customer not found" }, { status: 404 });
 
-const findCustomer = (id) => (mongoose.isValidObjectId(id) ? Customer.findById(id) : null);
+// a customer in the trash is out of reach until they are restored
+const findCustomer = (id) =>
+  mongoose.isValidObjectId(id) ? Customer.findOne({ _id: id, deletedAt: null }) : null;
 
 /** One customer with their balance, for the payment and ledger screens */
 export async function GET(req, { params }) {
@@ -108,8 +110,9 @@ export async function PUT(req, { params }) {
 }
 
 /**
- * Deletes a customer who has no history. Anyone with sales, receipts or a
- * login is kept, because their invoices point at them; deactivate instead.
+ * Moves a customer with no history to the trash. Anyone with sales, receipts
+ * or a login is kept, because their invoices point at them; deactivate
+ * instead. What lands in the trash is wiped after 30 days.
  */
 export async function DELETE(req, { params }) {
   try {
@@ -147,9 +150,10 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    await customer.deleteOne();
+    customer.deletedAt = new Date();
+    await customer.save();
 
-    return NextResponse.json({ success: true, message: `${customer.name} deleted` });
+    return NextResponse.json({ success: true, message: `${customer.name} moved to trash` });
   } catch (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }

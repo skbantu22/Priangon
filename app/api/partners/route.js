@@ -26,7 +26,7 @@ export async function GET() {
   const customerIds = users.map((u) => u.customerId).filter(Boolean);
 
   const [customers, balances] = await Promise.all([
-    Customer.find({ _id: { $in: customerIds } }).lean(),
+    Customer.find({ _id: { $in: customerIds }, deletedAt: null }).lean(),
     POSOrder.aggregate([
       { $match: { customerId: { $in: customerIds }, status: "completed" } },
       {
@@ -92,7 +92,9 @@ export async function POST(req) {
     if (await UserModel.exists({ phone, deletedAt: null })) throw new Error("This mobile number already has a login");
 
     // an existing customer (same phone) becomes the partner account
+    // a trashed customer with this number comes back as the partner
     let customer = await Customer.findOne({ phone });
+    if (customer?.deletedAt) customer.deletedAt = null;
     if (customer && (await UserModel.exists({ customerId: customer._id }))) {
       throw new Error("This phone number already has a partner login");
     }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import PurchaseModel from "@/models/Purchase.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { actorFullName, requirePermission } from "@/lib/apiAuth";
+import { recordMoney } from "@/lib/accounts";
 
 export async function POST(req, { params }) {
   try {
@@ -63,6 +64,20 @@ export async function POST(req, { params }) {
     purchase.recalculateTotals();
 
     await purchase.save();
+
+    const paid = purchase.payments[purchase.payments.length - 1];
+    await recordMoney({
+      showroomId: purchase.showroomId,
+      accountId: body.accountId,
+      method: paid.method,
+      direction: "out",
+      amount: paid.amount,
+      source: "purchase",
+      sourceId: String(purchase._id),
+      reference: purchase.purchaseNumber,
+      date: paid.paidAt,
+      createdBy: paid.createdBy,
+    });
 
     return NextResponse.json({
       success: true,

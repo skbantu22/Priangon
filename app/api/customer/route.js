@@ -25,11 +25,19 @@ export async function POST(req) {
 
     if (error) return NextResponse.json({ success: false, message: error }, { status: 400 });
 
-    const existing = await Customer.findOne({ phone: data.phone }).select("name").lean();
+    const existing = await Customer.findOne({ phone: data.phone })
+      .select("name deletedAt")
+      .lean();
 
     if (existing) {
       return NextResponse.json(
-        { success: false, message: `${data.phone} already belongs to ${existing.name}` },
+        {
+          success: false,
+          // the number is unique across the trash too, so say where it went
+          message: existing.deletedAt
+            ? `${data.phone} belongs to ${existing.name}, who is in the trash. Restore them instead.`
+            : `${data.phone} already belongs to ${existing.name}`,
+        },
         { status: 409 },
       );
     }

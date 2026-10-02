@@ -14,7 +14,6 @@ import { PAYMENT_METHODS, money } from "@/components/ui/Application/Admin/suppli
 import {
   AttachmentInput,
   Field,
-  ProductSearch,
   RATES,
   SupplierPicker,
   cell,
@@ -356,17 +355,12 @@ function AddPurchase() {
           </p>
         )}
 
-        <div className="mb-3 flex justify-stretch sm:justify-end">
-          <button type="button" onClick={() => setStep("pick")} className={`${btn.warning} w-full sm:w-auto`}>
-            Add more products
-          </button>
-        </div>
-        <ProductSearch onPick={addItem} />
+        <PurchasePosPicker onPick={addItem} showroomId={till.id} picked={items} />
 
         <div className="mt-3 space-y-3 md:hidden">
           {!items.length && (
             <p className="rounded-[6px] border border-dashed border-[#e3e3e3] py-8 text-center text-sm text-muted-foreground">
-              Search above to add products to this purchase.
+              Choose a brand or category above to add products.
             </p>
           )}
           {items.map((item, index) => (
@@ -406,7 +400,7 @@ function AddPurchase() {
               {!items.length && (
                 <tr>
                   <td colSpan={12} className={`${tdClass} py-10 text-center text-muted-foreground`}>
-                    Search above to add products to this purchase.
+                    Choose a brand or category above to add products.
                   </td>
                 </tr>
               )}

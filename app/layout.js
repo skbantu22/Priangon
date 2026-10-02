@@ -10,7 +10,7 @@ import SupportChannels from "@/components/ui/Application/website/SupportChannels
 // fetched them during `next build`, and on the VPS Google answered with font
 // links Turbopack could not read, which failed the build.
 const FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Geist+Mono&family=Assistant:wght@400;500;600;700;800&display=swap";
+  "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=Geist+Mono&family=Assistant:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap";
 
 export const metadata = {
   title: {

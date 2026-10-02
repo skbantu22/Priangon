@@ -17,7 +17,9 @@ async function load(params) {
 
   const { id } = await params;
 
-  const schedule = mongoose.isValidObjectId(id) ? await SupplierSchedule.findById(id) : null;
+  const schedule = mongoose.isValidObjectId(id)
+    ? await SupplierSchedule.findOne({ _id: id, deletedAt: null })
+    : null;
 
   return schedule ? { schedule } : { response: notFound() };
 }

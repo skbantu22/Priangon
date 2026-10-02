@@ -42,6 +42,7 @@ export const ADMIN_COUPON_EDIT = (id) => (id ? `/admin/coupon/edit/${id}` : "");
 // Customer route
 export const ADMIN_CUSTOMERS_SHOW = "/admin/customers";
 export const ADMIN_CUSTOMER_DUE_RECEIVED = "/admin/customers/due-received";
+export const ADMIN_CUSTOMER_DUE_RECEIVED_EDIT = (id) => `/admin/customers/due-received/${id}/edit`;
 export const ADMIN_CUSTOMER_DUE_PAID = "/admin/customers/due-paid";
 export const ADMIN_CUSTOMER_DUE_DISMISS = "/admin/customers/due-dismiss";
 export const ADMIN_CUSTOMER_ADVANCE = "/admin/customers/advance";
@@ -70,7 +71,10 @@ export const ADMIN_SUPPLIER_SCHEDULE = "/admin/supplier/schedule";
 export const ADMIN_SUPPLIER_DUE_RECEIVED = "/admin/supplier/due-received";
 export const ADMIN_SUPPLIER_DUE_PAID = "/admin/supplier/due-paid";
 export const ADMIN_SUPPLIER_DUE_DISMISS = "/admin/supplier/due-dismiss";
+export const ADMIN_SUPPLIER_EDIT = (id) => `/admin/supplier/${id}/edit`;
 export const ADMIN_SUPPLIER_LEDGER = (id) => `/admin/supplier/${id}/ledger`;
+export const ADMIN_SUPPLIER_PRODUCT_LEDGER = (id) =>
+  `/admin/supplier/${id}/product-ledger`;
 export const ADMIN_SUPPLIER_PAYMENT = (id, type) =>
   `/admin/supplier/${id}/payment/${type}`;
 
@@ -145,3 +149,14 @@ export const ADMIN_INVENTORY_TRANSFER = "/admin/inventory/transfer";
 export const ADMIN_INVENTORY_TRANSFER_VIEW = (id) => `/admin/inventory/transfers/${id}`;
 export const ADMIN_INVENTORY_TRANSFERRED = "/admin/inventory/transferred";
 export const ADMIN_INVENTORY_RECEIVED = "/admin/inventory/received";
+
+export const ADMIN_TELEKHATA = "/admin/telekhata";
+export const ADMIN_TELEKHATA_BAKI = "/admin/telekhata/baki";
+export const ADMIN_TELEKHATA_PARTY = (type, id) => `/admin/telekhata/baki/${type}/${id}`;
+export const ADMIN_TELEKHATA_KENA = "/admin/telekhata/kena";
+export const ADMIN_TELEKHATA_BECHA = "/admin/telekhata/becha";
+export const ADMIN_ACCOUNTS = "/admin/accounts";
+export const ADMIN_ACCOUNT_DEPOSIT = "/admin/accounts/deposit-withdraw";
+export const ADMIN_ACCOUNT_TRANSFER = "/admin/accounts/transfer";
+export const ADMIN_ACCOUNT_STATEMENT = "/admin/accounts/statement";
+export const ADMIN_ACCOUNT_BANKS = "/admin/accounts/banks";

@@ -47,16 +47,36 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "This mobile number is a staff login already" }, { status: 409 });
     }
 
-    // a blank photo leaves the current one as it is
-    const photo = String(body.photo || "").trim().slice(0, 500);
+    // optional extras; a blank value leaves what is already saved
+    const extras = {};
+    const put = (key, max) => {
+      const value = String(body[key] || "").trim().slice(0, max);
+      if (value) extras[key] = value;
+    };
+    put("photo", 500);
+    put("attachment", 500);
+    put("businessName", 160);
+    put("area", 120);
+    put("membershipNumber", 60);
+    put("note", 2000);
+    const email = String(body.email || "").trim().toLowerCase().slice(0, 160);
+    if (email && /^S+@S+.S+$/.test(email)) extras.email = email;
+
+    // an opening due only starts a new account; it never rewrites one that has history
+    const openingDue = Math.max(0, Number(body.openingDue) || 0);
+    const openingDate = body.openingDate ? new Date(body.openingDate) : null;
+    const onInsert = { phone };
+    if (openingDue) onInsert.openingDue = openingDue;
+    if (openingDate && !Number.isNaN(openingDate.getTime())) onInsert.openingDate = openingDate;
 
     const existed = await Customer.exists({ phone });
     const customer = await Customer.findOneAndUpdate(
       { phone },
-      { $set: { name, address, type, ...(photo && { photo }) }, $setOnInsert: { phone } },
+      // deletedAt clears so adding the same number back lifts it out of the trash
+      { $set: { name, address, type, deletedAt: null, ...extras }, $setOnInsert: onInsert },
       { new: true, upsert: true, runValidators: true },
     )
-      .select("name phone address photo type totalOrders totalSpent")
+      .select("name phone address photo businessName email area membershipNumber attachment note type totalOrders totalSpent")
       .lean();
 
     // the partner's login: made, or moved to the new type (and password)

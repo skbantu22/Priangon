@@ -25,6 +25,15 @@ export async function POST(req) {
 
     const existingColor = await ColorModel.findOne({ name });
 
+    // the name is unique across the trash too, so adding one back just
+    // lifts it out of the trash instead of failing on the index
+    if (existingColor?.deletedAt) {
+      existingColor.deletedAt = null;
+      await existingColor.save();
+
+      return NextResponse.json({ success: true, data: existingColor }, { status: 201 });
+    }
+
     if (existingColor) {
       return NextResponse.json(
         {

@@ -45,7 +45,7 @@ const STOCK_FILTERS = {
 export async function GET(request) {
   try {
     const auth = await isAuthenticated();
-    if (!auth.isAuth || !["admin", "manager"].includes(auth.role)) {
+    if (!auth.isAuth || !["admin", "manager", "cashier"].includes(auth.role)) {
       return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 403 });
     }
 

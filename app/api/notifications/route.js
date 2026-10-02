@@ -33,7 +33,7 @@ export async function GET() {
         : [],
       can("partnerOrders.view") ? PartnerOrder.countDocuments({ status: "pending" }) : 0,
       can("suppliers.view")
-        ? SupplierSchedule.find({ status: "pending", scheduledAt: { $lte: endOfToday } })
+        ? SupplierSchedule.find({ status: "pending", deletedAt: null, scheduledAt: { $lte: endOfToday } })
             .populate("supplierId", "name")
             .sort({ scheduledAt: 1 })
             .limit(20)
