@@ -5,14 +5,12 @@ const categorySchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
 
     slug: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -24,6 +22,12 @@ const categorySchema = new mongoose.Schema(
     },
   ],
 
+    isActive: { type: Boolean, default: true },
+
+    // Showroom that owns this category ("warehouse" or a showroom id).
+    // Older categories without it belong to the warehouse.
+    showroomId: { type: String, default: "warehouse", index: true },
+
     // ✅ Soft Delete Support
     deletedAt: {
       type: Date,
@@ -33,6 +37,9 @@ const categorySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+categorySchema.index({ name: 1, showroomId: 1 }, { unique: true });
+categorySchema.index({ slug: 1, showroomId: 1 }, { unique: true });
 
 const CategoryModel =
   mongoose.models.Category ||

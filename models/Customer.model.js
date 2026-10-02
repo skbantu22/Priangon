@@ -10,6 +10,9 @@ const CustomerSchema = new mongoose.Schema(
 
     businessName: { type: String, trim: true, default: "" },
 
+    // customer photo (media URL)
+    photo: { type: String, trim: true, default: "" },
+
     phone: {
       type: String,
       unique: true,

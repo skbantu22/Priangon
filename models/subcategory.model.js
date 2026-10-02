@@ -13,6 +13,8 @@ const subCategorySchema = new mongoose.Schema(
 
     slug: { type: String, required: true, lowercase: true, trim: true },
 
+    isActive: { type: Boolean, default: true },
+
     deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true }

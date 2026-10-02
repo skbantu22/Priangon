@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import ButtonLoading from "@/components/ui/Application/ButtonLoading";
 import { zSchema } from "@/lib/zodschema";
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 
 const breadcrumbData = [
   { href: ADMIN_DASHBOARD, label: "Home" },
@@ -38,6 +39,7 @@ const breadcrumbData = [
 
 const AddCategory = () => {
   const [loading, setloading] = useState(false);
+  const till = useOpeningStockTill();
 
   const formSchema = zSchema.pick({
     name: true,

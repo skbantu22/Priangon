@@ -125,11 +125,14 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
   const [quickAddSaving, setQuickAddSaving] = useState(false);
 
   useEffect(() => {
+    // this showroom's own, active categories
     axios
-      .get("/api/category?deleteType=SD&size=10000")
+      .get("/api/category", {
+        params: { deleteType: "SD", size: 10000, active: true, showroomId: till.id },
+      })
       .then(({ data }) => data?.success && setCategories(data.data))
       .catch(() => {});
-  }, []);
+  }, [till.id]);
 
   useEffect(() => {
     let current = true;
@@ -177,7 +180,7 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
     setQuickAddSaving(true);
     try {
       if (quickAddKind === "category") {
-        const { data } = await axios.post("/api/category/create", { name, slug: slugify(name, { lower: true, strict: true }) });
+        const { data } = await axios.post("/api/category/create", { name, slug: slugify(name, { lower: true, strict: true }), showroomId: till.id });
         if (data?.data?._id) {
           setCategories((list) => [...list, data.data]);
           pickCategory(data.data._id, data.data.name);

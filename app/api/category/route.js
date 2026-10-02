@@ -18,6 +18,7 @@ const filters = JSON.parse(searchParams.get('filters') || "[]")
 const globalFilter = searchParams.get('globalFilter') || ""
 const sorting = JSON.parse(searchParams.get('sorting') || "[]")
 const deleteType = searchParams.get('deleteType')
+const showroomId = searchParams.get('showroomId') || ""
 // Build match query
 let matchQuery = {}
 
@@ -25,6 +26,18 @@ if (deleteType === 'SD') {
   matchQuery = { deletedAt: null }
 } else if (deleteType === 'PD') {
   matchQuery = { deletedAt: { $ne: null } }
+}
+// One showroom's own categories (older ones without an owner are the warehouse's)
+if (showroomId && showroomId !== 'all') {
+  if (showroomId === 'warehouse') {
+    matchQuery.showroomId = { $in: ['warehouse', null, ''] }
+  } else {
+    matchQuery.showroomId = showroomId
+  }
+}
+// ?active=true leaves out deactivated categories (product / sub category forms)
+if (searchParams.get('active') === 'true') {
+  matchQuery.isActive = { $ne: false }
 }
 // Global search
 if (globalFilter) {
@@ -56,6 +69,8 @@ const aggregatePipeline = [
       createdAt: 1,
       updatedAt: 1,
       deletedAt: 1,
+      showroomId: 1,
+      isActive: 1,
     },
   },
 ]

@@ -5,14 +5,12 @@ const brandSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, "Brand name is required"],
-      unique: true,
       trim: true,
     },
 
     slug: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -38,6 +36,14 @@ const brandSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Showroom that owns this brand ("warehouse" or a showroom id).
+    // Older brands without it belong to the warehouse.
+    showroomId: {
+      type: String,
+      default: "warehouse",
+      index: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -58,6 +64,9 @@ const brandSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+brandSchema.index({ name: 1, showroomId: 1 }, { unique: true });
+brandSchema.index({ slug: 1, showroomId: 1 }, { unique: true });
 
 const BrandModel =
   mongoose.models.Brand || mongoose.model("Brand", brandSchema, "brands");

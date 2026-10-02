@@ -19,6 +19,13 @@ export async function GET(req) {
       filter.isActive = true;
     }
 
+    // One showroom's own brands (older ones without an owner are the warehouse's)
+    const showroomId = searchParams.get("showroomId") || "";
+    if (showroomId && showroomId !== "all") {
+      filter.showroomId =
+        showroomId === "warehouse" ? { $in: ["warehouse", null, ""] } : showroomId;
+    }
+
     const search = searchParams.get("search")?.trim();
 
     if (search) {

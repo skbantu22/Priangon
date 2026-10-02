@@ -30,8 +30,11 @@ export async function PUT(req, { params }) {
     const slug = slugify(name, { lower: true, strict: true });
 
     // Another brand must not already hold this name or slug
+    const current = await BrandModel.findById(id).select("showroomId").lean();
+    const owner = current?.showroomId || "warehouse";
     const duplicate = await BrandModel.findOne({
       _id: { $ne: id },
+      showroomId: owner === "warehouse" ? { $in: ["warehouse", null, ""] } : owner,
       $or: [{ name: exactRegex(name) }, { slug }],
     });
 

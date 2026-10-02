@@ -61,6 +61,7 @@ export async function GET(request) {
           name: 1,
           slug: 1,
           categoryId: 1, // ✅
+          isActive: 1,
           createdAt: 1,
           updatedAt: 1,
           deletedAt: 1,

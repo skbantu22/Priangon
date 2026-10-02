@@ -36,7 +36,11 @@ export async function POST(request) {
 
     const { name, slug,subcategories } = validate.data;
 
-    const exists = await CategoryModel.findOne({ slug });
+    const showroomId = String(payload.showroomId || "warehouse");
+    const exists = await CategoryModel.findOne({
+      slug,
+      showroomId: showroomId === "warehouse" ? { $in: ["warehouse", null, ""] } : showroomId,
+    });
     if (exists) {
       return NextResponse.json(
         { success: false, message: "Category already exists" },
@@ -44,13 +48,25 @@ export async function POST(request) {
       );
     }
 
-    const created = await CategoryModel.create({ name, slug });
+    const created = await CategoryModel.create({ name, slug, showroomId });
 
     return NextResponse.json(
       { success: true, message: "Category added successfully", data: created },
       { status: 201 }
     );
   } catch (error) {
+    if (error.code === 11000) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            error.keyPattern?.showroomId
+              ? "Category already exists"
+              : "Category name is still unique across showrooms. Run scripts/category-showroom-index.mjs once.",
+        },
+        { status: 409 }
+      );
+    }
     console.error(error);
     return NextResponse.json(
       { success: false, message: "Server error" },

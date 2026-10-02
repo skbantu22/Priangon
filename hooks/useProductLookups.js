@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 
 import { PRODUCT_UNITS } from "@/lib/productExtraFields";
+import { useOpeningStockTill } from "@/lib/posProducts";
 
 /**
  * Brand and unit suggestions for the product form.
@@ -15,6 +16,7 @@ import { PRODUCT_UNITS } from "@/lib/productExtraFields";
  * unconfigured install still suggests something.
  */
 export function useProductLookups({ fallbackBrands = [] } = {}) {
+  const tillId = useOpeningStockTill().id;
   const [brands, setBrands] = useState(fallbackBrands);
   const [units, setUnits] = useState(PRODUCT_UNITS);
 
@@ -48,7 +50,7 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
     const load = async () => {
       try {
         const [brandRes, unitRes] = await Promise.all([
-          axios.get("/api/brand?active=true"),
+          axios.get("/api/brand", { params: { active: true, showroomId: tillId } }),
           axios.get("/api/unit?active=true"),
         ]);
 
@@ -81,7 +83,7 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [fallbackKey]);
+  }, [fallbackKey, tillId]);
 
   return { brands, units };
 }

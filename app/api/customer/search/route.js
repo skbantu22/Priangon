@@ -25,7 +25,7 @@ export async function GET(req) {
       const customers = await Customer.find({
         $or: [{ name: rx }, { phone: rx }],
       })
-        .select("name phone address type totalOrders totalSpent")
+        .select("name phone address photo type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(8)
         .lean();
@@ -36,7 +36,7 @@ export async function GET(req) {
     // ?recent=1 -> latest customers (POS customer modal before typing)
     if (searchParams.get("recent")) {
       const customers = await Customer.find({})
-        .select("name phone address type totalOrders totalSpent")
+        .select("name phone address photo type totalOrders totalSpent")
         .sort({ updatedAt: -1 })
         .limit(10)
         .lean();

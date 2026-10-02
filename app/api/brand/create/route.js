@@ -26,9 +26,13 @@ export async function POST(req) {
     }
 
     const slug = slugify(name, { lower: true, strict: true });
+    const showroomId = String(body.showroomId || "warehouse");
+    const owner =
+      showroomId === "warehouse" ? { $in: ["warehouse", null, ""] } : showroomId;
 
     // A soft deleted brand still owns its name, so match those too
     const existingBrand = await BrandModel.findOne({
+      showroomId: owner,
       $or: [{ name: exactRegex(name) }, { slug }],
     });
 
@@ -47,6 +51,7 @@ export async function POST(req) {
     const brand = await BrandModel.create({
       name,
       slug,
+      showroomId,
       logo: body.logo?.trim() || "",
       serviceCenter: body.serviceCenter?.trim() || "",
       warrantyMonths: Number(body.warrantyMonths) || 0,

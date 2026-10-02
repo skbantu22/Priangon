@@ -47,13 +47,16 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: "This mobile number is a staff login already" }, { status: 409 });
     }
 
+    // a blank photo leaves the current one as it is
+    const photo = String(body.photo || "").trim().slice(0, 500);
+
     const existed = await Customer.exists({ phone });
     const customer = await Customer.findOneAndUpdate(
       { phone },
-      { $set: { name, address, type }, $setOnInsert: { phone } },
+      { $set: { name, address, type, ...(photo && { photo }) }, $setOnInsert: { phone } },
       { new: true, upsert: true, runValidators: true },
     )
-      .select("name phone address type totalOrders totalSpent")
+      .select("name phone address photo type totalOrders totalSpent")
       .lean();
 
     // the partner's login: made, or moved to the new type (and password)

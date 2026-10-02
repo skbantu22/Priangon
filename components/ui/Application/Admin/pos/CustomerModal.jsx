@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Pencil, Search, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImageIcon, Loader2, Pencil, Search, UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { showToast } from "@/lib/showToast";
 
 const isPhone = (s) => /^01\d{9}$/.test(String(s).replace(/[\s-]/g, ""));
 
-const EMPTY_FORM = { name: "", phone: "", address: "", type: "retail", password: "" };
+const EMPTY_FORM = { name: "", phone: "", address: "", type: "retail", password: "", photo: "" };
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary dark:border-white/10 dark:bg-transparent";
@@ -41,6 +41,8 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
   const [searching, setSearching] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const photoInputRef = useRef(null);
 
   // every open starts on "find", seeded with what was typed in the cart box
   useEffect(() => {
@@ -48,7 +50,13 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     setTab("find");
     setQuery(initialQuery);
     setForm(EMPTY_FORM);
+    setPhotoFile(null);
   }, [open, initialQuery]);
+
+  useEffect(() => {
+    if (!photoFile?.preview) return undefined;
+    return () => URL.revokeObjectURL(photoFile.preview);
+  }, [photoFile]);
 
   useEffect(() => {
     if (!open || tab !== "find") return;
@@ -83,13 +91,15 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
   const startNew = () => {
     const q = query.trim();
     setForm({ ...EMPTY_FORM, ...(isPhone(q) ? { phone: q } : { name: q }) });
+    setPhotoFile(null);
     setTab("form");
   };
 
   const startEdit = (c) => {
     const type = normalizeCustomerType(c.type);
     // a dealer / wholesaler already has a login: the password is only for changing it
-    setForm({ name: c.name || "", phone: c.phone || "", address: c.address || "", type, password: "", hadLogin: type !== "retail" });
+    setForm({ name: c.name || "", phone: c.phone || "", address: c.address || "", photo: c.photo || "", type, password: "", hadLogin: type !== "retail" });
+    setPhotoFile(null);
     setTab("form");
   };
 
@@ -107,17 +117,40 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     }
 
     setSaving(true);
+    let uploadedPhotoId = null;
+    const dropUpload = () => {
+      if (!uploadedPhotoId) return;
+      fetch("/api/media/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [uploadedPhotoId], deleteType: "PD" }),
+      }).catch(() => {});
+    };
     try {
+      let payload = form;
+      if (photoFile?.file) {
+        const body = new FormData();
+        body.append("file", photoFile.file);
+        const up = await fetch("/api/media/upload", { method: "POST", body });
+        const upData = await up.json().catch(() => ({}));
+        if (!upData?.success || !upData.media?.secure_url) {
+          throw new Error(upData?.message || "Could not upload the picture");
+        }
+        uploadedPhotoId = upData.media._id;
+        payload = { ...form, photo: upData.media.secure_url };
+      }
+
       const res = await fetch("/api/customer/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       showToast("success", data.message);
       pick(data.customer);
     } catch (err) {
+      dropUpload();
       showToast("error", err.message || "Could not save customer");
     } finally {
       setSaving(false);
@@ -176,6 +209,14 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
               )}
               {results.map((c) => (
                 <div key={c._id} className="flex items-center gap-2 px-3 py-2 hover:bg-primary/5">
+                  {c.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.photo} alt="" className="size-9 shrink-0 rounded-full border object-cover" />
+                  ) : (
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold uppercase text-primary">
+                      {String(c.name || "?").slice(0, 2)}
+                    </span>
+                  )}
                   <button type="button" onClick={() => pick(c)} className="min-w-0 flex-1 text-left">
                     <span className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">{c.name}</span>
@@ -238,6 +279,49 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
               </label>
             </div>
 
+            <div className="space-y-1 text-sm font-medium">
+              <span>Picture</span>
+              <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-2 dark:border-white/10">
+                {photoFile?.preview || form.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoFile?.preview || form.photo} alt="" className="size-12 shrink-0 rounded-full border bg-white object-cover" />
+                ) : (
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <ImageIcon className="size-5" />
+                  </span>
+                )}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setPhotoFile({ file, preview: URL.createObjectURL(file) });
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="h-8 rounded-md bg-muted px-3 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-white/10"
+                >
+                  {photoFile?.file || form.photo ? "Change picture" : "Choose picture"}
+                </button>
+                {(photoFile?.file || form.photo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoFile(null);
+                      setForm((f) => ({ ...f, photo: "" }));
+                    }}
+                    className="h-8 rounded-md px-2 text-xs text-muted-foreground hover:text-red-500"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
 
             <label className="block space-y-1 text-sm font-medium">
               <span>Address</span>

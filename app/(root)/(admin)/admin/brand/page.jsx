@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { useLanguage } from "@/hooks/useLanguage";
 import { oneLine } from "@/lib/labels";
-import { useOpeningStockTill } from "@/lib/posProducts";
+import { WAREHOUSE_TILL, posShowroomsQueryOptions, useOpeningStockTill, writePosShowroom } from "@/lib/posProducts";
 import { showToast } from "@/lib/showToast";
 import {
   ActionMenu,
@@ -40,11 +41,13 @@ export default function BrandPage() {
   const { language } = useLanguage();
   const t = (en, bn) => oneLine(en, bn, language);
   const till = useOpeningStockTill();
+  const { data: showrooms = [] } = useQuery(posShowroomsQueryOptions());
 
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -60,7 +63,8 @@ export default function BrandPage() {
   const loadBrands = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get("/api/brand");
+      // the selected showroom's own brands
+      const { data } = await axios.get("/api/brand", { params: { showroomId: till.id } });
       if (data.success) setBrands(data.data);
       else showToast("error", data.message || "Could not load brands");
     } catch (error) {
@@ -68,7 +72,7 @@ export default function BrandPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [till.id]);
 
   useEffect(() => {
     setSearch("");
@@ -123,7 +127,7 @@ export default function BrandPage() {
 
       const { data } = editingId
         ? await axios.put(`/api/brand/update/${editingId}`, payload)
-        : await axios.post("/api/brand/create", payload);
+        : await axios.post("/api/brand/create", { ...payload, showroomId: till.id });
 
       if (!data.success) {
         if (uploadedLogoId) {
@@ -166,104 +170,115 @@ export default function BrandPage() {
     () => brands.filter((brand) => brand.name.toLowerCase().includes(search.trim().toLowerCase())),
     [brands, search],
   );
-  const pageSize = 10;
   const pages = Math.max(1, Math.ceil(visibleBrands.length / pageSize));
   const safePage = Math.min(page, pages);
   const rows = visibleBrands.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  return (
-    <div className="space-y-4">
-      <ListCard
-        title={t("Brand List", "ব্র্যান্ড তালিকা")}
-        actions={
-          <button type="button" className={btn.success} onClick={openCreate}>
-            <Plus size={14} /> {t("Add New Brand", "নতুন ব্র্যান্ড")}
-          </button>
-        }
-      >
-        <form className="mb-4 flex flex-wrap items-center gap-2" onSubmit={(event) => event.preventDefault()}>
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder={t("Search brand", "ব্র্যান্ড খুঁজুন")}
-            className={`${filterInput} min-w-[220px] flex-1`}
-          />
-          <button type="submit" className={btn.info}>{t("Search", "খুঁজুন")}</button>
-          <button type="button" className={btn.warning} onClick={() => { setSearch(""); setPage(1); }}>
-            {t("Clear", "মুছুন")}
-          </button>
-        </form>
+  const toggleBrand = async (brand) => {
+    try {
+      const { data } = await axios.put(`/api/brand/update/${brand._id}`, {
+        name: brand.name,
+        logo: brand.logo || "",
+        serviceCenter: brand.serviceCenter || "",
+        warrantyMonths: brand.warrantyMonths || 0,
+        sortOrder: brand.sortOrder || 0,
+        isActive: brand.isActive === false,
+      });
+      showToast(data.success ? "success" : "error", data.success ? (brand.isActive === false ? t("Brand activated", "ব্র্যান্ড চালু হয়েছে") : t("Brand deactivated", "ব্র্যান্ড বন্ধ হয়েছে")) : data.message);
+      loadBrands();
+    } catch (error) {
+      showToast("error", error.response?.data?.message || t("Could not update brand", "ব্র্যান্ড আপডেট হয়নি"));
+    }
+  };
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className={theadClass}>
-                <th className={thClass}>{t("SL", "ক্রম")}</th>
-                <th className={thClass}>{t("Brand", "ব্র্যান্ড")}</th>
-                <th className={thClass}>{t("Warranty", "ওয়ারেন্টি")}</th>
-                <th className={thClass}>{t("Service Center", "সার্ভিস সেন্টার")}</th>
-                <th className={thClass}>{t("Status", "অবস্থা")}</th>
-                <th className={thClass}>{t("Action", "অ্যাকশন")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && <tr><td colSpan={6} className={`${tdClass} py-8 text-center`}>{t("Loading...", "লোড হচ্ছে...")}</td></tr>}
-              {!loading && rows.length === 0 && (
-                <EmptyRow
-                  colSpan={6}
-                  title={search ? t("No brand matched your search", "এই খোঁজে কোনো ব্র্যান্ড নেই") : t("No brand yet", "এখনো কোনো ব্র্যান্ড নেই")}
-                />
-              )}
-              {!loading &&
-                rows.map((brand, index) => (
-                  <tr key={brand._id} className="hover:bg-[#f5f7f9] dark:hover:bg-muted/50">
-                    <td className={tdClass}>{(safePage - 1) * pageSize + index + 1}</td>
-                    <td className={tdClass}>
-                      <div className="flex items-center gap-3 font-medium">
-                        {brand.logo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={brand.logo} alt="" className="size-9 rounded border bg-white object-contain p-0.5" />
-                        ) : (
-                          <span className="flex size-9 items-center justify-center rounded bg-[#e8f4fd] text-xs font-semibold uppercase text-[#188ae2]">
-                            {brand.name.slice(0, 2)}
-                          </span>
-                        )}
-                        {brand.name}
-                      </div>
-                    </td>
-                    <td className={tdClass}>{brand.warrantyMonths > 0 ? `${brand.warrantyMonths} ${t("months", "মাস")}` : "—"}</td>
-                    <td className={`${tdClass} max-w-[240px] truncate`}>{brand.serviceCenter || "—"}</td>
-                    <td className={tdClass}>
-                      <span className={`rounded px-2 py-0.5 text-[12px] font-semibold ${brand.isActive ? "bg-[#e7f8ef] text-[#0e8a4a]" : "bg-[#f1f3f5] text-[#868e96]"}`}>
-                        {brand.isActive ? t("Active", "সক্রিয়") : t("Inactive", "নিষ্ক্রিয়")}
-                      </span>
-                    </td>
-                    <td className={tdClass}>
-                      <ActionMenu
-                        label={t("Action", "অ্যাকশন")}
-                        items={[
-                          [t("Edit", "সম্পাদনা"), () => openEdit(brand)],
-                          [t("Delete", "মুছুন"), () => deleteBrand(brand), "danger"],
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination
-          page={safePage}
-          pages={pages}
-          from={visibleBrands.length ? (safePage - 1) * pageSize + 1 : 0}
-          count={rows.length}
-          total={visibleBrands.length}
-          onPage={setPage}
-        />
-      </ListCard>
+  return (
+    <div className="rounded-[8px] bg-white p-[24px] shadow-[0_1px_3px_rgba(16,24,40,0.08)] dark:bg-card">
+      <div className="mb-[28px] flex flex-wrap items-start justify-between gap-3">
+        <h1 className="m-0 text-[22px] font-semibold text-[#212529] dark:text-foreground">{t("Brands", "ব্র্যান্ড")}</h1>
+        <button type="button" onClick={openCreate} className={`${btn.primary} !px-[18px] !py-[10px] !text-[14px]`}>
+          <Plus size={16} /> {t("Add New Brand", "নতুন ব্র্যান্ড")}
+        </button>
+      </div>
+
+      <div className="mb-[22px] flex flex-wrap items-center gap-3">
+        <select
+          value={pageSize}
+          onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}
+          className={`${filterInput} !h-[48px] !w-[100px]`}
+        >
+          {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select
+          value={till.id}
+          onChange={(event) => writePosShowroom(event.target.value)}
+          className={`${filterInput} !h-[48px] !w-[358px] max-w-full`}
+        >
+          {till.id === WAREHOUSE_TILL && <option value={WAREHOUSE_TILL}>{t("Ware House", "ওয়্যারহাউস")}</option>}
+          {showrooms.filter((s) => s.isActive !== false).map((s) => (
+            <option key={s._id} value={s._id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[16px]">
+          <thead>
+            <tr className="bg-[#1fa463] text-white">
+              <th className={`${thClass} !w-[76px] !text-[16px]`}>{t("SL", "ক্রম")}</th>
+              <th className={`${thClass} !text-[16px]`}>{t("Brand Name", "ব্র্যান্ডের নাম")}</th>
+              <th className={`${thClass} !text-[16px]`}>{t("Warranty", "ওয়ারেন্টি")}</th>
+              <th className={`${thClass} !text-[16px]`}>{t("Action", "অ্যাকশন")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={4} className={`${tdClass} py-8 text-center`}>{t("Loading...", "লোড হচ্ছে...")}</td></tr>}
+            {!loading && rows.length === 0 && (
+              <EmptyRow colSpan={4} title={t("No brand yet", "এখনো কোনো ব্র্যান্ড নেই")} />
+            )}
+            {!loading &&
+              rows.map((brand, index) => (
+                <tr key={brand._id} className="odd:bg-[#f4f7fa] dark:odd:bg-muted/40">
+                  <td className={`${tdClass} !text-[16px]`}>{(safePage - 1) * pageSize + index + 1}</td>
+                  <td className={tdClass}>
+                    <div className="flex items-center gap-3 text-[17px]">
+                      {brand.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={brand.logo} alt="" className="size-9 rounded border bg-white object-contain p-0.5" />
+                      ) : (
+                        <span className="flex size-9 items-center justify-center rounded bg-[#e8f4fd] text-xs font-semibold uppercase text-[#188ae2]">
+                          {brand.name.slice(0, 2)}
+                        </span>
+                      )}
+                      {brand.name}
+                    </div>
+                  </td>
+                  <td className={`${tdClass} !text-[16px]`}>{brand.warrantyMonths > 0 ? `${brand.warrantyMonths} ${t("months", "মাস")}` : "—"}</td>
+                  <td className={tdClass}>
+                    <div className="flex">
+                      <button type="button" onClick={() => openEdit(brand)} className="rounded-l-[4px] bg-[#188ae2] px-[14px] py-[8px] text-[14px] font-medium text-white hover:bg-[#1379c7]">
+                        {t("Edit", "সম্পাদনা")}
+                      </button>
+                      <button type="button" onClick={() => toggleBrand(brand)} className="bg-[#f9c851] px-[14px] py-[8px] text-[14px] font-medium text-white hover:bg-[#f0b93a]">
+                        {brand.isActive === false ? t("Active", "চালু") : t("Deactive", "বন্ধ")}
+                      </button>
+                      <button type="button" onClick={() => deleteBrand(brand)} className="rounded-r-[4px] bg-[#ff5b5b] px-[14px] py-[8px] text-[14px] font-medium text-white hover:bg-[#f24242]">
+                        {t("Delete", "মুছুন")}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination
+        page={safePage}
+        pages={pages}
+        from={visibleBrands.length ? (safePage - 1) * pageSize + 1 : 0}
+        count={rows.length}
+        total={visibleBrands.length}
+        onPage={setPage}
+      />
 
       <Dialog
         open={open}
@@ -272,11 +287,11 @@ export default function BrandPage() {
           if (!nextOpen) setLogoFile(null);
         }}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? t("Edit Brand", "ব্র্যান্ড সম্পাদনা") : t("New Brand", "নতুন ব্র্যান্ড")}</DialogTitle>
+        <DialogContent className="max-h-[90vh] max-w-[620px] gap-0 overflow-y-auto p-0">
+          <DialogHeader className="border-b bg-[#f7f7f7] px-[26px] py-[24px]">
+            <DialogTitle className="text-[20px] font-medium">{editingId ? t("Brand Update", "ব্র্যান্ড আপডেট") : t("Brand Create", "ব্র্যান্ড তৈরি")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 px-[26px] py-[22px]">
             <label className="block space-y-1 text-[13px] text-[#495057]">
               {t("Brand Name", "ব্র্যান্ডের নাম")}
               <input id="brand-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Samsung" className={filterInput} />
@@ -323,10 +338,6 @@ export default function BrandPage() {
                 </div>
               </div>
             </div>
-            <label className="block space-y-1 text-[13px] text-[#495057]">
-              {t("Service Center", "সার্ভিস সেন্টার")}
-              <input id="brand-service" value={form.serviceCenter} onChange={(e) => setForm({ ...form, serviceCenter: e.target.value })} className={filterInput} />
-            </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block space-y-1 text-[13px] text-[#495057]">
                 {t("Warranty (months)", "ওয়ারেন্টি (মাস)")}
@@ -342,12 +353,14 @@ export default function BrandPage() {
               {t("Active (show while adding products)", "সক্রিয় (পণ্য যোগের সময় দেখাবে)")}
             </label>
           </div>
-          <DialogFooter>
-            <button type="button" className={btn.secondary} onClick={() => { setOpen(false); setLogoFile(null); }}>{t("Cancel", "বাতিল")}</button>
-            <button type="button" className={btn.success} onClick={saveBrand} disabled={saving}>
+          <div className="flex justify-end gap-2 px-[26px] pb-[22px]">
+            <button type="button" onClick={saveBrand} disabled={saving} className="rounded-[4px] bg-[#10c469] px-[18px] py-[10px] text-[15px] font-medium text-white hover:bg-[#0dab5b] disabled:opacity-60">
               {saving ? t("Saving...", "সেভ হচ্ছে...") : editingId ? t("Update", "আপডেট") : t("Save", "সেভ")}
             </button>
-          </DialogFooter>
+            <button type="button" onClick={() => { setOpen(false); setLogoFile(null); }} className="rounded-[4px] bg-[#ff5b5b] px-[18px] py-[10px] text-[15px] font-medium text-white hover:bg-[#f24242]">
+              {t("Close", "বন্ধ")}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

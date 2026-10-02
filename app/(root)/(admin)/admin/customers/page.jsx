@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Plus } from "lucide-react";
@@ -72,6 +72,7 @@ const TypeBadge = ({ type }) => (
 const emptyForm = {
   name: "",
   businessName: "",
+  photo: "",
   phone: "",
   email: "",
   address: "",
@@ -154,6 +155,13 @@ export default function CustomersPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [details, setDetails] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const photoInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!photoFile?.preview) return undefined;
+    return () => URL.revokeObjectURL(photoFile.preview);
+  }, [photoFile]);
 
   const params = useCallback(
     (extra) => ({
@@ -236,6 +244,7 @@ export default function CustomersPage() {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, type: type || "retail" });
+    setPhotoFile(null);
     setFormOpen(true);
   };
 
@@ -249,6 +258,7 @@ export default function CustomersPage() {
       isActive: customer.isActive !== false,
     });
     setDetails(null);
+    setPhotoFile(null);
     setFormOpen(true);
   };
 
@@ -267,21 +277,46 @@ export default function CustomersPage() {
 
     setSaving(true);
 
+    let uploadedPhotoId = null;
+    const dropUpload = () => {
+      if (uploadedPhotoId) {
+        axios.delete("/api/media/delete", { data: { ids: [uploadedPhotoId], deleteType: "PD" } }).catch(() => {});
+      }
+    };
+
     try {
+      let payload = form;
+      if (photoFile?.file) {
+        const body = new FormData();
+        body.append("file", photoFile.file);
+        const { data: uploadData } = await axios.post("/api/media/upload", body, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (!uploadData?.success || !uploadData.media?.secure_url) {
+          throw new Error(uploadData?.message || "Could not upload the photo");
+        }
+        uploadedPhotoId = uploadData.media._id;
+        payload = { ...form, photo: uploadData.media.secure_url };
+      }
+
       const { data } = editing
-        ? await axios.put(`/api/customer/${editing._id}`, form)
-        : await axios.post("/api/customer", form);
+        ? await axios.put(`/api/customer/${editing._id}`, payload)
+        : await axios.post("/api/customer", payload);
 
       if (!data.success) {
+        dropUpload();
         showToast("error", data.message || "Could not save customer");
         return;
       }
+
+      setPhotoFile(null);
 
       showToast("success", data.message);
       setFormOpen(false);
       load();
     } catch (error) {
-      showToast("error", error.response?.data?.message || "Could not save customer");
+      dropUpload();
+      showToast("error", error.response?.data?.message || error.message || "Could not save customer");
     } finally {
       setSaving(false);
     }
@@ -503,6 +538,14 @@ export default function CustomersPage() {
                     onChange={(event) => check(row._id, event.target.checked)}
                     aria-label={`Select ${row.name}`}
                   />
+                  {row.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={row.photo} alt="" className="size-10 shrink-0 rounded-full border object-cover" />
+                  ) : (
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#e8f4fd] text-xs font-semibold uppercase text-[#188ae2]">
+                      {String(row.name || "?").slice(0, 2)}
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <button type="button" onClick={() => setDetails(row)} className="block max-w-full truncate text-left text-[15px] font-semibold">
                       {row.name}
@@ -607,11 +650,23 @@ export default function CustomersPage() {
                     </td>
                     <td className={tdClass}>{meta.from + index}</td>
                     <td className={tdClass}>
-                      <button type="button" onClick={() => setDetails(row)} className="text-left font-medium hover:text-blue-600">
-                        {row.name}
-                      </button>
-                      {!row.isActive && <span className="ml-1 text-xs text-red-500">(Inactive)</span>}
-                      {row.businessName && <span className="block text-xs text-muted-foreground">{row.businessName}</span>}
+                      <div className="flex items-center gap-2">
+                        {row.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={row.photo} alt="" className="size-9 shrink-0 rounded-full border object-cover" />
+                        ) : (
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e8f4fd] text-xs font-semibold uppercase text-[#188ae2]">
+                            {String(row.name || "?").slice(0, 2)}
+                          </span>
+                        )}
+                        <div>
+                          <button type="button" onClick={() => setDetails(row)} className="text-left font-medium hover:text-blue-600">
+                            {row.name}
+                          </button>
+                          {!row.isActive && <span className="ml-1 text-xs text-red-500">(Inactive)</span>}
+                          {row.businessName && <span className="block text-xs text-muted-foreground">{row.businessName}</span>}
+                        </div>
+                      </div>
                     </td>
                     <td className={tdClass}>{row.phone}</td>
                     <td className={tdClass}>
@@ -703,6 +758,45 @@ export default function CustomersPage() {
             </DialogHeader>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
+              <div className="flex items-center gap-4 sm:col-span-6">
+                {photoFile?.preview || form.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoFile?.preview || form.photo} alt="" className="size-20 shrink-0 rounded-full border bg-white object-cover" />
+                ) : (
+                  <div className="flex size-20 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">
+                    No photo
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) setPhotoFile({ file, preview: URL.createObjectURL(file) });
+                      event.target.value = "";
+                    }}
+                  />
+                  <button type="button" className="rounded-md bg-[#35b8e0] px-3 py-2 text-sm text-white hover:bg-[#22a6cf]" onClick={() => photoInputRef.current?.click()}>
+                    {photoFile?.file || form.photo ? "Change photo" : "Upload photo"}
+                  </button>
+                  {(photoFile?.file || form.photo) && (
+                    <button
+                      type="button"
+                      className="rounded-md bg-[#868e96] px-3 py-2 text-sm text-white hover:bg-[#727b84]"
+                      onClick={() => {
+                        setPhotoFile(null);
+                        setForm((current) => ({ ...current, photo: "" }));
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <Field label="Name" required className="sm:col-span-3">
                 <Input value={form.name} onChange={set("name")} placeholder="Name" maxLength={120} />
               </Field>
