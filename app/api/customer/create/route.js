@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth.server";
 import { connectDB } from "@/lib/databaseconnection";
 import { PARTNER_ROLES, normalizeCustomerType } from "@/lib/priceTiers";
-import { standInEmail } from "@/lib/mobileLogin";
+import { createPartnerLogin } from "@/lib/partnerLogin";
 import Customer from "@/models/Customer.model";
 import UserModel from "@/models/User.model";
 
@@ -95,16 +95,7 @@ export async function POST(req) {
         await login.save();
         loginNote = password ? " · login password changed" : "";
       } else {
-        await UserModel.create({
-          name,
-          email: standInEmail(phone),
-          password,
-          role: type,
-          customerId: customer._id,
-          phone,
-          address,
-          isEmailVerified: true,
-        });
+        await createPartnerLogin({ customer, name, phone, address, password, role: type });
         loginNote = ` · login made (${phone})`;
       }
     }

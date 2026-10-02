@@ -5,6 +5,7 @@ import axios from "axios";
 import { ArrowLeftRight, Loader2, Printer } from "lucide-react";
 
 import { fmtDate, money } from "@/lib/partnerQueries";
+import ProductDueTable from "@/components/ui/Application/ProductDueTable";
 
 const input =
   "h-[38px] rounded-[4px] border border-[#e3e3e3] bg-white px-3 text-[13px] outline-none focus:border-[#188ae2] dark:border-white/10 dark:bg-card";
@@ -18,13 +19,14 @@ const td = "border border-[#edf0f3] px-2.5 py-2 text-[13px] dark:border-white/10
 export default function PartnerStatement() {
   const [dates, setDates] = useState({ start: "", end: "" });
   const [applied, setApplied] = useState({ start: "", end: "" });
+  const [withProducts, setWithProducts] = useState(false);
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     axios
-      .get("/api/partner/statement", { params: applied })
+      .get("/api/partner/statement", { params: { ...applied, ...(withProducts && { products: "1" }) } })
       .then(({ data: res }) => {
         if (cancelled) return;
         if (res.success) setData(res);
@@ -34,7 +36,7 @@ export default function PartnerStatement() {
     return () => {
       cancelled = true;
     };
-  }, [applied]);
+  }, [applied, withProducts]);
 
   const s = data?.summary;
 
@@ -67,6 +69,10 @@ export default function PartnerStatement() {
           <button type="submit" className="h-[38px] bg-[#10c469] px-4 text-[13px] font-semibold text-white">
             Search
           </button>
+          <label className="flex h-[38px] items-center gap-1.5 whitespace-nowrap text-[13px]">
+            <input type="checkbox" checked={withProducts} onChange={(e) => setWithProducts(e.target.checked)} />
+            With products
+          </label>
           <button type="button" onClick={() => window.print()} className="flex h-[38px] items-center gap-1.5 bg-[#868e96] px-3 text-[13px] text-white">
             <Printer className="size-4" /> Print
           </button>
@@ -94,7 +100,7 @@ export default function PartnerStatement() {
         <table className="w-full min-w-[720px] border-collapse">
           <thead>
             <tr>
-              {["Sl", "Date", "Type", "Invoice / Receipt", "Note", "Debit", "Credit", "Balance"].map((h) => (
+              {["Sl", "Date", "Type", "Invoice / Receipt", ...(withProducts ? ["Product"] : []), "Note", "Debit", "Credit", "Balance"].map((h) => (
                 <th key={h} className={th}>
                   {h}
                 </th>
@@ -104,21 +110,21 @@ export default function PartnerStatement() {
           <tbody>
             {!data && !failed && (
               <tr>
-                <td colSpan={8} className={`${td} py-10 text-center text-muted-foreground`}>
+                <td colSpan={withProducts ? 9 : 8} className={`${td} py-10 text-center text-muted-foreground`}>
                   <Loader2 className="mr-2 inline size-4 animate-spin" /> Loading...
                 </td>
               </tr>
             )}
             {failed && (
               <tr>
-                <td colSpan={8} className={`${td} py-10 text-center text-red-600`}>
+                <td colSpan={withProducts ? 9 : 8} className={`${td} py-10 text-center text-red-600`}>
                   Could not load your statement.
                 </td>
               </tr>
             )}
             {data?.rows.length === 0 && (
               <tr>
-                <td colSpan={8} className={`${td} py-10 text-center text-muted-foreground`}>
+                <td colSpan={withProducts ? 9 : 8} className={`${td} py-10 text-center text-muted-foreground`}>
                   Nothing in this period.
                 </td>
               </tr>
@@ -129,6 +135,7 @@ export default function PartnerStatement() {
                 <td className={`${td} whitespace-nowrap`}>{fmtDate(r.date)}</td>
                 <td className={`${td} whitespace-nowrap`}>{r.type}</td>
                 <td className={`${td} font-mono text-[12px]`}>{r.invoiceNo || "—"}</td>
+                {withProducts && <td className={`${td} max-w-72 text-xs`}>{r.details || "—"}</td>}
                 <td className={`${td} text-muted-foreground`}>{[r.note, r.method].filter(Boolean).join(" · ") || "—"}</td>
                 <td className={`${td} text-right tabular-nums`}>{r.amount > 0 ? money(r.amount) : ""}</td>
                 <td className={`${td} text-right tabular-nums text-[#0b8a45]`}>{r.amount < 0 ? money(-r.amount) : ""}</td>
@@ -138,6 +145,7 @@ export default function PartnerStatement() {
           </tbody>
         </table>
       </div>
+      {withProducts && data && <ProductDueTable rows={data.productRows || []} />}
       <p className="text-xs text-muted-foreground">Debit is what you bought; credit is what you paid or returned. Balance is what you owed after that line.</p>
     </div>
   );

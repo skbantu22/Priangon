@@ -846,8 +846,8 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {!editing && form.type !== "retail" && (
-                <Field label="Portal login password *" className="sm:col-span-6">
+              {form.type !== "retail" && !editing?.hasLogin && (
+                <Field label={editing ? "Portal login password" : "Portal login password *"} className="sm:col-span-6">
                   <Input
                     type="password"
                     autoComplete="new-password"
@@ -857,6 +857,7 @@ export default function CustomersPage() {
                   />
                   <span className="mt-1 block text-xs text-muted-foreground">
                     They log in to the dealer portal with {form.phone || "their mobile number"} and this password. The login shows in Users.
+                    {editing && " This customer has no login yet; set a password to make one."}
                   </span>
                 </Field>
               )}

@@ -4,7 +4,7 @@ import Customer from "@/models/Customer.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
 import { PARTNER_ROLES, normalizeCustomerType } from "@/lib/priceTiers";
-import { standInEmail } from "@/lib/mobileLogin";
+import { createPartnerLogin } from "@/lib/partnerLogin";
 import UserModel from "@/models/User.model";
 import { readCustomer } from "@/lib/customerService";
 
@@ -59,16 +59,20 @@ export async function POST(req) {
     const customer = await Customer.create({ ...data, type });
 
     if (isPartner) {
-      await UserModel.create({
-        name: data.name,
-        email: standInEmail(data.phone),
-        password,
-        role: type,
-        customerId: customer._id,
-        phone: data.phone,
-        address: data.address || "",
-        isEmailVerified: true,
-      });
+      try {
+        await createPartnerLogin({
+          customer,
+          name: data.name,
+          phone: data.phone,
+          address: data.address,
+          password,
+          role: type,
+        });
+      } catch (loginError) {
+        // no customer without the login they were asked to get
+        await Customer.deleteOne({ _id: customer._id });
+        throw loginError;
+      }
     }
 
     return NextResponse.json({

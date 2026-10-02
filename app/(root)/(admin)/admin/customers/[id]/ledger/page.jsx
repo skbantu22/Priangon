@@ -6,6 +6,7 @@ import axios from "axios";
 import { BookOpen } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
+import ProductDueTable from "@/components/ui/Application/ProductDueTable";
 import { CUSTOMER_TYPES } from "@/lib/priceTiers";
 import { ADMIN_CUSTOMER_PAYMENT } from "@/Route/Adminpannelroute";
 
@@ -280,6 +281,12 @@ function CustomerLedger({ params }) {
               A + amount adds to what the customer owes; a − amount takes it down.
             </p>
           </section>
+
+          {withProducts && (
+            <section className="rounded-[8px] bg-white p-4 shadow-sm dark:bg-card">
+              <ProductDueTable rows={data.productRows || []} />
+            </section>
+          )}
         </>
       )}
     </div>

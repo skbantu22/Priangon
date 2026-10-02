@@ -16,6 +16,7 @@ export async function GET(req) {
     const ledger = await customerLedger(partner.customer, {
       start: searchParams.get("start") || "",
       end: searchParams.get("end") || "",
+      withProducts: searchParams.get("products") === "1",
     });
     return NextResponse.json({ success: true, ...ledger });
   } catch (error) {

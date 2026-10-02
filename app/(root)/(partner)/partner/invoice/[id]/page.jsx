@@ -19,7 +19,7 @@ export default async function PartnerInvoice({ params }) {
       </Link>
       {order ? (
         <div className="rounded-2xl border bg-white py-4">
-          <PrintReceipt order={order} autoPrint={false} />
+          <PrintReceipt order={order} autoPrint={false} publicView />
         </div>
       ) : (
         <p className="py-20 text-center text-muted-foreground">Invoice not found.</p>

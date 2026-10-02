@@ -51,6 +51,9 @@ export async function DELETE(req, { params }) {
 
     user.deletedAt = new Date();
     user.isActive = false;
+    // The email is unique, so a removed login must let go of it or the same
+    // person could never be given a login again
+    user.email = `${user._id}.${user.email}`;
     // Old tokens stop working immediately
     user.tokenVersion = (user.tokenVersion || 0) + 1;
 

@@ -8,7 +8,8 @@ import PartnerOrder from "@/models/PartnerOrder.model";
 import UserModel from "@/models/User.model";
 import { connectDB } from "@/lib/databaseconnection";
 import { requirePermission } from "@/lib/apiAuth";
-import { normalizeCustomerType } from "@/lib/priceTiers";
+import { PARTNER_ROLES, normalizeCustomerType } from "@/lib/priceTiers";
+import { createPartnerLogin } from "@/lib/partnerLogin";
 import { customerBalance, readCustomer } from "@/lib/customerService";
 
 const notFound = () =>
@@ -98,10 +99,45 @@ export async function PUT(req, { params }) {
       }
     }
 
+    // a dealer, sub dealer or wholesaler saved without a login gets one when a password is given
+    const password = String(body.password || "").trim();
+    const wantsLogin = PARTNER_ROLES.includes(type) && password;
+    let makeLogin = false;
+
+    if (wantsLogin) {
+      if (password.length < 4) {
+        return NextResponse.json({ success: false, message: "Set a login password of at least 4 characters" }, { status: 400 });
+      }
+
+      const hasLogin = await UserModel.exists({ customerId: customer._id, deletedAt: null });
+
+      if (!hasLogin) {
+        if (await UserModel.exists({ phone: data.phone, deletedAt: null })) {
+          return NextResponse.json({ success: false, message: `${data.phone} already has a login` }, { status: 409 });
+        }
+        makeLogin = true;
+      }
+    }
+
     Object.assign(customer, data, { type });
     await customer.save();
 
-    return NextResponse.json({ success: true, message: "Customer updated", data: customer });
+    if (makeLogin) {
+      await createPartnerLogin({
+        customer,
+        name: data.name,
+        phone: data.phone,
+        address: data.address,
+        password,
+        role: type,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: makeLogin ? `Customer updated · login made (${data.phone})` : "Customer updated",
+      data: customer,
+    });
   } catch (error) {
     console.error("CUSTOMER UPDATE ERROR:", error);
 
