@@ -207,6 +207,18 @@ export default function CustomersPage() {
     setSelected([]);
   }, [page, limit, filters, type]);
 
+  useEffect(() => {
+    const text = draft.search.trim();
+    if (text === filters.search) return undefined;
+
+    const timer = setTimeout(() => {
+      setPage(1);
+      setFilters((current) => ({ ...current, search: text }));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [draft.search, filters.search]);
+
   const search = (event) => {
     event?.preventDefault();
     setPage(1);
