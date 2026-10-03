@@ -113,7 +113,7 @@ export default function PurchasePosPicker({ onPick, showroomId = "", picked = []
         ))}
       </div>
 
-      {categoryId && (
+      {subcategories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" aria-label="subcategories">
           <button type="button" onClick={() => setSubcategoryId("")} className={chip(!subcategoryId)}>
             All Sub Categories

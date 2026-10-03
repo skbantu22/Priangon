@@ -26,6 +26,8 @@ const productSchema = new mongoose.Schema(
     },
 
     brand: { type: String, trim: true, default: "", index: true },
+    // grade of the item, e.g. Original / Copy / Master (accessories)
+    quality: { type: String, trim: true, default: "" },
 
     // =========================
     // 🛡️ WARRANTY

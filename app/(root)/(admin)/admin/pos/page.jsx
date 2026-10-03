@@ -20,6 +20,7 @@ import {
 import {
   filterPosProducts,
   posBrandsQueryOptions,
+  posCatalogQueryOptions,
   posCategoriesQueryOptions,
   posProductsQueryOptions,
   posShowroomsQueryOptions,
@@ -50,16 +51,15 @@ const MAX_EAGER_PAGES = 20;
 const inThisShop = (items) =>
   (items || [])
     .map((product) => {
-      const variants = (product.variants || []).filter(
-        (variant) => Number(variant.showroomStock ?? variant.stock ?? 0) > 0,
-      );
+      const variants = product.variants || [];
       const totalStock = variants.reduce(
         (sum, variant) => sum + Number(variant.showroomStock ?? variant.stock ?? 0),
         0,
       );
       return { ...product, variants, totalStock };
     })
-    .filter((product) => product.totalStock > 0);
+    // sold-out items stay listed (shown as out of stock); only empty shells go
+    .filter((product) => product.variants.length > 0);
 
 // Held (parked) sales live only on this device, like a paper slip at the till
 const HELD_SALES_KEY = "pos-held-sales";
@@ -93,6 +93,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState(""); // 🚀 Debounce Search State
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [sort, setSort] = useState("latest");
   const [lastOrderId, setLastOrderId] = useState(null);
@@ -209,6 +210,7 @@ export default function POSPage() {
       setSearch("");
       setDebouncedSearch("");
       setSelectedCategoryId("");
+      setSelectedSubcategoryId("");
       setSelectedBrand("");
       setSort("latest");
     }
@@ -268,12 +270,14 @@ export default function POSPage() {
   const listFilters = {
     search,
     categoryId: selectedCategoryId,
+    subcategoryId: selectedSubcategoryId,
     brand: selectedBrand,
     sort,
   };
   const hasFilter = !!(
     search.trim() ||
     selectedCategoryId ||
+    selectedSubcategoryId ||
     selectedBrand ||
     sort !== "latest"
   );
@@ -281,7 +285,7 @@ export default function POSPage() {
   const localProducts = useMemo(
     () => filterPosProducts(allProducts, listFilters),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allProducts, search, selectedCategoryId, selectedBrand, sort],
+    [allProducts, search, selectedCategoryId, selectedSubcategoryId, selectedBrand, sort],
   );
 
   // Only when the shop has more products than the eager load holds does a
@@ -325,6 +329,12 @@ export default function POSPage() {
     enabled: !!selectedShowroomId,
     refetchOnWindowFocus: false,
   });
+  // sub categories of this till (same request the category list uses, so it is cached)
+  const catalogQuery = useQuery({
+    ...posCatalogQueryOptions(selectedShowroomId),
+    enabled: !!selectedShowroomId,
+    refetchOnWindowFocus: false,
+  });
   const brandQuery = useQuery({
     ...posBrandsQueryOptions(selectedShowroomId),
     enabled: !!selectedShowroomId,
@@ -344,6 +354,26 @@ export default function POSPage() {
   const categories =
     categoryQuery.isSuccess && !emptyTill ? categoryQuery.data || [] : [];
   const brands = brandQuery.isSuccess && !emptyTill ? brandQuery.data || [] : [];
+  const subcategories = useMemo(
+    () =>
+      catalogQuery.isSuccess && !emptyTill
+        ? (catalogQuery.data?.subcategories || []).filter(
+            (row) => !selectedCategoryId || String(row.categoryId) === String(selectedCategoryId),
+          )
+        : [],
+    [catalogQuery.isSuccess, catalogQuery.data, emptyTill, selectedCategoryId],
+  );
+
+  // a sub category belongs to one category: drop it when the category changes
+  useEffect(() => {
+    if (
+      selectedSubcategoryId &&
+      catalogQuery.isSuccess &&
+      !subcategories.some((row) => String(row._id) === String(selectedSubcategoryId))
+    ) {
+      setSelectedSubcategoryId("");
+    }
+  }, [catalogQuery.isSuccess, subcategories, selectedSubcategoryId]);
 
   useEffect(() => {
     if (!categoryQuery.isSuccess) return;
@@ -875,7 +905,7 @@ export default function POSPage() {
             isError={isError}
             onRetry={() => refetch()}
             emptyHint={
-              search.trim() || selectedCategoryId || selectedBrand
+              search.trim() || selectedCategoryId || selectedSubcategoryId || selectedBrand
                 ? "No products found"
                 : "No products in this shop"
             }
@@ -890,6 +920,9 @@ export default function POSPage() {
             categories={categories}
             selectedCategoryId={selectedCategoryId}
             setSelectedCategoryId={setSelectedCategoryId}
+            subcategories={subcategories}
+            selectedSubcategoryId={selectedSubcategoryId}
+            setSelectedSubcategoryId={setSelectedSubcategoryId}
             brands={brands}
             selectedBrand={selectedBrand}
             setSelectedBrand={setSelectedBrand}

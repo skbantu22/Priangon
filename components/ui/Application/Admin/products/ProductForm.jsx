@@ -115,7 +115,7 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
     refetchOnWindowFocus: false,
   });
   const { data: existingBrands = [] } = useQuery({ ...posBrandsQueryOptions(), refetchOnWindowFocus: false });
-  const { brands, units } = useProductLookups({ fallbackBrands: existingBrands });
+  const { brands, units, qualities } = useProductLookups({ fallbackBrands: existingBrands });
 
   const categoryId = watch("category");
   const [categories, setCategories] = useState([]);
@@ -385,6 +385,14 @@ export default function ProductForm({ product, onSave, saving, footerNote, pendi
             <datalist id="brand-options">
               {brands.map((b) => (
                 <option key={b} value={b} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Quality" className="sm:col-span-2">
+            <input {...register("quality")} list="quality-options" placeholder="Ex: Original, Copy" className={inputClass} />
+            <datalist id="quality-options">
+              {qualities.map((q) => (
+                <option key={q} value={q} />
               ))}
             </datalist>
           </Field>

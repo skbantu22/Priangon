@@ -163,7 +163,7 @@ function AddButton({ disabled, onClick }) {
 function ProductItem({ item, view, setOpenProduct, addToCart }) {
   const { name, brand, warranty, variants, imageUrl, rawProduct, stock, minPrice, maxPrice, options } =
     summarize(item);
-  if (stock <= 0) return null;
+  const soldOut = stock <= 0;
   const [label, labelClass] = stockLabel(stock);
   const warrantyText =
     warranty?.type && warranty.type !== "none" && warranty.months
@@ -194,7 +194,7 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
   );
 
   const image = (className, sizes) => (
-    <div className={`relative overflow-hidden rounded-lg bg-linear-to-b from-violet-50 to-white dark:from-white/5 dark:to-transparent ${className}`}>
+    <div className={`relative overflow-hidden rounded-lg bg-linear-to-b from-violet-50 to-white dark:from-white/5 dark:to-transparent ${soldOut ? "opacity-50 grayscale" : ""} ${className}`}>
       <Image
         src={imageUrl}
         alt={name}
@@ -237,6 +237,11 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
       onClick={() => setOpenProduct(item)}
       className="group relative flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 dark:border-white/10 dark:bg-card"
     >
+      {soldOut && (
+        <span className="absolute left-2 top-2 z-10 rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          Out of stock
+        </span>
+      )}
       {variants.length > 1 && (
         <span className="absolute right-2 top-2 z-10 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
           {variants.length} options
@@ -245,7 +250,7 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
 
       {image("aspect-square w-full", "(max-width: 1280px) 25vw, 15vw")}
 
-      {warrantyText && (
+      {warrantyText && !soldOut && (
         <span className="absolute left-2 top-2 z-10 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
           🛡 {warrantyText}
         </span>
@@ -292,6 +297,9 @@ export default function ProductGallery({
   categories = [],
   selectedCategoryId,
   setSelectedCategoryId,
+  subcategories = [],
+  selectedSubcategoryId = "",
+  setSelectedSubcategoryId = () => {},
   brands = [],
   selectedBrand,
   setSelectedBrand,
@@ -321,12 +329,9 @@ export default function ProductGallery({
     return unique;
   }, [brands]);
 
+  // sold-out items stay listed; ProductItem marks them out of stock
   const inShop = useMemo(
-    () =>
-      (products || []).filter((item) => {
-        const { variants } = getParsedProduct(item);
-        return variants.some((variant) => variantStock(variant) > 0);
-      }),
+    () => (products || []).filter((item) => getParsedProduct(item).variants.length > 0),
     [products],
   );
 
@@ -468,7 +473,13 @@ export default function ProductGallery({
       {/* ---------------- PRODUCTS PANEL ---------------- */}
       <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
         {/* filter bar */}
-        <div className="grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]">
+        <div
+          className={`grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 ${
+            subcategories.length > 0
+              ? "md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]"
+              : "md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]"
+          }`}
+        >
           <label className="col-span-2 hidden h-10 items-center gap-2 sm:flex rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
             <Search className="size-4 text-gray-400" />
             <input
@@ -491,6 +502,21 @@ export default function ProductGallery({
               </option>
             ))}
           </select>
+
+          {subcategories.length > 0 && (
+            <select
+              value={selectedSubcategoryId}
+              onChange={(e) => setSelectedSubcategoryId(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">All Sub Categories</option>
+              {subcategories.map((sub) => (
+                <option key={sub._id} value={sub._id}>
+                  {sub.name || sub.title}
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             value={sort}

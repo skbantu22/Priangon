@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-import { PRODUCT_UNITS } from "@/lib/productExtraFields";
+import { PRODUCT_QUALITIES, PRODUCT_UNITS } from "@/lib/productExtraFields";
 import { useOpeningStockTill } from "@/lib/posProducts";
 
 /**
@@ -19,6 +19,7 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
   const tillId = useOpeningStockTill().id;
   const [brands, setBrands] = useState(fallbackBrands);
   const [units, setUnits] = useState(PRODUCT_UNITS);
+  const [qualities, setQualities] = useState(PRODUCT_QUALITIES);
 
   // Callers pass `data = []` straight out of a query, so while that query
   // is still loading this is a brand new array on every render. Depending
@@ -49,9 +50,10 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
 
     const load = async () => {
       try {
-        const [brandRes, unitRes] = await Promise.all([
+        const [brandRes, unitRes, qualityRes] = await Promise.all([
           axios.get("/api/brand", { params: { active: true, showroomId: tillId } }),
           axios.get("/api/unit?active=true"),
+          axios.get("/api/quality", { params: { active: true, showroomId: tillId } }),
         ]);
 
         if (cancelled) return;
@@ -63,6 +65,12 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
               fallbackList,
             ),
           );
+        }
+
+        // this shop's own list; the built-in suggestions only until it has one
+        if (qualityRes.data?.success) {
+          const own = qualityRes.data.data.map((quality) => quality.name);
+          setQualities(own.length ? own : PRODUCT_QUALITIES);
         }
 
         if (unitRes.data?.success) {
@@ -85,5 +93,5 @@ export function useProductLookups({ fallbackBrands = [] } = {}) {
     };
   }, [fallbackKey, tillId]);
 
-  return { brands, units };
+  return { brands, units, qualities };
 }

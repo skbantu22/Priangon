@@ -38,7 +38,7 @@ export async function GET(req) {
     const hasShowroom =
       !isWarehouse && /^[a-f\d]{24}$/i.test(String(showroomId || ""));
 
-    // Only this shop. Missing rows and zero stock stay off the grid.
+    // Only this shop. Items sold out here stay on the grid, marked out of stock.
     if (!hasShowroom) {
       return Response.json({
         success: true,
@@ -51,10 +51,7 @@ export async function GET(req) {
     }
 
     // This shop only. No warehouse, no variant.stock, no other branch.
-    const stockRows = await ShowroomStock.find({
-      showroomId,
-      stock: { $gt: 0 },
-    })
+    const stockRows = await ShowroomStock.find({ showroomId })
       .select("productId variantId stock")
       .lean();
 
@@ -94,6 +91,11 @@ export async function GET(req) {
 
     if (categoryId && categoryId !== "all") {
       query.category = categoryId;
+    }
+
+    const subcategoryId = searchParams.get("subcategoryId");
+    if (subcategoryId && /^[a-f\d]{24}$/i.test(subcategoryId)) {
+      query.subcategory = subcategoryId;
     }
 
     if (brand) {
@@ -225,8 +227,7 @@ export async function GET(req) {
               (typeof variant.media?.[0] === "string"
                 ? variant.media[0]
                 : variant.media?.[0]?.secure_url) || productImage,
-          }))
-          .filter((variant) => Number(variant.showroomStock) > 0),
+          })),
       };
     }).filter((item) => item.variants.length > 0);
 
