@@ -5,6 +5,7 @@ import { sendMail } from "@/lib/sendMail";
 import { zSchema } from "@/lib/zodschema";
 import OTPModel from "@/models/Otp.model";
 import UserModel from "@/models/User.model"; // ✅ REQUIRED
+import { MOBILE_LOGIN_DOMAIN } from "@/lib/mobileLogin";
 
 import { NextResponse } from "next/server";
 
@@ -26,6 +27,11 @@ const { email } = validatedData.data
 const getUser = await UserModel.findOne({ deletedAt: null, email }).lean()
 if (!getUser) {
   return response(false, 404, 'User not found.')
+}
+
+// a mobile-only login has no email to send a code to
+if (String(getUser.email).endsWith(MOBILE_LOGIN_DOMAIN)) {
+  return response(false, 400, 'This login has no email. Ask the shop to reset your password.')
 }
 
 // remove old otps

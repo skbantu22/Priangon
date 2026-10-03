@@ -95,7 +95,7 @@ export async function POST(req) {
         await login.save();
         loginNote = password ? " · login password changed" : "";
       } else {
-        await createPartnerLogin({ customer, name, phone, address, password, role: type });
+        await createPartnerLogin({ customer, name, phone, address, password, role: type, email: extras.email });
         loginNote = ` · login made (${phone})`;
       }
     }

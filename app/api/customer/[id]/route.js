@@ -128,6 +128,7 @@ export async function PUT(req, { params }) {
         name: data.name,
         phone: data.phone,
         address: data.address,
+        email: data.email,
         password,
         role: type,
       });
