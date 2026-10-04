@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { showToast } from "@/lib/showToast";
 import { bdOperator, isValidBdMobile } from "@/lib/bdFormat";
 import { CUSTOMER_TYPES } from "@/lib/priceTiers";
+import { useOpeningStockTill } from "@/lib/posProducts";
 import { ADMIN_CUSTOMER_LEDGER, ADMIN_CUSTOMER_PAYMENT, ADMIN_SALES } from "@/Route/Adminpannelroute";
 
 import {
@@ -135,6 +136,7 @@ const dueTone = (due) => (due > 0 ? "text-red-600" : due < 0 ? "text-green-600" 
 /** Customer list, laid out like the 360 contacts screen, with the price-list type as the category */
 export default function CustomersPage() {
   const router = useRouter();
+  const till = useOpeningStockTill();
 
   const [rows, setRows] = useState([]);
   const [totals, setTotals] = useState(null);
@@ -313,7 +315,7 @@ export default function CustomersPage() {
 
       const { data } = editing
         ? await axios.put(`/api/customer/${editing._id}`, payload)
-        : await axios.post("/api/customer", payload);
+        : await axios.post("/api/customer", { ...payload, showroomId: till.id });
 
       if (!data.success) {
         dropUpload();

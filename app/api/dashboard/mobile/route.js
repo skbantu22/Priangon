@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
 import POSOrder from "@/models/posorder.model";
+import Customer from "@/models/Customer.model";
+import { customerBalances } from "@/lib/customerService";
 import ShowroomStock from "@/models/ShowroomStock";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import WarrantyClaim from "@/models/WarrantyClaim.model";
@@ -410,7 +412,37 @@ export async function GET(req) {
       orders: chartMap.get(b.key)?.orders || 0,
     }));
 
-    const dues = orderFacets.due;
+    // what customers owed before their first sale (set when the customer was
+    // added) still counts as due, for the shop the customer was added in
+    const dues = [...orderFacets.due];
+    const openers = await Customer.find({
+      deletedAt: null,
+      openingDue: { $gt: 0 },
+      ...(showroom ? { openingShowroomId: showroom } : isWarehouse ? { openingShowroomId: null } : {}),
+    })
+      .select("name phone openingDue")
+      .lean();
+    if (openers.length) {
+      const [balances, saleDues] = await Promise.all([
+        customerBalances(openers),
+        POSOrder.aggregate([
+          { $match: { status: "completed", customerId: { $in: openers.map((c) => c._id) } } },
+          { $group: { _id: "$customerId", due: sumOf("$dueAmount") } },
+        ]),
+      ]);
+      const saleDueBy = new Map(saleDues.map((r) => [String(r._id), r.due]));
+      for (const c of openers) {
+        const id = String(c._id);
+        // due left after sales and receipts, minus the due that sits on invoices
+        const left = (balances.get(id)?.due || 0) - (saleDueBy.get(id) || 0);
+        const open = Math.min(c.openingDue, Math.max(0, left));
+        if (open <= 0.009) continue;
+        const row = dues.find((d) => String(d._id) === id);
+        if (row) row.due += open;
+        else dues.push({ _id: c._id, name: c.name, phone: c.phone, due: open, orders: 0 });
+      }
+      dues.sort((a, b) => b.due - a.due);
+    }
     const sv = stockFacets?.value?.[0] || {};
 
     return NextResponse.json({

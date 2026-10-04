@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import Customer from "@/models/Customer.model";
@@ -56,7 +57,8 @@ export async function POST(req) {
       }
     }
 
-    const customer = await Customer.create({ ...data, type });
+    const openingShowroomId = mongoose.isValidObjectId(body.showroomId) ? body.showroomId : null;
+    const customer = await Customer.create({ ...data, type, openingShowroomId });
 
     if (isPartner) {
       try {

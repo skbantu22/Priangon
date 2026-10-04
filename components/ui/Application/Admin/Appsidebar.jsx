@@ -41,7 +41,7 @@ import { oneLine } from "@/lib/labels";
 import { resetOrderNotification } from "@/store/reducer/notificationSlice";
 
 const menuButtonClass =
-  "h-12 gap-2.5 rounded-lg px-2.5 text-[15px] font-bold text-white hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-primary data-[active=true]:font-bold data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-black/20 [&>svg]:!size-4";
+  "h-12 gap-2.5 rounded-lg px-2.5 text-[15px] font-bold text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground data-[active=true]:bg-sidebar-primary data-[active=true]:font-bold data-[active=true]:text-white data-[active=true]:shadow-lg data-[active=true]:shadow-black/20 [&>svg]:!size-4";
 
 const ICON_TONE = {
   Dashboard: "bg-[#ff6a1f]",
@@ -136,16 +136,16 @@ export default function Appsidebar() {
                 <Image src={sbtMark} alt="SB Telecom" fill sizes="40px" className="object-contain p-0.5" priority />
               </span>
               <span className="min-w-0 flex flex-col leading-tight">
-                <span className="text-xl font-extrabold tracking-wide text-white">
+                <span className="text-xl font-extrabold tracking-wide text-sidebar-foreground">
                   SB <span className="text-[#e0415e]">Telecom</span>
                 </span>
-                <span key={selectedShowroomId} className="truncate text-[12px] font-bold text-white/90">
+                <span key={selectedShowroomId} className="truncate text-[12px] font-bold text-sidebar-foreground/80">
                   {isWarehouseUser ? "Warehouse" : `Sale Center · ${branchName}`}
                 </span>
               </span>
             </Link>
 
-            <p key={`branch-${selectedShowroomId}`} className="mt-2 truncate rounded-lg bg-white/10 px-2 py-1.5 text-[12px] font-bold text-white">
+            <p key={`branch-${selectedShowroomId}`} className="mt-2 truncate rounded-lg bg-sidebar-accent px-2 py-1.5 text-[12px] font-bold text-sidebar-foreground">
               {branchName}
             </p>
           </div>
@@ -153,7 +153,7 @@ export default function Appsidebar() {
           <button
             onClick={toggleSidebar}
             type="button"
-            className="md:hidden flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-white"
+            className="md:hidden flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-foreground"
           >
             <IoMdClose />
           </button>
@@ -214,7 +214,7 @@ export default function Appsidebar() {
                                 <SidebarMenuSubButton
                                   asChild
                                   isActive={pathname === sub.url}
-                                  className="h-9 text-[14px] font-bold text-white hover:bg-sidebar-accent hover:text-white data-[active=true]:bg-sidebar-accent data-[active=true]:font-bold data-[active=true]:text-white"
+                                  className="h-9 text-[14px] font-bold text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-bold data-[active=true]:text-sidebar-foreground"
                                 >
                                   <Link
                                     href={sub.url}

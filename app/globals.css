@@ -124,19 +124,20 @@
 
 /* Admin panel theme (purple). Scoped so the storefront keeps its own colors. */
 .admin-theme {
-  --background: #f5f4fb;
+  --background: #ffffff;
+  --foreground: #111111;
   --primary: #5b2ee0;
   --primary-foreground: #ffffff;
   --ring: #8b6cf6;
   --accent: #efeafd;
   --accent-foreground: #3b1c9e;
-  --sidebar: #24135f;
-  --sidebar-foreground: #d9d3f5;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111111;
   --sidebar-primary: #5b2ee0;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(255 255 255 / 0.08);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-accent: #f1eefc;
+  --sidebar-accent-foreground: #111111;
+  --sidebar-border: #e6e3f2;
   --sidebar-ring: #8b6cf6;
 }
 
@@ -159,6 +160,10 @@
   --accent: #221a45;
   --accent-foreground: #ffffff;
   --sidebar: #160c3d;
+  --sidebar-foreground: #f7f5ff;
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.08);
 }
 
 /* Dashboard chart roles (validated categorical palette, light + dark) */

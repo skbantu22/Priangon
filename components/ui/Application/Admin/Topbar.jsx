@@ -23,27 +23,27 @@ const Topbar = () => {
 
   return (
     <div
-      className={`fixed h-16 w-full top-0 left-0 z-30 ${offset} md:pe-6 px-4 flex justify-between items-center gap-4 bg-sidebar text-white shadow-md transition-[padding] duration-200`}
+      className={`fixed h-16 w-full top-0 left-0 z-30 ${offset} md:pe-6 px-4 flex justify-between items-center gap-4 bg-sidebar text-sidebar-foreground border-b border-sidebar-border shadow-sm transition-[padding] duration-200`}
     >
       <div className="flex items-center gap-3 min-w-0">
         <button
           type="button"
           onClick={toggleSidebar}
-          className="flex size-9 items-center justify-center rounded-lg hover:bg-white/10"
+          className="flex size-9 items-center justify-center rounded-lg hover:bg-sidebar-accent"
           title="Toggle menu"
         >
           <RiMenu4Fill className="size-5" />
         </button>
 
         <span className="hidden text-lg font-extrabold sm:inline md:hidden">
-          SB <span className="text-[#f06a8a]">Telecom</span>
+          SB <span className="text-[#e0415e]">Telecom</span>
         </span>
 
         {/* Desktop search opens the existing search modal */}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="hidden md:flex h-10 w-[420px] max-w-[40vw] items-center overflow-hidden rounded-lg bg-white text-left text-sm text-gray-400"
+          className="hidden md:flex h-10 w-[420px] max-w-[40vw] items-center overflow-hidden rounded-lg border border-sidebar-border bg-white text-left text-sm text-gray-500"
         >
           <span className="flex flex-1 items-center gap-2 px-3">
             <IoSearch className="size-4" />
@@ -60,19 +60,19 @@ const Topbar = () => {
         <StoreSwitch />
         <Link
           href="/admin/pos"
-          className="hidden sm:flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-white/10"
+          className="hidden sm:flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-sidebar-accent"
         >
           <IoCartOutline className="size-5" />
           POS
         </Link>
 
-        <div className="md:hidden [&_button]:text-white">
+        <div className="md:hidden [&_button]:text-sidebar-foreground">
           <AdminMobileSearch />
         </div>
 
         <NotificationBell />
 
-        <div className="[&_button]:text-white [&_button:hover]:bg-white/10 [&_button:hover]:text-white">
+        <div className="[&_button]:text-sidebar-foreground [&_button:hover]:bg-sidebar-accent [&_button:hover]:text-sidebar-foreground">
           <Themeswitch />
         </div>
 
@@ -80,7 +80,7 @@ const Topbar = () => {
           type="button"
           onClick={() => setProfileOpen(true)}
           aria-label="Account"
-          className="flex size-9 items-center justify-center rounded-full text-white hover:bg-white/10"
+          className="flex size-9 items-center justify-center rounded-full text-sidebar-foreground hover:bg-sidebar-accent"
         >
           <IoPersonCircleOutline className="size-7" />
         </button>

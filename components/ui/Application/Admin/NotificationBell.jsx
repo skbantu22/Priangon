@@ -82,7 +82,7 @@ export default function NotificationBell() {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={count ? `${count} notifications` : "Notifications"}
-        className="relative flex size-9 items-center justify-center rounded-full text-white hover:bg-white/10"
+        className="relative flex size-9 items-center justify-center rounded-full text-sidebar-foreground hover:bg-sidebar-accent"
       >
         <Bell className="size-5" />
         {count > 0 && (

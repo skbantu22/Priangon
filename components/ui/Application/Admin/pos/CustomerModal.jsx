@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { CUSTOMER_TYPES, normalizeCustomerType } from "@/lib/priceTiers";
 import { showToast } from "@/lib/showToast";
+import { useOpeningStockTill } from "@/lib/posProducts";
 
 const isPhone = (s) => /^01\d{9}$/.test(String(s).replace(/[\s-]/g, ""));
 
@@ -87,6 +88,7 @@ const IconBox = ({ icon: Icon, text, children }) => (
 // POS customer modal: find a customer, or add / edit one with its type.
 // The picked customer's type sets the rate the cart charges (dealer price...).
 export default function CustomerModal({ open, onOpenChange, onPick, initialQuery = "" }) {
+  const till = useOpeningStockTill();
   const [tab, setTab] = useState("find");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -214,7 +216,7 @@ export default function CustomerModal({ open, onOpenChange, onPick, initialQuery
     };
 
     try {
-      const payload = { ...form };
+      const payload = { ...form, showroomId: till.id };
       if (photoFile?.file) payload.photo = await upload(photoFile.file, "picture");
       if (attachFile?.file) payload.attachment = await upload(attachFile.file, "attachment");
 

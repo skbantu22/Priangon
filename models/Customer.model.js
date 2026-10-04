@@ -43,6 +43,9 @@ const CustomerSchema = new mongoose.Schema(
     openingDue: { type: Number, default: 0, min: 0 },
     initialAdvance: { type: Number, default: 0, min: 0 },
     openingDate: { type: Date, default: null },
+    // the shop the opening due belongs to (null = warehouse / no shop), so each
+    // shop's dashboard counts only its own old dues
+    openingShowroomId: { type: mongoose.Schema.Types.ObjectId, ref: "Showroom", default: null, index: true },
 
     note: { type: String, trim: true, default: "" },
 

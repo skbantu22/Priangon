@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth.server";
 import { connectDB } from "@/lib/databaseconnection";
@@ -66,6 +67,7 @@ export async function POST(req) {
     const openingDue = Math.max(0, Number(body.openingDue) || 0);
     const openingDate = body.openingDate ? new Date(body.openingDate) : null;
     const onInsert = { phone };
+    if (mongoose.isValidObjectId(body.showroomId)) onInsert.openingShowroomId = body.showroomId;
     if (openingDue) onInsert.openingDue = openingDue;
     if (openingDate && !Number.isNaN(openingDate.getTime())) onInsert.openingDate = openingDate;
 
