@@ -34,7 +34,7 @@ function RepairInvoice() {
       .then(({ data }) => {
         if (!data.success || !data.data) return;
         const s = data.data;
-        setCompany({ name: s.companyName || "", logo: s.logo || "", address: s.address || "", phone: s.phone || "" });
+        setCompany({ name: s.companyName || "", logo: s.logo || "", address: s.address || "", phone: s.phone || "", email: s.email || "", invoiceFooter: s.invoiceFooter || "" });
       })
       .catch(() => {});
   }, []);

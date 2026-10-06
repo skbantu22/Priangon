@@ -1,12 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
-import { Printer } from "lucide-react";
-
-const cell = "border border-black px-2 py-1.5 align-top text-[#111] text-[13px]";
-const headCell = `${cell} bg-[#f4f4f5] font-bold align-middle text-center`;
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+import { useEffect, useState } from "react";
+import { showToast } from "@/lib/showToast";
+import InvoiceSheet, { amountInWords, downloadInvoicePdf, money } from "@/components/InvoiceSheet";
 
 const STATUS = {
   received: "Received",
@@ -17,29 +13,17 @@ const STATUS = {
   cancelled: "Cancelled",
 };
 
-function formatBillDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${day} - ${MONTHS[date.getMonth()]} - ${date.getFullYear()}`;
-}
+const REPAIR_NOTES = [
+  "Please bring this invoice when you collect your phone.",
+  "Phones not collected within 30 days of the repair being done are not our responsibility.",
+];
 
-function InfoLine({ label, value }) {
-  return (
-    <p className="text-[13px] leading-5">
-      <span className="font-semibold">{label}</span>
-      {value ? ` ${value}` : ""}
-    </p>
-  );
-}
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-GB") : "—");
 
-const money = (value) => Number(value || 0).toFixed(2);
-
-/**
- * Repair invoice for the customer: what came in, what was done and what is
- * owed. Full page, printed without the admin sidebar.
- */
+// the customer's repair invoice, in the same paper layout as the sales invoice
 export default function RepairReceipt({ job, company = {}, autoPrint = false }) {
+  const [sending, setSending] = useState(false);
+
   useEffect(() => {
     if (!autoPrint) return undefined;
     const timer = setTimeout(() => window.print(), 500);
@@ -48,129 +32,146 @@ export default function RepairReceipt({ job, company = {}, autoPrint = false }) 
 
   if (!job) return <div className="p-4 text-center">Loading...</div>;
 
+  const shopName = company.name || "SB Telecom";
+  const shopAddress = company.address || "";
+  const shopPhone = company.phone || "";
+  const shopEmail = company.email || "";
+
   const parts = job.parts || [];
   const charge = Number(job.serviceCharge) || 0;
   const total = Number(job.total) || 0;
   const paid = Number(job.paid) || 0;
   const due = Number(job.due) || 0;
-  const billed = total > 0 || charge > 0 || parts.length > 0;
+  const billed = charge > 0 || parts.length > 0;
+
+  const rows = [
+    ...(charge > 0 ? [["Service charge", charge]] : []),
+    ...parts.map((p) => [p.name, Number(p.price) || 0]),
+    ...(!billed ? [["Estimated cost (not final)", Number(job.estimate) || 0]] : []),
+  ];
+
+  const meta = [
+    [
+      { label: "Job No", value: job.jobNumber },
+      { label: "Received", value: fmtDate(job.receivedAt) },
+    ],
+    [
+      { label: "Customer", value: job.customerName },
+      { label: "Phone", value: job.phone || "—" },
+    ],
+    [
+      { label: "Device", value: job.device },
+      { label: "IMEI", value: job.imei || "—" },
+    ],
+    [
+      { label: "Problem", value: job.issue },
+      { label: "Technician", value: job.technicianName || "—" },
+    ],
+    [
+      { label: "Promised", value: fmtDate(job.expectedAt) },
+      { label: "Status", value: STATUS[job.status] || job.status },
+    ],
+    ...(job.accessories ? [[{ label: "Came with it", value: job.accessories }]] : []),
+  ];
+
+  const columns = [
+    { key: "sl", label: "SL", align: "center", width: "8%" },
+    { key: "product", label: "Description", align: "left" },
+    { key: "amount", label: "Amount", align: "right", width: "24%" },
+  ];
+
+  const lines = rows.map(([name, amount], index) => ({
+    key: index,
+    cells: { sl: index + 1, product: name, amount: money(amount) },
+  }));
+
+  const totals = [
+    { label: "Total", value: total, strong: true },
+    { label: "Paid", value: paid },
+    { label: "Due", value: due, strong: true },
+  ];
+
+  const words = amountInWords(total);
+
+  const sheet = {
+    fileName: `Repair-${job.jobNumber}.pdf`,
+    shopName,
+    shopAddress,
+    shopPhone,
+    shopEmail,
+    title: "REPAIR INVOICE",
+    meta,
+    head: ["SL", "Description", "Amount"],
+    body: rows.map(([name, amount], index) => [String(index + 1), name, money(amount)]),
+    widths: [14, 130, 42],
+    totals,
+    words,
+    note: job.note || "",
+  };
+
+  const shareWhatsApp = async () => {
+    const digits = String(job.phone || "").replace(/\D/g, "").replace(/^88/, "");
+    const text = `${shopName}\nRepair invoice ${job.jobNumber}\n${job.device}\nTotal ${money(total)}, Paid ${money(paid)}, Due ${money(due)}`;
+    setSending(true);
+    try {
+      const { toBlob } = await import("html-to-image");
+      const blob = await toBlob(document.getElementById("invoice-print"), { pixelRatio: 2, backgroundColor: "#ffffff" });
+      const file = new File([blob], `Repair-${job.jobNumber}.png`, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text });
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(file);
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast("success", "Invoice picture downloaded: attach it in the WhatsApp chat");
+      window.open(`https://wa.me/${/^01\d{9}$/.test(digits) ? `88${digits}` : ""}?text=${encodeURIComponent(text)}`, "_blank");
+    } catch (err) {
+      if (err?.name !== "AbortError") showToast("error", "Could not make the invoice picture");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const btn = "rounded px-3 py-1.5 text-[12px] font-medium text-white transition disabled:opacity-60";
 
   return (
-    <div className="mx-auto w-full max-w-[860px]">
-      <div className="print:hidden mb-4 flex justify-center">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-[6px] bg-[#3d5afe] px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:brightness-110"
-        >
-          <Printer size={16} /> Print
-        </button>
-      </div>
-
-      <div
-        id="invoice-print"
-        className="bg-white px-6 py-7 text-[13px] leading-snug text-[#111] shadow-[0_1px_8px_rgba(0,0,0,0.12)] print:p-0 print:shadow-none"
-      >
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            {company.logo ? (
-              <img src={company.logo} alt="" className="mb-2 h-14 max-w-[220px] object-contain object-left" />
-            ) : null}
-            <h1 className="text-[20px] font-bold leading-tight text-[#188ae2]">{company.name || "Shop"}</h1>
-            {company.address ? <p className="mt-1 text-[13px]">{company.address}</p> : null}
-            {company.phone ? <p className="text-[13px]">{company.phone}</p> : null}
-            <p className="mt-3 text-[15px] font-semibold">Repair Invoice</p>
-          </div>
-
-          <div className="shrink-0 sm:min-w-[260px]">
-            <InfoLine label="Job No :" value={job.jobNumber} />
-            <InfoLine label="Received :" value={formatBillDate(job.receivedAt)} />
-            {job.expectedAt ? <InfoLine label="Promised :" value={formatBillDate(job.expectedAt)} /> : null}
-            {job.deliveredAt ? <InfoLine label="Delivered :" value={formatBillDate(job.deliveredAt)} /> : null}
-            <InfoLine label="Status :" value={STATUS[job.status] || job.status} />
-          </div>
+    <InvoiceSheet
+      shopName={shopName}
+      shopAddress={shopAddress}
+      shopPhone={shopPhone}
+      shopEmail={shopEmail}
+      title="REPAIR INVOICE"
+      meta={meta}
+      columns={columns}
+      lines={lines}
+      totals={totals}
+      words={words}
+      note={job.note}
+      below={
+        <div className="mt-4 text-center text-[11px] leading-4">
+          {REPAIR_NOTES.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+          {company.invoiceFooter && <p className="mt-2">{company.invoiceFooter}</p>}
         </div>
-
-        <div className="mt-5 grid gap-x-8 sm:grid-cols-2">
-          <div>
-            <InfoLine label="Customer :" value={job.customerName} />
-            {job.phone ? <InfoLine label="Mobile :" value={job.phone} /> : null}
-          </div>
-          <div>
-            <InfoLine label="Phone :" value={job.device} />
-            {job.imei ? <InfoLine label="IMEI :" value={job.imei} /> : null}
-            {job.accessories ? <InfoLine label="Came with it :" value={job.accessories} /> : null}
-          </div>
+      }
+      signatures={["Customer", "Authorised Signature"]}
+      toolbar={
+        <div className="print-hide print:hidden mb-4 flex flex-wrap justify-center gap-2 rounded bg-gray-100 p-2 shadow-sm">
+          <button type="button" onClick={() => window.print()} className={`${btn} bg-blue-600 hover:bg-blue-700`}>
+            Print
+          </button>
+          <button type="button" onClick={() => downloadInvoicePdf(sheet)} className={`${btn} bg-red-600 hover:bg-red-700`}>
+            Download PDF
+          </button>
+          <button type="button" onClick={shareWhatsApp} disabled={sending} className={`${btn} bg-green-600 hover:bg-green-700`}>
+            {sending ? "Preparing..." : "Send WhatsApp"}
+          </button>
         </div>
-
-        <p className="mt-4 text-[13px]">
-          <span className="font-semibold">Problem :</span> {job.issue}
-        </p>
-        {job.technicianName ? (
-          <p className="text-[13px]">
-            <span className="font-semibold">Technician :</span> {job.technicianName}
-          </p>
-        ) : null}
-
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[480px] border-collapse">
-            <thead>
-              <tr>
-                <th className={`${headCell} w-[8%]`}>SL.</th>
-                <th className={`${headCell} text-left`}>Description</th>
-                <th className={`${headCell} w-[20%]`}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!billed && (
-                <tr>
-                  <td colSpan={3} className={`${cell} text-center`}>
-                    Estimated cost: {money(job.estimate)}
-                  </td>
-                </tr>
-              )}
-              {charge > 0 && (
-                <tr>
-                  <td className={`${cell} text-center`}>1</td>
-                  <td className={cell}>Service charge</td>
-                  <td className={`${cell} text-right`}>{money(charge)}</td>
-                </tr>
-              )}
-              {parts.map((part, index) => (
-                <tr key={`${part.name}-${index}`}>
-                  <td className={`${cell} text-center`}>{index + 1 + (charge > 0 ? 1 : 0)}</td>
-                  <td className={cell}>{part.name}</td>
-                  <td className={`${cell} text-right`}>{money(part.price)}</td>
-                </tr>
-              ))}
-              <tr>
-                <td colSpan={2} className={`${cell} text-right font-bold`}>Total</td>
-                <td className={`${cell} text-right font-bold`}>{money(total)}</td>
-              </tr>
-              <tr>
-                <td colSpan={2} className={`${cell} text-right`}>Paid</td>
-                <td className={`${cell} text-right`}>{money(paid)}</td>
-              </tr>
-              <tr>
-                <td colSpan={2} className={`${cell} text-right font-bold`}>Due</td>
-                <td className={`${cell} text-right font-bold`}>{money(due)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {job.note ? (
-          <p className="mt-4 text-[12px]">
-            <span className="font-semibold">Note :</span> {job.note}
-          </p>
-        ) : null}
-
-        <div className="print-signatures mt-12 flex justify-between text-[12px]">
-          <span className="border-t border-black px-6 pt-1">Customer signature</span>
-          <span className="border-t border-black px-6 pt-1">Authorized signature</span>
-        </div>
-        <p className="mt-6 text-center text-[11px] text-[#666]">Please bring this invoice when you collect your phone.</p>
-      </div>
-    </div>
+      }
+    />
   );
 }
