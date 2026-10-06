@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import Link from "next/link";
-import { BarChart3, Loader2, Plus, Search, Trash2, Wrench } from "lucide-react";
+import { BarChart3, Loader2, Plus, Printer, Search, Trash2, Wrench } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
 import { useOpeningStockTill } from "@/lib/posProducts";
@@ -323,6 +323,12 @@ export default function RepairPage() {
                       </option>
                     ))}
                   </select>
+                  <Link
+                    href={`/admin/repair/${job._id}?print=1`}
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold"
+                  >
+                    <Printer className="size-4" /> Invoice
+                  </Link>
                   <button
                     type="button"
                     onClick={() => openEdit(job)}
