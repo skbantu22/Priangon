@@ -76,7 +76,7 @@ export default function Login() {
           role === "admin"
             ? ADMIN_DASHBOARD
             : ["dealer", "subDealer", "wholesaler"].includes(role)
-              ? "/partner/products"
+              ? "/partner"
               : "/admin/pos",
         );
       }
