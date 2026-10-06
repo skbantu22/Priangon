@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Search } from "lucide-react";
 
-import { ADMIN_REPORT, ADMIN_REPORT_DUE, ADMIN_REPORT_PROFIT_LOSS } from "@/Route/Adminpannelroute";
+import { ADMIN_REPORT, ADMIN_REPORT_DUE, ADMIN_REPORT_PROFIT_LOSS, ADMIN_REPORT_REPAIR } from "@/Route/Adminpannelroute";
 import { inputClass } from "@/components/ui/Application/Admin/supplier/supplierKit";
 
 // pages outside the report engine that belong in these groups
 const EXTRA = {
   "Customer Report": [["Due Report (customers & suppliers)", ADMIN_REPORT_DUE]],
+  "Repair Report": [["Repair Income & Jobs", ADMIN_REPORT_REPAIR]],
   "Profit Loss Report": [["Profit & Loss (with chart)", ADMIN_REPORT_PROFIT_LOSS]],
 };
 

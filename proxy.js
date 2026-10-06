@@ -65,7 +65,7 @@ export async function proxy(request) {
       isPartner &&
       (isAuthRoute || pathname.startsWith("/admin"))
     ) {
-      return NextResponse.redirect(new URL("/partner", request.url));
+      return NextResponse.redirect(new URL("/partner/products", request.url));
     }
 
     if (!isPartner && !STAFF_ROLES.includes(role)) return signOut(request);

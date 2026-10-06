@@ -51,6 +51,7 @@ const ICON_TONE = {
   Sales: "bg-[#4429ff]",
   Products: "bg-[#851eec]",
   "Dealer / Wholesaler Orders": "bg-[#0097a7]",
+  Repair: "bg-[#ef6c00]",
   Warranty: "bg-[#e91e63]",
   Customers: "bg-[#188ae2]",
   Suppliers: "bg-[#f9a825]",

@@ -28,8 +28,8 @@ import { posShowroomsQueryOptions } from "@/lib/posProducts";
 import { usePartnerBranchId, writePartnerBranch } from "@/lib/partnerBranch";
 
 const NAV = [
-  { href: "/partner", label: "Dashboard", icon: LayoutDashboard },
   { href: "/partner/products", label: "Products & Stock", icon: Smartphone },
+  { href: "/partner/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/partner/orders", label: "Orders & Invoices", icon: ReceiptText },
   { href: "/partner/statement", label: "Statement", icon: BookOpenText },
 ];
@@ -65,13 +65,12 @@ function Header() {
     router.push("/auth/login");
   };
 
-  const active = (href) =>
-    href === "/partner" ? pathname === href : pathname.startsWith(href);
+  const active = (href) => pathname.startsWith(href);
 
   return (
     <header className="sticky top-0 z-40 bg-sidebar text-white shadow-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
-        <Link href="/partner" className="flex shrink-0 items-center gap-2.5">
+        <Link href="/partner/products" className="flex shrink-0 items-center gap-2.5">
           <span className="relative size-10 overflow-hidden rounded-xl bg-white">
             <Image src={sbtMark} alt="SB Telecom" fill sizes="40px" className="object-contain p-0.5" />
           </span>

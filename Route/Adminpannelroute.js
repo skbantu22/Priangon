@@ -160,3 +160,4 @@ export const ADMIN_ACCOUNT_DEPOSIT = "/admin/accounts/deposit-withdraw";
 export const ADMIN_ACCOUNT_TRANSFER = "/admin/accounts/transfer";
 export const ADMIN_ACCOUNT_STATEMENT = "/admin/accounts/statement";
 export const ADMIN_ACCOUNT_BANKS = "/admin/accounts/banks";
+export const ADMIN_REPORT_REPAIR = "/admin/reports/repair";
