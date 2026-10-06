@@ -93,7 +93,7 @@ function Header() {
               }`}
             >
               <Icon className="size-4" />
-              <span className="hidden md:inline">{label}</span>
+              <span className="whitespace-nowrap text-[13px] md:text-sm">{label}</span>
             </Link>
           ))}
         </nav>
