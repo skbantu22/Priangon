@@ -48,7 +48,9 @@ function Header() {
     : "";
   const branchId = branches.some((row) => String(row._id) === picked)
     ? picked
-    : home || (branches[0] ? String(branches[0]._id) : "");
+    : home ||
+      // the sale center is where the stock sits; the list itself comes newest first
+      String(branches.find((row) => row.isSaleCenter)?._id || branches[0]?._id || "");
 
   useEffect(() => {
     if (branchId && branchId !== picked) writePartnerBranch(branchId);
