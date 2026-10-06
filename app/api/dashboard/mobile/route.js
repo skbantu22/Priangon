@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
 import POSOrder from "@/models/posorder.model";
 import Customer from "@/models/Customer.model";
+import KhataEntry from "@/models/KhataEntry.model";
 import { customerBalances } from "@/lib/customerService";
 import ShowroomStock from "@/models/ShowroomStock";
 import WarehouseStock from "@/models/WarehouseStock.model";
@@ -441,6 +442,45 @@ export async function GET(req) {
         if (row) row.due += open;
         else dues.push({ _id: c._id, name: c.name, phone: c.phone, due: open, orders: 0 });
       }
+      dues.sort((a, b) => b.due - a.due);
+    }
+
+    // baki written by hand in Telekhata counts too, so this card and the Pabo
+    // on the Baki Khata page tell the same story for the shop
+    const khata = await KhataEntry.aggregate([
+      {
+        $match: {
+          deletedAt: null,
+          partyType: "customer",
+          ...(showroom ? { showroomId: String(showroom) } : isWarehouse ? { showroomId: "warehouse" } : {}),
+        },
+      },
+      {
+        $group: {
+          _id: "$partyId",
+          net: { $sum: { $cond: [{ $eq: ["$direction", "give"] }, "$amount", { $multiply: ["$amount", -1] }] } },
+        },
+      },
+    ]);
+    if (khata.length) {
+      const known = new Map(dues.map((d) => [String(d._id), d]));
+      const missing = khata
+        .filter((k) => !known.has(String(k._id)) && mongoose.isValidObjectId(k._id))
+        .map((k) => new mongoose.Types.ObjectId(String(k._id)));
+      const people = missing.length
+        ? await Customer.find({ _id: { $in: missing }, deletedAt: null }).select("name phone").lean()
+        : [];
+      const personBy = new Map(people.map((p) => [String(p._id), p]));
+      for (const k of khata) {
+        const id = String(k._id);
+        const row = known.get(id);
+        if (row) row.due += k.net;
+        else if (personBy.has(id)) {
+          const p = personBy.get(id);
+          dues.push({ _id: p._id, name: p.name, phone: p.phone, due: k.net, orders: 0 });
+        }
+      }
+      for (let i = dues.length - 1; i >= 0; i--) if (dues[i].due <= 0.009) dues.splice(i, 1);
       dues.sort((a, b) => b.due - a.due);
     }
     const sv = stockFacets?.value?.[0] || {};
