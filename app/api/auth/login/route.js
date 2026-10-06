@@ -145,6 +145,7 @@ export async function POST(request) {
         phone: getUser.phone,
         address: getUser.address,
         city: getUser.city,
+        avatar: getUser.avatar?.url || "",
       },
     };
 

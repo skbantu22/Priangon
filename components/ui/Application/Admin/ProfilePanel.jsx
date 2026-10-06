@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
-import { IoLanguage, IoLockClosed, IoLogOut, IoPerson } from "react-icons/io5";
+import { IoCamera, IoLanguage, IoLockClosed, IoLogOut, IoPerson } from "react-icons/io5";
 
 import { showToast } from "@/lib/showToast";
 import { WEBSITE_LOGIN } from "@/Route/Websiteroute";
-import { logout } from "@/store/reducer/authReducer";
+import { login, logout } from "@/store/reducer/authReducer";
 import { useLanguage } from "@/hooks/useLanguage";
 import { LANGUAGES } from "@/lib/labels";
 
@@ -109,6 +109,51 @@ const ProfilePanel = ({ open, onOpenChange }) => {
     }
   };
 
+  const photoInput = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  // a new profile picture: saved on the login and kept in the session copy
+  const changePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("error", "Choose an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("error", "The photo must be under 5 MB");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const body = new FormData();
+      body.append("file", file);
+
+      const { data } = await axios.post("/api/profile/update", body);
+
+      if (!data.success) {
+        showToast("error", data.message || "Could not change the photo");
+        return;
+      }
+
+      const avatar = data.data?.avatar?.url || "";
+      const next = auth?.data?.user
+        ? { ...auth, data: { ...auth.data, user: { ...auth.data.user, avatar } } }
+        : { ...auth, user: { ...auth?.user, avatar } };
+      dispatch(login(next));
+      showToast("success", "Profile photo changed");
+    } catch (error) {
+      showToast("error", error.response?.data?.message || "Could not change the photo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       const { data } = await axios.post("/api/auth/logout");
@@ -135,6 +180,34 @@ const ProfilePanel = ({ open, onOpenChange }) => {
               {shopName || user?.name || "Account"}
             </SheetTitle>
           </SheetHeader>
+
+          {user && (
+            <div className="flex flex-col items-center gap-2 border-b px-4 py-5">
+              <div className="relative">
+                <span className="flex size-24 items-center justify-center overflow-hidden rounded-full border bg-primary/10 text-3xl font-bold text-primary">
+                  {user.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatar} alt="" className="size-full object-cover" />
+                  ) : (
+                    String(user.name || "?").trim().charAt(0).toUpperCase()
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => photoInput.current?.click()}
+                  disabled={uploading}
+                  aria-label="Change profile photo"
+                  className="absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full bg-primary text-white shadow-md hover:brightness-110 disabled:opacity-60"
+                >
+                  <IoCamera className="size-4" />
+                </button>
+              </div>
+              <input ref={photoInput} type="file" accept="image/*" className="hidden" onChange={changePhoto} />
+              <p className="text-xs text-muted-foreground">
+                {uploading ? "Uploading..." : "Tap the camera to change your photo"}
+              </p>
+            </div>
+          )}
 
           <div className="divide-y">
             {user && (

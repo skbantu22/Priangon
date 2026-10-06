@@ -4,6 +4,7 @@ import { CUSTOMER_TYPES } from "@/lib/priceTiers";
 import POSOrder from "@/models/posorder.model";
 import PartnerOrder from "@/models/PartnerOrder.model";
 import CustomerPayment from "@/models/CustomerPayment.model";
+import { khataMap, round, systemBalanceMap } from "@/lib/telekhata";
 
 const BD_OFFSET = 6 * 3600 * 1000;
 const monthKey = (d) => new Date(new Date(d).getTime() + BD_OFFSET).toISOString().slice(0, 7);
@@ -84,6 +85,14 @@ export async function GET() {
   ]);
 
   const t = totals[0] || {};
+
+  // what this partner owes, worked out the way the admin customer ledger and Baki Khata do:
+  // opening due, invoices, payments, advance and returns, plus the hand-written khata lines
+  const [systemDue, khata] = await Promise.all([
+    systemBalanceMap("customer", [customer._id]),
+    khataMap({ partyType: "customer" }),
+  ]);
+  const due = round((systemDue.get(String(customer._id)) || 0) + (khata.get(`customer:${customer._id}`)?.net || 0));
   const counts = Object.fromEntries(orderCounts.map((c) => [c._id, c.n]));
   const monthMap = new Map(byMonth.map((m) => [m._id, m]));
   const monthly = months.map((key) => ({
@@ -108,7 +117,7 @@ export async function GET() {
     stats: {
       invoices: t.invoices || 0,
       spent: t.spent || 0,
-      due: t.due || 0,
+      due,
       units: t.units || 0,
       monthSpent: monthMap.get(thisMonth)?.amount || 0,
       monthInvoices: monthMap.get(thisMonth)?.invoices || 0,
