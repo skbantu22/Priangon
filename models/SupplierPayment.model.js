@@ -65,6 +65,15 @@ const supplierPaymentSchema = new mongoose.Schema(
 
     date: { type: Date, default: Date.now, index: true },
 
+    // The shop the money moved at, so the branch switch can split the dues
+    // the same way it splits purchases. null is the warehouse.
+    showroomId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Showroom",
+      default: null,
+      index: true,
+    },
+
     note: { type: String, trim: true, default: "" },
     createdBy: { type: String, trim: true, default: "" },
 

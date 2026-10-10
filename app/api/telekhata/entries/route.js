@@ -332,8 +332,15 @@ export async function POST(req) {
     const done = []; // what was written, for the message
     let rest = amount; // what is left for a Telekhata line
 
+    // The shop this entry is written at. It decides two things: how much of
+    // the money settles a due here rather than becoming an advance, and which
+    // shop's book the receipt lands in. Without it a payment taken at one
+    // shop could pay off another shop's due, and the two screens would drift
+    // apart again.
+    const shop = String(body.showroomId || "warehouse");
+
     if (kind === "money" && partyType === "customer") {
-      const balance = await customerBalance(party);
+      const balance = await customerBalance(party, { showroomId: shop });
 
       if (direction === "take") {
         // money in: first their due, then an advance
@@ -341,12 +348,12 @@ export async function POST(req) {
         const pay = round(Math.min(rest, owes));
         if (pay > 0) {
           const allocations = share(await customerDue(party._id), pay, "orderId");
-          await createCustomerPayment({ customer: party, type: "receive", body: { amount: pay, note, date, method: "cash", allocations }, createdBy });
+          await createCustomerPayment({ customer: party, type: "receive", body: { amount: pay, note, date, method: "cash", allocations, showroomId: shop }, createdBy });
           done.push(`বাকি আদায় ${pay}`);
           rest = round(rest - pay);
         }
         if (rest > 0.009) {
-          await createCustomerPayment({ customer: party, type: "advance", body: { amount: rest, note, date, method: "cash" }, createdBy });
+          await createCustomerPayment({ customer: party, type: "advance", body: { amount: rest, note, date, method: "cash", showroomId: shop }, createdBy });
           done.push(`অগ্রিম ${rest}`);
           rest = 0;
         }
@@ -355,7 +362,7 @@ export async function POST(req) {
         const owed = Math.max(0, -balance.due);
         const pay = round(Math.min(rest, owed));
         if (pay > 0) {
-          await createCustomerPayment({ customer: party, type: "pay", body: { amount: pay, note, date, method: "cash" }, createdBy });
+          await createCustomerPayment({ customer: party, type: "pay", body: { amount: pay, note, date, method: "cash", showroomId: shop }, createdBy });
           done.push(`টাকা ফেরত ${pay}`);
           rest = round(rest - pay);
         }
@@ -363,7 +370,7 @@ export async function POST(req) {
     }
 
     if (kind === "money" && partyType === "supplier") {
-      const balance = await supplierBalance(party);
+      const balance = await supplierBalance(party, { showroomId: shop });
 
       if (direction === "give") {
         // money out: first their bills, then an advance
@@ -371,12 +378,12 @@ export async function POST(req) {
         const pay = round(Math.min(rest, owes));
         if (pay > 0) {
           const allocations = share(await supplierDue(party._id), pay, "purchaseId");
-          await createSupplierPayment({ supplier: party, type: "pay", body: { amount: pay, note, date, method: "cash", allocations }, createdBy });
+          await createSupplierPayment({ supplier: party, type: "pay", body: { amount: pay, note, date, method: "cash", allocations, showroomId: shop }, createdBy });
           done.push(`বিল পরিশোধ ${pay}`);
           rest = round(rest - pay);
         }
         if (rest > 0.009) {
-          await createSupplierPayment({ supplier: party, type: "advance", body: { amount: rest, note, date, method: "cash" }, createdBy });
+          await createSupplierPayment({ supplier: party, type: "advance", body: { amount: rest, note, date, method: "cash", showroomId: shop }, createdBy });
           done.push(`অগ্রিম ${rest}`);
           rest = 0;
         }
@@ -385,7 +392,7 @@ export async function POST(req) {
         const owed = Math.max(0, -balance.due);
         const pay = round(Math.min(rest, owed));
         if (pay > 0) {
-          await createSupplierPayment({ supplier: party, type: "receive", body: { amount: pay, note, date, method: "cash" }, createdBy });
+          await createSupplierPayment({ supplier: party, type: "receive", body: { amount: pay, note, date, method: "cash", showroomId: shop }, createdBy });
           done.push(`টাকা ফেরত পাওয়া ${pay}`);
           rest = round(rest - pay);
         }
@@ -402,7 +409,7 @@ export async function POST(req) {
         note,
         photo: String(body.photo || "").trim().slice(0, 500),
         date,
-        showroomId: String(body.showroomId || "warehouse"),
+        showroomId: shop,
         createdBy,
       });
       done.push(kind === "goods" ? `পণ্য বাকি ${rest}` : `বাকি ${rest}`);

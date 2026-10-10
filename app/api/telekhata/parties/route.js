@@ -30,6 +30,8 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const partyType = cleanType(searchParams.get("type"));
     const search = (searchParams.get("search") || "").trim();
+    // the shop switch at the top, so the book splits per shop like the rest
+    const showroomId = searchParams.get("showroomId") || "warehouse";
 
     const { Model, phone, filter } = sources[partyType];
     const query = filter();
@@ -41,7 +43,7 @@ export async function GET(req) {
 
     const [people, { book, totals }, counts] = await Promise.all([
       Model.find(query).select(`name ${phone} photo${partyType === "customer" ? " type" : ""}`).sort({ name: 1 }).limit(2000).lean(),
-      unifiedBook(),
+      unifiedBook(showroomId),
       Promise.all(TYPES.map((type) => sources[type].Model.countDocuments(sources[type].filter()))),
     ]);
 

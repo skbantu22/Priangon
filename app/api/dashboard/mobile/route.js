@@ -4,8 +4,8 @@ import { connectDB } from "@/lib/databaseconnection";
 import { isAuthenticated } from "@/lib/auth.server";
 import POSOrder from "@/models/posorder.model";
 import Customer from "@/models/Customer.model";
-import KhataEntry from "@/models/KhataEntry.model";
 import { customerBalances } from "@/lib/customerService";
+import { khataMap } from "@/lib/telekhata";
 import ShowroomStock from "@/models/ShowroomStock";
 import WarehouseStock from "@/models/WarehouseStock.model";
 import WarrantyClaim from "@/models/WarrantyClaim.model";
@@ -413,76 +413,38 @@ export async function GET(req) {
       orders: chartMap.get(b.key)?.orders || 0,
     }));
 
-    // what customers owed before their first sale (set when the customer was
-    // added) still counts as due, for the shop the customer was added in
-    const dues = [...orderFacets.due];
-    const openers = await Customer.find({
-      deletedAt: null,
-      openingDue: { $gt: 0 },
-      ...(showroom ? { openingShowroomId: showroom } : isWarehouse ? { openingShowroomId: null } : {}),
-    })
-      .select("name phone openingDue")
+    // Customer dues come from the one shared book: the same balance the
+    // Baki Khata page shows for this shop. Building it here a second time
+    // is what used to make the card and that page disagree — a customer
+    // who had paid money in still showed their full handwritten baki.
+    const people = await Customer.find({ deletedAt: null })
+      .select("name phone openingDue initialAdvance openingShowroomId")
       .lean();
-    if (openers.length) {
-      const [balances, saleDues] = await Promise.all([
-        customerBalances(openers),
-        POSOrder.aggregate([
-          { $match: { status: "completed", customerId: { $in: openers.map((c) => c._id) } } },
-          { $group: { _id: "$customerId", due: sumOf("$dueAmount") } },
-        ]),
-      ]);
-      const saleDueBy = new Map(saleDues.map((r) => [String(r._id), r.due]));
-      for (const c of openers) {
-        const id = String(c._id);
-        // due left after sales and receipts, minus the due that sits on invoices
-        const left = (balances.get(id)?.due || 0) - (saleDueBy.get(id) || 0);
-        const open = Math.min(c.openingDue, Math.max(0, left));
-        if (open <= 0.009) continue;
-        const row = dues.find((d) => String(d._id) === id);
-        if (row) row.due += open;
-        else dues.push({ _id: c._id, name: c.name, phone: c.phone, due: open, orders: 0 });
-      }
-      dues.sort((a, b) => b.due - a.due);
+
+    const [balances, khataNet, orderCounts] = await Promise.all([
+      customerBalances(people, { showroomId: scope }),
+      khataMap({ partyType: "customer", showroomId: scope || "all" }),
+      Promise.resolve(new Map(orderFacets.due.map((row) => [String(row._id), row.orders || 0]))),
+    ]);
+
+    const dues = [];
+
+    for (const person of people) {
+      const id = String(person._id);
+      const due = (balances.get(id)?.due || 0) + (khataNet.get(`customer:${id}`)?.net || 0);
+
+      if (due <= 0.009) continue;
+
+      dues.push({
+        _id: person._id,
+        name: person.name,
+        phone: person.phone,
+        due: Math.round(due * 100) / 100,
+        orders: orderCounts.get(id) || 0,
+      });
     }
 
-    // baki written by hand in Telekhata counts too, so this card and the Pabo
-    // on the Baki Khata page tell the same story for the shop
-    const khata = await KhataEntry.aggregate([
-      {
-        $match: {
-          deletedAt: null,
-          partyType: "customer",
-          ...(showroom ? { showroomId: String(showroom) } : isWarehouse ? { showroomId: "warehouse" } : {}),
-        },
-      },
-      {
-        $group: {
-          _id: "$partyId",
-          net: { $sum: { $cond: [{ $eq: ["$direction", "give"] }, "$amount", { $multiply: ["$amount", -1] }] } },
-        },
-      },
-    ]);
-    if (khata.length) {
-      const known = new Map(dues.map((d) => [String(d._id), d]));
-      const missing = khata
-        .filter((k) => !known.has(String(k._id)) && mongoose.isValidObjectId(k._id))
-        .map((k) => new mongoose.Types.ObjectId(String(k._id)));
-      const people = missing.length
-        ? await Customer.find({ _id: { $in: missing }, deletedAt: null }).select("name phone").lean()
-        : [];
-      const personBy = new Map(people.map((p) => [String(p._id), p]));
-      for (const k of khata) {
-        const id = String(k._id);
-        const row = known.get(id);
-        if (row) row.due += k.net;
-        else if (personBy.has(id)) {
-          const p = personBy.get(id);
-          dues.push({ _id: p._id, name: p.name, phone: p.phone, due: k.net, orders: 0 });
-        }
-      }
-      for (let i = dues.length - 1; i >= 0; i--) if (dues[i].due <= 0.009) dues.splice(i, 1);
-      dues.sort((a, b) => b.due - a.due);
-    }
+    dues.sort((a, b) => b.due - a.due);
     const sv = stockFacets?.value?.[0] || {};
 
     return NextResponse.json({
