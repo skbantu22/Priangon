@@ -180,7 +180,7 @@ export default function BakiKhata() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={party.photo} alt="" className="size-14 shrink-0 rounded-full border object-cover" />
               ) : (
-                <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-[#1b56d8] text-[24px] font-bold text-white">
+                <span className={`flex size-14 shrink-0 items-center justify-center rounded-full text-[24px] font-bold text-white ${party.balance < 0 ? "bg-[#2e9b4a]" : "bg-[#1b56d8]"}`}>
                   {String(party.name || "?").slice(0, 1)}
                 </span>
               )}

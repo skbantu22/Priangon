@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FcMoneyTransfer, FcPackage } from "react-icons/fc";
-import { BellRing, CalendarDays, ChevronLeft, ChevronRight, ImagePlus, MessageSquare, Phone, ScanBarcode, Search, Trash2 } from "lucide-react";
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, ImagePlus, MessageSquare, Pencil, Phone, ScanBarcode, Search, Trash2 } from "lucide-react";
 
 import { ADMIN_TELEKHATA_BAKI } from "@/Route/Adminpannelroute";
 import { normalizeCustomerType, rateForType } from "@/lib/priceTiers";
@@ -29,6 +29,31 @@ const RATE_LABEL = {
   wholesaler: "পাইকারি দর",
 };
 
+// the "where it came from" card: each kind of line on its own, so the total
+// cost, the advance and the due collected are not one lump
+const SPLIT = [
+  ["cost", "মোট বিক্রি / খরচ", "text-[#d9453c]"],
+  ["paidAtSale", "বিক্রির সময় নগদ", "text-[#2e9b4a]"],
+  ["dueReceived", "বাকি আদায়", "text-[#2e9b4a]"],
+  ["advance", "অগ্রিম", "text-[#1b56d8]"],
+  ["returned", "ফেরত", "text-[#c77700]"],
+  ["dismissed", "বাকি মওকুফ", "text-[#777]"],
+  ["khataGiven", "খাতায় দিয়েছি", "text-[#d9453c]"],
+  ["khataTaken", "খাতায় নিয়েছি", "text-[#2e9b4a]"],
+];
+
+const BADGE = {
+  cost: "bg-[#fbe0de] text-[#d9453c]",
+  paidAtSale: "bg-[#dcf2e1] text-[#2e9b4a]",
+  dueReceived: "bg-[#dcf2e1] text-[#2e9b4a]",
+  advance: "bg-[#e3ecff] text-[#1b56d8]",
+  returned: "bg-[#fff1d6] text-[#c77700]",
+  dismissed: "bg-[#eee] text-[#555]",
+  khataGiven: "bg-[#fbe0de] text-[#d9453c]",
+  khataTaken: "bg-[#dcf2e1] text-[#2e9b4a]",
+  other: "bg-[#eee] text-[#555]",
+};
+
 const dayWords = (value) => new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "long" });
 const num = (value) => Math.max(0, Number(value) || 0);
 
@@ -44,6 +69,10 @@ export default function PartyStatement({ type, id, askKind = false }) {
   const [kindOpen, setKindOpen] = useState(askKind);
   const [menuOpen, setMenuOpen] = useState(false);
   const [range, setRange] = useState({ key: "year", offset: 0, start: "", end: "" });
+  const [entry, setEntry] = useState(null); // the line opened for its detail
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ amount: "", date: "", note: "" });
+  const [editing, setEditing] = useState(false);
 
   const win = useMemo(() => (range.key === "custom" ? { start: range.start, end: range.end } : windowFor(range.key, range.offset)), [range]);
 
@@ -82,6 +111,36 @@ export default function PartyStatement({ type, id, askKind = false }) {
     const json = await res.json().catch(() => ({}));
     showToast(json.success ? "success" : "error", json.success ? "এন্ট্রি মুছে গেছে" : json.message || "মোছা যায়নি");
     if (json.success) refresh();
+  };
+
+  const removeEntry = async (row) => {
+    await remove(row);
+    setEntry(null);
+  };
+
+  const openEdit = (row) => {
+    setEditForm({ amount: String(row.amount), date: todayInput(new Date(row.date)), note: row.note || "" });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!(Number(editForm.amount) > 0)) return showToast("error", "টাকার পরিমাণ লিখুন");
+    setEditing(true);
+    try {
+      const res = await fetch(`/api/telekhata/entries?id=${entry._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: Number(editForm.amount), date: editForm.date, note: editForm.note }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!json.success) return showToast("error", json.message || "এন্ট্রি বদলানো যায়নি");
+      showToast("success", "এন্ট্রি বদলানো হয়েছে");
+      setEditOpen(false);
+      setEntry(null);
+      refresh();
+    } finally {
+      setEditing(false);
+    }
   };
 
   const saveDueDate = async (value) => {
@@ -146,6 +205,94 @@ export default function PartyStatement({ type, id, askKind = false }) {
           refresh();
         }}
       />
+    );
+  }
+
+  // --------------------------------------------------------- entry detail
+  if (entry && party) {
+    const isKhata = entry.source === "khata";
+    const given = entry.direction === "give";
+    return (
+      <Screen className="pb-10">
+        <AppBar title="বাকির বিবরণ" onBack={() => setEntry(null)} />
+        <div className="space-y-3 p-3">
+          <div className="rounded-xl border border-[#f0d58a] bg-[#fdf1dc] p-4">
+            <p className="m-0 text-[19px] text-[#111]">
+              {party.name} ({TYPE_NAME[type]})
+            </p>
+            <p className="m-0 mt-2 text-[18px] text-[#111]">+88{party.phone}</p>
+            <p className={`m-0 mt-2 text-[18px] ${given ? "text-[#d9453c]" : "text-[#2e9b4a]"}`}>
+              {entry.label || (given ? "দিয়েছি" : "নিয়েছি")}: {money(entry.amount)}
+            </p>
+          </div>
+
+          <div>
+            <p className="m-0 pb-2 text-[18px]">বাকির ইতিহাস</p>
+            <div className="flex items-start justify-between gap-3 rounded-lg bg-[#f4f4f4] p-3">
+              <div className="min-w-0">
+                <p className="m-0 text-[16px] font-medium text-[#222]">
+                  {dayWords(entry.date)} {new Date(entry.date).getFullYear()} |{" "}
+                  {new Date(entry.date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+                {entry.note && <p className="m-0 mt-1 break-words text-[14px] text-[#555]">নোট: {entry.note}</p>}
+                <p className={`m-0 mt-3 text-[15px] ${entry.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>
+                  ব্যালেন্স: {money(Math.abs(entry.balance))}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className={`m-0 text-[16px] ${given ? "text-[#d9453c]" : "text-[#2e9b4a]"}`}>
+                  {given ? "দিয়েছি" : "নিয়েছি"}: {money(entry.amount)}
+                </p>
+                {entry.photo && (
+                  <a href={entry.photo} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[13px] text-[#1b56d8] underline">
+                    ছবি দেখুন
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {isKhata ? (
+            <div className="flex items-center justify-center gap-10 pt-3">
+              <button type="button" onClick={() => removeEntry(entry)} className="flex items-center gap-2 text-[17px] text-[#d9453c]">
+                <Trash2 className="size-5" /> মুছে ফেলুন
+              </button>
+              <button type="button" onClick={() => openEdit(entry)} className="flex items-center gap-2 text-[17px] text-[#1b56d8]">
+                <Pencil className="size-5" /> এডিট করুন
+              </button>
+            </div>
+          ) : (
+            <p className="pt-4 text-center text-[14px] text-[#777]">
+              এই এন্ট্রি বিক্রি বা পেমেন্ট থেকে এসেছে, তাই ওই পেজ থেকেই বদলাতে বা মুছতে হবে।
+            </p>
+          )}
+        </div>
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>এন্ট্রি এডিট করুন</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <label className="block text-[14px]">
+                টাকা
+                <input type="number" inputMode="decimal" value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} className="mt-1 h-11 w-full rounded-lg border px-3 text-[16px]" />
+              </label>
+              <label className="block text-[14px]">
+                তারিখ
+                <input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} className="mt-1 h-11 w-full rounded-lg border px-3 text-[16px]" />
+              </label>
+              <label className="block text-[14px]">
+                নোট
+                <input value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} className="mt-1 h-11 w-full rounded-lg border px-3 text-[16px]" />
+              </label>
+              <button type="button" onClick={saveEdit} disabled={editing} className="h-12 w-full rounded-xl bg-[#1b56d8] text-[17px] font-medium text-white disabled:opacity-60">
+                {editing ? "সেভ হচ্ছে..." : "সেভ করুন"}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </Screen>
     );
   }
 
@@ -254,6 +401,21 @@ export default function PartyStatement({ type, id, askKind = false }) {
             )}
           </div>
 
+          {/* where the balance came from: cost, advance and due collected each on its own */}
+          {data.split && SPLIT.some(([key]) => data.split[key] > 0) && (
+            <div className="rounded-xl border bg-white p-3 shadow-sm">
+              <p className="m-0 pb-2 text-[15px] font-medium text-[#222]">হিসাবের ভাগ</p>
+              <div className="space-y-1.5">
+                {SPLIT.filter(([key]) => data.split[key] > 0).map(([key, label, tone]) => (
+                  <div key={key} className="flex items-center justify-between text-[14px]">
+                    <span className="text-[#444]">{label}</span>
+                    <span className={`font-medium tabular-nums ${tone}`}>{money(data.split[key])}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-5 gap-1.5 text-[14px]">
             {RANGES.map(([key, label]) => (
               <button
@@ -286,15 +448,20 @@ export default function PartyStatement({ type, id, askKind = false }) {
           <div className="space-y-2">
             {data.rows.length === 0 && <p className="py-10 text-center text-[14px] text-[#777]">এখনো কোনো এন্ট্রি নেই</p>}
             {data.rows.map((row) => (
-              <div key={row._id} className="grid grid-cols-[1.35fr_1fr_1fr_1fr] items-stretch overflow-hidden rounded-lg border bg-white shadow-sm">
+              <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.35fr_1fr_1fr_1fr] items-stretch overflow-hidden rounded-lg border bg-white shadow-sm active:scale-[0.99]">
                 <div className="min-w-0 p-2">
                   <p className="m-0 text-[13px] leading-tight text-[#222]">
                     {dayWords(row.date)} {new Date(row.date).getFullYear()} |{" "}
                     {new Date(row.date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                   </p>
-                  {(row.note || row.kind === "goods") && (
-                    <p className="m-0 mt-0.5 truncate text-[12px] text-[#555]">
-                      {row.kind === "goods" ? "পণ্য · " : ""}নোট: {row.note || "—"}
+                  {row.label && (
+                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[row.group] || BADGE.other}`}>
+                      {row.label}
+                    </span>
+                  )}
+                  {row.note && row.note !== row.label && (
+                    <p className="m-0 mt-0.5 break-words text-[12px] text-[#555]">
+                      {row.note.startsWith(row.label) ? row.note.slice(row.label.length).replace(/^\s*·\s*/, "") || "" : `নোট: ${row.note}`}
                     </p>
                   )}
                   <div className="mt-1 flex items-center gap-2">
@@ -304,7 +471,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
                       </a>
                     )}
                     {row.source === "khata" && (
-                      <button type="button" onClick={() => remove(row)} className="text-[#999] hover:text-red-500" aria-label="মুছুন">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); remove(row); }} className="text-[#999] hover:text-red-500" aria-label="মুছুন">
                         <Trash2 className="size-3.5" />
                       </button>
                     )}
@@ -316,7 +483,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
                 <span className={`flex items-center justify-center text-[15px] ${row.direction === "give" ? "bg-[#fbe0de] font-medium text-[#d9453c]" : "bg-[#fdeceb]"}`}>
                   {row.direction === "give" ? money(row.amount) : ""}
                 </span>
-                <span className="flex items-center justify-center text-[15px] text-[#d9453c]">{money(row.balance)}</span>
+                <span className={`flex items-center justify-center text-[15px] ${row.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>{money(row.balance)}</span>
               </div>
             ))}
           </div>
@@ -325,7 +492,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
             <span>মোট</span>
             <span className="text-center text-[13px] text-[#2e9b4a]">{money(summary.taken)}</span>
             <span className="text-center text-[13px] text-[#d9453c]">{money(summary.given)}</span>
-            <span className="text-center text-[#d9453c]">{money(summary.balance)}</span>
+            <span className={`text-center ${summary.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>{money(summary.balance)}</span>
           </div>
         </div>
       )}

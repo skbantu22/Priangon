@@ -44,6 +44,25 @@ const LABEL = {
   "Purchase Return": "ক্রয় ফেরত",
 };
 
+// which part of the account a line belongs to, so the statement can show the
+// total cost, the advance and the due collected apart instead of one lump
+const GROUP = {
+  Sale: "cost",
+  "Opening Due": "cost",
+  Purchase: "cost",
+  "Sale Payment": "paidAtSale",
+  "Purchase Payment": "paidAtSale",
+  "Due Received": "dueReceived",
+  "Advance Received": "advance",
+  "Opening Advance": "advance",
+  "Advance Paid": "advance",
+  "Sale Return": "returned",
+  "Purchase Return": "returned",
+  "Due Paid": "returned",
+  "Advance Refund": "returned",
+  "Due Dismiss": "dismissed",
+};
+
 /** The lines the sales, purchases and payments already hold, in Telekhata's sign */
 async function systemLines(partyType, party) {
   if (partyType === "employee") return [];
@@ -61,6 +80,8 @@ async function systemLines(partyType, party) {
       amount: Math.abs(signed),
       signed,
       note: [LABEL[line.type] || line.type, line.invoiceNo, line.note].filter(Boolean).join(" · "),
+      label: LABEL[line.type] || line.type || "",
+      group: GROUP[line.type] || "other",
       photo: "",
     };
   });
@@ -104,6 +125,8 @@ export async function GET(req) {
       amount: line.amount,
       signed: line.direction === "give" ? line.amount : -line.amount,
       note: line.note,
+      label: line.kind === "goods" ? "পণ্য বাকি" : "হাতের খাতা",
+      group: line.direction === "give" ? "khataGiven" : "khataTaken",
       photo: line.photo,
     }));
 
@@ -116,6 +139,7 @@ export async function GET(req) {
     let opening = 0;
     let given = 0;
     let taken = 0;
+    const split = {}; // amount per kind of line, for the "where it came from" card
     const rows = [];
 
     for (const line of lines) {
@@ -131,6 +155,8 @@ export async function GET(req) {
       if (line.signed >= 0) given += line.amount;
       else taken += line.amount;
 
+      split[line.group || "other"] = round((split[line.group || "other"] || 0) + line.amount);
+
       rows.push({
         _id: line.key,
         source: line.source,
@@ -139,6 +165,8 @@ export async function GET(req) {
         kind: line.kind,
         amount: round(line.amount),
         note: line.note,
+        label: line.label || "",
+        group: line.group || "other",
         photo: line.photo,
         balance: round(balance),
       });
@@ -156,6 +184,7 @@ export async function GET(req) {
       },
       rows,
       summary: { opening: round(opening), given: round(given), taken: round(taken), balance: round(balance) },
+      split,
     });
   } catch (error) {
     console.error("TELEKHATA ENTRIES ERROR:", error);
@@ -444,5 +473,44 @@ export async function DELETE(req) {
   } catch (error) {
     console.error("TELEKHATA DELETE ERROR:", error);
     return NextResponse.json({ success: false, message: "Could not remove the entry" }, { status: 500 });
+  }
+}
+
+/** Edits one Telekhata line: the amount, the date and the note. The direction and the party stay. */
+export async function PUT(req) {
+  try {
+    const auth = await requireRoles(ADMIN_MANAGER);
+    if (auth.response) return auth.response;
+
+    await connectDB();
+
+    const id = new URL(req.url).searchParams.get("id");
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ success: false, message: "Invalid entry" }, { status: 400 });
+    }
+
+    const body = await req.json();
+    const amount = round(body.amount);
+    const date = body.date ? new Date(body.date) : null;
+
+    if (!(amount > 0)) {
+      return NextResponse.json({ success: false, message: "Enter an amount greater than 0" }, { status: 400 });
+    }
+    if (date && Number.isNaN(date.getTime())) {
+      return NextResponse.json({ success: false, message: "The date is invalid" }, { status: 400 });
+    }
+
+    const set = { amount, note: String(body.note || "").trim().slice(0, 300) };
+    if (date) set.date = date;
+
+    const result = await KhataEntry.updateOne({ _id: id, deletedAt: null }, { $set: set });
+    if (!result.matchedCount) {
+      return NextResponse.json({ success: false, message: "Entry not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: "Entry updated" });
+  } catch (error) {
+    console.error("TELEKHATA EDIT ERROR:", error);
+    return NextResponse.json({ success: false, message: "Could not update the entry" }, { status: 500 });
   }
 }
