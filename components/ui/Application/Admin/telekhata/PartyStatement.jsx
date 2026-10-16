@@ -443,8 +443,8 @@ export default function PartyStatement({ type, id, askKind = false }) {
 
           <div>
             {data.rows.length === 0 && <p className="py-10 text-center text-[14px] text-[#777]">এখনো কোনো এন্ট্রি নেই</p>}
-            {/* newest first; the balance on each line is the one after that line */}
-            {[...data.rows].reverse().map((row) => (
+            {/* oldest first, the latest at the bottom, like the printed statement; the balance on each line is the one after that line */}
+            {data.rows.map((row) => (
               <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.5fr_1fr_1fr_1fr] items-start border-b border-[#ddd] px-1 py-2.5 text-black active:bg-[#f6f6f6]">
                 <div className="min-w-0 pr-2">
                   <p className="m-0 text-[17px] leading-snug">{dateLabel(row.date)}</p>
