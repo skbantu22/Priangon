@@ -5,6 +5,8 @@ import { MessageSquareText, Phone, X } from "lucide-react";
 
 // Support number (Call + WhatsApp). Set NEXT_PUBLIC_SUPPORT_PHONE to change it.
 const SUPPORT_PHONE = process.env.NEXT_PUBLIC_SUPPORT_PHONE || "8801706126663";
+// WhatsApp has its own number. Set NEXT_PUBLIC_SUPPORT_WHATSAPP to change it.
+const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || "8801717058481";
 
 const WhatsAppIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
@@ -20,6 +22,7 @@ export default function SupportWidget() {
   const hideHint = () => setHintHidden(true);
 
   const localNumber = `0${SUPPORT_PHONE.replace(/^880?/, "")}`;
+  const whatsappNumber = `0${SUPPORT_WHATSAPP.replace(/^880?/, "")}`;
 
   return (
     <div className="fixed right-4 bottom-4 z-[60] flex items-end gap-3 print:hidden">
@@ -59,7 +62,7 @@ export default function SupportWidget() {
                 </span>
               </a>
               <a
-                href={`https://wa.me/${SUPPORT_PHONE}?text=${encodeURIComponent("Hello SB Telecom, I need help.")}`}
+                href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent("Hello SB Telecom, I need help.")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2.5 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
@@ -69,7 +72,7 @@ export default function SupportWidget() {
                 </span>
                 <span className="text-sm">
                   <span className="block font-semibold text-gray-900 dark:text-white">WhatsApp</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-300">Chat with us</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-300">{whatsappNumber}</span>
                 </span>
               </a>
             </div>
