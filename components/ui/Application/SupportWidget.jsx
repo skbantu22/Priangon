@@ -4,9 +4,9 @@ import { useState } from "react";
 import { MessageSquareText, Phone, X } from "lucide-react";
 
 // Support number (Call + WhatsApp). Set NEXT_PUBLIC_SUPPORT_PHONE to change it.
-const SUPPORT_PHONE = process.env.NEXT_PUBLIC_SUPPORT_PHONE || "8801706126663";
-// WhatsApp has its own number. Set NEXT_PUBLIC_SUPPORT_WHATSAPP to change it.
-const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || "8801717058481";
+const SUPPORT_PHONE = process.env.NEXT_PUBLIC_SUPPORT_PHONE || "8801717058481";
+// WhatsApp uses the same number unless NEXT_PUBLIC_SUPPORT_WHATSAPP says otherwise.
+const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || SUPPORT_PHONE;
 
 const WhatsAppIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
