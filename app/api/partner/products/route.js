@@ -52,12 +52,14 @@ export async function GET(req) {
     const showroomId = open.has(asked) ? asked : open.has(home) ? home : branches[0]?._id || "";
     if (!showroomId) return emptyPage(page, "", branches);
 
-    const stockRows = await ShowroomStock.find({ showroomId, stock: { $gt: 0 } })
+    // Items that sold out stay in the list marked "Out of stock", so a partner
+    // still sees them; only items the shop never stocked are left out.
+    const stockRows = await ShowroomStock.find({ showroomId, stock: { $gte: 0 } })
       .select("productId variantId stock")
       .lean();
     const stockMap = new Map(stockRows.map((row) => [String(row.variantId), Number(row.stock) || 0]));
     const productIds = [...new Set(stockRows.map((row) => row.productId).filter(Boolean))];
-    const catalog = await catalogForTill(showroomId);
+    const catalog = await catalogForTill(showroomId, { includeSoldOut: true });
 
     if (!productIds.length) return emptyPage(page, showroomId, branches);
 
@@ -135,8 +137,7 @@ export async function GET(req) {
             price: partnerPrice(p, v, partner.type),
             stock: stockMap.get(String(v._id)) || 0,
             image: (typeof v.media?.[0] === "string" && v.media[0]) || image,
-          }))
-          .filter((line) => line.stock > 0);
+          }));
         if (!lines.length) return null;
         return {
           _id: p._id,
