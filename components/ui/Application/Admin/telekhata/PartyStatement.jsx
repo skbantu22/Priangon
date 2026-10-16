@@ -433,28 +433,28 @@ export default function PartyStatement({ type, id, askKind = false }) {
           )}
 
           {/* table */}
-          {/* the same plain ledger look as the printed statement */}
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] border-b-2 border-black px-1 pb-1.5 pt-1 text-[17px] font-bold text-black">
-            <span>ইতিহাস</span>
-            <span className="text-right">নিয়েছি</span>
-            <span className="text-right">দিয়েছি</span>
-            <span className="text-right">ব্যালেন্স</span>
+          <div className="grid grid-cols-[1.35fr_1fr_1fr_1fr] px-1 pt-1 text-[14px] font-medium">
+            <span>বাকির ইতিহাস</span>
+            <span className="text-center text-[#2e9b4a]">নিয়েছি</span>
+            <span className="text-center text-[#d9453c]">দিয়েছি</span>
+            <span className="text-center">ব্যালেন্স</span>
           </div>
 
-          <div>
+          <div className="space-y-2">
             {data.rows.length === 0 && <p className="py-10 text-center text-[14px] text-[#777]">এখনো কোনো এন্ট্রি নেই</p>}
-            {/* oldest first, the latest at the bottom, like the printed statement; the balance on each line is the one after that line */}
+            {/* oldest first, the latest at the bottom; the balance on each line is the one after that line */}
             {data.rows.map((row) => (
-              <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.5fr_1fr_1fr_1fr] items-start border-b border-[#ddd] px-1 py-2.5 text-black active:bg-[#f6f6f6]">
-                <div className="min-w-0 pr-2">
-                  <p className="m-0 text-[17px] leading-snug">{dateLabel(row.date)}</p>
+              <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.35fr_1fr_1fr_1fr] items-stretch overflow-hidden rounded-lg border bg-white shadow-sm active:scale-[0.99]">
+                <div className="min-w-0 p-2">
+                  <p className="m-0 text-[13px] leading-tight text-[#222]">
+                    {dayText(row.date)} | {timeOf(row.at || row.date)}
+                  </p>
                   {(row.note || row.kind === "goods") && (
-                    <p className="m-0 break-words text-[17px] leading-snug">
-                      {row.kind === "goods" ? "পণ্য · " : ""}
-                      {row.note}
+                    <p className="m-0 mt-0.5 break-words text-[12px] text-[#555]">
+                      {row.kind === "goods" ? "পণ্য · " : ""}নোট: {row.note || "—"}
                     </p>
                   )}
-                  <div className="mt-0.5 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     {row.photo && (
                       <a href={row.photo} target="_blank" rel="noreferrer" className="text-[11px] text-[#1b56d8] underline">
                         ছবি
@@ -467,18 +467,22 @@ export default function PartyStatement({ type, id, askKind = false }) {
                     )}
                   </div>
                 </div>
-                <span className="text-right text-[17px] tabular-nums">{row.direction === "take" ? bnNumber(row.amount) : ""}</span>
-                <span className="text-right text-[17px] tabular-nums">{row.direction === "give" ? bnNumber(row.amount) : ""}</span>
-                <span className="text-right text-[17px] tabular-nums">{bnNumber(row.balance)}</span>
+                <span className={`flex items-center justify-center text-[15px] ${row.direction === "take" ? "bg-[#dcf2e1] font-medium text-[#2e9b4a]" : ""}`}>
+                  {row.direction === "take" ? money(row.amount) : ""}
+                </span>
+                <span className={`flex items-center justify-center text-[15px] ${row.direction === "give" ? "bg-[#fbe0de] font-medium text-[#d9453c]" : "bg-[#fdeceb]"}`}>
+                  {row.direction === "give" ? money(row.amount) : ""}
+                </span>
+                <span className={`flex items-center justify-center text-[15px] ${row.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>{money(row.balance)}</span>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] border-t-2 border-black px-1 pt-2 text-[17px] font-bold text-black">
+          <div className="grid grid-cols-[1.35fr_1fr_1fr_1fr] px-1 pt-5 text-[15px]">
             <span>মোট</span>
-            <span className="text-right tabular-nums">{bnNumber(summary.taken)}</span>
-            <span className="text-right tabular-nums">{bnNumber(summary.given)}</span>
-            <span className="text-right tabular-nums">{bnNumber(summary.balance)}</span>
+            <span className="text-center text-[13px] text-[#2e9b4a]">{money(summary.taken)}</span>
+            <span className="text-center text-[13px] text-[#d9453c]">{money(summary.given)}</span>
+            <span className={`text-center ${summary.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>{money(summary.balance)}</span>
           </div>
         </div>
       )}
