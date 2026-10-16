@@ -75,6 +75,7 @@ async function systemLines(partyType, party) {
       key: `sys-${index}`,
       source: "system",
       date: line.date,
+      at: line.at || line.date,
       direction: signed >= 0 ? "give" : "take",
       kind: "money",
       amount: Math.abs(signed),
@@ -120,6 +121,7 @@ export async function GET(req) {
       source: "khata",
       _id: String(line._id),
       date: line.date,
+      at: line.date,
       direction: line.direction,
       kind: line.kind,
       amount: line.amount,
@@ -130,7 +132,7 @@ export async function GET(req) {
       photo: line.photo,
     }));
 
-    const lines = [...system, ...own].sort((a, b) => new Date(a.date) - new Date(b.date) || (a.source === "system" ? -1 : 1));
+    const lines = [...system, ...own].sort((a, b) => new Date(a.date) - new Date(b.date) || new Date(a.at || a.date) - new Date(b.at || b.date) || (a.source === "system" ? -1 : 1));
 
     const from = start ? new Date(`${start}T00:00:00`) : null;
     const to = end ? new Date(`${end}T23:59:59.999`) : null;
@@ -161,6 +163,7 @@ export async function GET(req) {
         _id: line.key,
         source: line.source,
         date: line.date,
+        at: line.at || line.date,
         direction: line.direction,
         kind: line.kind,
         amount: round(line.amount),

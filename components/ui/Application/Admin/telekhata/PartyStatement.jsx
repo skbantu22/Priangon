@@ -54,12 +54,13 @@ const BADGE = {
   other: "bg-[#eee] text-[#555]",
 };
 
-// Payments and old sales keep only the day, which lands at 06:00 AM in Dhaka,
-// so an exact-midnight time (UTC) is not shown; Baki Khata lines keep a real time
+// The time a line was written, in Bangladesh time. Payments and sales carry the
+// moment they were saved; a bare day (exactly midnight UTC, so 06:00 AM in
+// Dhaka) has no real time, so none is shown for it.
 const timeOf = (value) => {
   const d = new Date(value);
   if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return "";
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
 };
 
 const dayWords = (value) => new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "long" });
@@ -240,7 +241,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
               <div className="min-w-0">
                 <p className="m-0 text-[16px] font-medium text-[#222]">
                   {dayWords(entry.date)} {new Date(entry.date).getFullYear()}
-                  {timeOf(entry.date) && ` | ${timeOf(entry.date)}`}
+                  {timeOf(entry.at || entry.date) && ` | ${timeOf(entry.at || entry.date)}`}
                 </p>
                 {entry.note && <p className="m-0 mt-1 break-words text-[14px] text-[#555]">নোট: {entry.note}</p>}
                 <p className={`m-0 mt-3 text-[15px] ${entry.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>
@@ -455,12 +456,13 @@ export default function PartyStatement({ type, id, askKind = false }) {
 
           <div className="space-y-2">
             {data.rows.length === 0 && <p className="py-10 text-center text-[14px] text-[#777]">এখনো কোনো এন্ট্রি নেই</p>}
-            {data.rows.map((row) => (
+            {/* newest first; the balance on each line is the one after that line */}
+            {[...data.rows].reverse().map((row) => (
               <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.35fr_1fr_1fr_1fr] items-stretch overflow-hidden rounded-lg border bg-white shadow-sm active:scale-[0.99]">
                 <div className="min-w-0 p-2">
                   <p className="m-0 text-[13px] leading-tight text-[#222]">
                     {dayWords(row.date)} {new Date(row.date).getFullYear()}
-                    {timeOf(row.date) && ` | ${timeOf(row.date)}`}
+                    {timeOf(row.at || row.date) && ` | ${timeOf(row.at || row.date)}`}
                   </p>
                   {row.label && (
                     <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[row.group] || BADGE.other}`}>
