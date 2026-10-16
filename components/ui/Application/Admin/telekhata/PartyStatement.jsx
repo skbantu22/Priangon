@@ -42,28 +42,15 @@ const SPLIT = [
   ["khataTaken", "খাতায় নিয়েছি", "text-[#2e9b4a]"],
 ];
 
-const BADGE = {
-  cost: "bg-[#fbe0de] text-[#d9453c]",
-  paidAtSale: "bg-[#dcf2e1] text-[#2e9b4a]",
-  dueReceived: "bg-[#dcf2e1] text-[#2e9b4a]",
-  advance: "bg-[#e3ecff] text-[#1b56d8]",
-  returned: "bg-[#fff1d6] text-[#c77700]",
-  dismissed: "bg-[#eee] text-[#555]",
-  khataGiven: "bg-[#fbe0de] text-[#d9453c]",
-  khataTaken: "bg-[#dcf2e1] text-[#2e9b4a]",
-  other: "bg-[#eee] text-[#555]",
-};
-
 // The time a line was written, in Bangladesh time. Payments and sales carry the
-// moment they were saved; a bare day (exactly midnight UTC, so 06:00 AM in
-// Dhaka) has no real time, so none is shown for it.
-const timeOf = (value) => {
-  const d = new Date(value);
-  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return "";
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
-};
+// moment they were saved. A line that only has a day (an opening due) shows
+// 06:00 AM, as it always did.
+const timeOf = (value) =>
+  new Date(value).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" });
 
-const dayWords = (value) => new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "long" });
+// "01 October 2026", the day in Bangladesh (not the device's own time zone)
+const dayText = (value) =>
+  new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric", timeZone: "Asia/Dhaka" });
 const num = (value) => Math.max(0, Number(value) || 0);
 
 // One party's statement, and the Dichhi / Nichhi flow:
@@ -240,8 +227,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
             <div className="flex items-start justify-between gap-3 rounded-lg bg-[#f4f4f4] p-3">
               <div className="min-w-0">
                 <p className="m-0 text-[16px] font-medium text-[#222]">
-                  {dayWords(entry.date)} {new Date(entry.date).getFullYear()}
-                  {timeOf(entry.at || entry.date) && ` | ${timeOf(entry.at || entry.date)}`}
+                  {dayText(entry.date)} | {timeOf(entry.at || entry.date)}
                 </p>
                 {entry.note && <p className="m-0 mt-1 break-words text-[14px] text-[#555]">নোট: {entry.note}</p>}
                 <p className={`m-0 mt-3 text-[15px] ${entry.balance < 0 ? "text-[#2e9b4a]" : "text-[#d9453c]"}`}>
@@ -461,17 +447,11 @@ export default function PartyStatement({ type, id, askKind = false }) {
               <div key={row._id} role="button" tabIndex={0} onClick={() => setEntry(row)} onKeyDown={(e) => e.key === "Enter" && setEntry(row)} className="grid cursor-pointer grid-cols-[1.35fr_1fr_1fr_1fr] items-stretch overflow-hidden rounded-lg border bg-white shadow-sm active:scale-[0.99]">
                 <div className="min-w-0 p-2">
                   <p className="m-0 text-[13px] leading-tight text-[#222]">
-                    {dayWords(row.date)} {new Date(row.date).getFullYear()}
-                    {timeOf(row.at || row.date) && ` | ${timeOf(row.at || row.date)}`}
+                    {dayText(row.date)} | {timeOf(row.at || row.date)}
                   </p>
-                  {row.label && (
-                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE[row.group] || BADGE.other}`}>
-                      {row.label}
-                    </span>
-                  )}
-                  {row.note && row.note !== row.label && (
+                  {(row.note || row.kind === "goods") && (
                     <p className="m-0 mt-0.5 break-words text-[12px] text-[#555]">
-                      {row.note.startsWith(row.label) ? row.note.slice(row.label.length).replace(/^\s*·\s*/, "") || "" : `নোট: ${row.note}`}
+                      {row.kind === "goods" ? "পণ্য · " : ""}নোট: {row.note || "—"}
                     </p>
                   )}
                   <div className="mt-1 flex items-center gap-2">

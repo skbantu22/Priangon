@@ -3,7 +3,7 @@
 export const money = (value) => `${Number(value || 0).toLocaleString("bn-BD", { maximumFractionDigits: 2 })} ৳`;
 
 export const dateLabel = (value) =>
-  new Date(value).toLocaleDateString("bn-BD", { day: "numeric", month: "long", year: "numeric" });
+  new Date(value).toLocaleDateString("bn-BD", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Dhaka" });
 
 export const todayInput = () => {
   const now = new Date();
