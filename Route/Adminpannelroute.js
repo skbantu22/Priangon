@@ -162,3 +162,4 @@ export const ADMIN_ACCOUNT_STATEMENT = "/admin/accounts/statement";
 export const ADMIN_ACCOUNT_BANKS = "/admin/accounts/banks";
 export const ADMIN_REPORT_REPAIR = "/admin/reports/repair";
 export const ADMIN_EMPLOYEE_ATTENDANCE = "/admin/employees/attendance";
+export const ADMIN_EMPLOYEE_VIEW = (id) => `/admin/employees/${id}`;

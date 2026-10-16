@@ -7,7 +7,7 @@ import axios from "axios";
 import { PlusSquare } from "lucide-react";
 
 import { showToast } from "@/lib/showToast";
-import { ADMIN_EMPLOYEE_ADD, ADMIN_EMPLOYEE_EDIT } from "@/Route/Adminpannelroute";
+import { ADMIN_EMPLOYEE_ADD, ADMIN_EMPLOYEE_EDIT, ADMIN_EMPLOYEE_VIEW } from "@/Route/Adminpannelroute";
 import {
   ActionMenu,
   EmptyRow,
@@ -173,13 +173,13 @@ export default function EmployeeListPage() {
               <tr key={e._id} className={e.isActive ? "hover:bg-[#f5f7f9] dark:hover:bg-muted/50" : "bg-[#fafafa] text-[#98a6ad] dark:bg-muted/30"}>
                 <td className={tdClass}>{i + 1}</td>
                 <td className={tdClass}>
-                  <span className="flex items-center gap-2">
+                  <Link href={ADMIN_EMPLOYEE_VIEW(e._id)} className="flex items-center gap-2 no-underline" title="Open this employee's monthly report">
                     <Avatar employee={e} />
                     <span>
-                      <b className="block font-medium">{e.name}</b>
+                      <b className="block font-medium text-[#1b56d8] hover:underline">{e.name}</b>
                       {e.email && <span className="block text-[12px] text-[#98a6ad]">{e.email}</span>}
                     </span>
-                  </span>
+                  </Link>
                 </td>
                 <td className={tdClass}>{e.designation}</td>
                 <td className={tdClass}>{e.showroomId?.name || "Head Office"}</td>
