@@ -8,6 +8,7 @@ import { showToast } from "@/lib/showToast";
 import { useOpeningStockTill } from "@/lib/posProducts";
 import { ListCard, inputClass, money, tdClass, thClass, theadRow, totalRow } from "@/components/ui/Application/Admin/supplier/supplierKit";
 import { today } from "@/components/ui/Application/Admin/purchase/purchaseKit";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -199,6 +200,7 @@ function Monthly({ scope, ready }) {
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [data, setData] = useState(null);
+  const [open, setOpen] = useState(null); // the employee whose year is open
   const years = Array.from({ length: 4 }, (_, i) => String(now.getFullYear() - i));
 
   useEffect(() => {
@@ -269,8 +271,10 @@ function Monthly({ scope, ready }) {
             {rows?.map((r) => (
               <tr key={r._id}>
                 <td className={tdClass}>
-                  <b className="block font-medium">{r.name}</b>
-                  <span className="text-[12px] text-[#98a6ad]">{r.designation}</span>
+                  <button type="button" onClick={() => setOpen(r)} className="text-left" title="See the year, with the leave dates">
+                    <b className="block font-medium text-[#1b56d8] underline-offset-2 hover:underline">{r.name}</b>
+                    <span className="text-[12px] text-[#98a6ad]">{r.designation}</span>
+                  </button>
                 </td>
                 <td className={`${tdClass} text-right`}>{money(r.salary)}</td>
                 <td className={`${tdClass} text-center text-[#2e9b4a]`}>{r.present}</td>
@@ -297,6 +301,94 @@ function Monthly({ scope, ready }) {
           )}
         </table>
       </div>
+
+      <Dialog open={Boolean(open)} onOpenChange={(value) => !value && setOpen(null)}>
+        {open && <EmployeeYear key={open._id} employee={open} startYear={year} />}
+      </Dialog>
     </div>
+  );
+}
+
+const fmtDay = (key) => new Date(`${key}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+
+/** One employee's year: each month's marks, and the dates of leave, absent and half days */
+function EmployeeYear({ employee, startYear }) {
+  const [year, setYear] = useState(startYear);
+  const [data, setData] = useState(null);
+  const years = Array.from({ length: 4 }, (_, i) => String(new Date().getFullYear() - i));
+
+  useEffect(() => {
+    let cancelled = false;
+    axios
+      .get("/api/attendance/employee", { params: { employeeId: employee._id, year } })
+      .then(({ data: res }) => !cancelled && setData(res.success ? res : { months: [], totals: {} }))
+      .catch(() => !cancelled && setData({ months: [], totals: {} }));
+    return () => {
+      cancelled = true;
+    };
+  }, [employee._id, year]);
+
+  const used = data?.months?.filter((m) => m.leave || m.absent || m.half || m.present) || [];
+
+  return (
+    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>
+          {employee.name} <span className="text-[13px] font-normal text-[#98a6ad]">{employee.designation}</span>
+        </DialogTitle>
+        <DialogDescription>Attendance for the year, with the dates of leave, absent and half days.</DialogDescription>
+      </DialogHeader>
+
+      <select value={year} onChange={(e) => setYear(e.target.value)} className={`${inputClass} !w-[110px]`} aria-label="Year">
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+
+      {data?.totals && (
+        <div className="grid grid-cols-4 gap-2 text-center">
+          {[
+            ["Present", data.totals.present, "text-[#2e9b4a]"],
+            ["Absent", data.totals.absent, "text-[#d9453c]"],
+            ["Half", data.totals.half, "text-[#c77700]"],
+            ["Leave", data.totals.leave, "text-[#1b56d8]"],
+          ].map(([label, value, tone]) => (
+            <div key={label} className="rounded-lg border bg-white px-2 py-2">
+              <p className={`m-0 text-xl font-bold tabular-nums ${tone}`}>{value || 0}</p>
+              <p className="m-0 text-[12px] text-[#6b7785]">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!data && <div className="h-20 animate-pulse rounded-lg bg-slate-100" />}
+      {data && used.length === 0 && <p className="py-6 text-center text-sm text-[#6b7785]">No attendance has been marked in {year}.</p>}
+
+      <div className="space-y-2">
+        {used.map((m) => (
+          <div key={m.month} className="rounded-lg border bg-white p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <b>{MONTHS[m.month - 1]}</b>
+              <span className="text-[12px] text-[#6b7785]">
+                Present {m.present} · Absent {m.absent} · Half {m.half} · Leave {m.leave}
+              </span>
+            </div>
+            {[
+              ["Leave", m.leaveDates, "text-[#1b56d8]"],
+              ["Absent", m.absentDates, "text-[#d9453c]"],
+              ["Half day", m.halfDates, "text-[#c77700]"],
+            ]
+              .filter(([, dates]) => dates.length)
+              .map(([label, dates, tone]) => (
+                <p key={label} className="m-0 mt-1 text-[13px]">
+                  <span className={`font-medium ${tone}`}>{label}:</span> {dates.map(fmtDay).join(", ")}
+                </p>
+              ))}
+          </div>
+        ))}
+      </div>
+    </DialogContent>
   );
 }
