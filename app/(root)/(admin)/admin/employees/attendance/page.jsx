@@ -59,6 +59,59 @@ export default function AttendancePage() {
   );
 }
 
+/**
+ * A date as day, month name and year, in that order, so 10/11 can never be
+ * read as month-first. The value is the "YYYY-MM-DD" the rest of the page uses,
+ * and nothing after `max` (today) can be picked.
+ */
+function DatePick({ value, max, onChange }) {
+  const [y, m, d] = value.split("-").map(Number);
+  const [maxY, maxM, maxD] = max.split("-").map(Number);
+  const pad = (n) => String(n).padStart(2, "0");
+  const years = Array.from({ length: 4 }, (_, i) => maxY - i);
+
+  // keep the day inside the month and never past today
+  const set = (year, month, day) => {
+    let next = { year, month, day: Math.min(day, new Date(year, month, 0).getDate()) };
+    if (next.year > maxY || (next.year === maxY && next.month > maxM) || (next.year === maxY && next.month === maxM && next.day > maxD)) {
+      next = { year: maxY, month: maxM, day: maxD };
+    }
+    onChange(`${next.year}-${pad(next.month)}-${pad(next.day)}`);
+  };
+
+  const daysInSelected = new Date(y, m, 0).getDate();
+  const lastDay = y === maxY && m === maxM ? maxD : daysInSelected;
+  const lastMonth = y === maxY ? maxM : 12;
+  const weekday = new Date(y, m - 1, d).toLocaleDateString("en-GB", { weekday: "long" });
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <select value={d} onChange={(e) => set(y, m, Number(e.target.value))} className={`${inputClass} !w-[72px]`} aria-label="Day">
+        {Array.from({ length: lastDay }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+      <select value={m} onChange={(e) => set(y, Number(e.target.value), d)} className={`${inputClass} !w-[130px]`} aria-label="Month">
+        {MONTHS.slice(0, lastMonth).map((name, i) => (
+          <option key={name} value={i + 1}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <select value={y} onChange={(e) => set(Number(e.target.value), m, d)} className={`${inputClass} !w-[92px]`} aria-label="Year">
+        {years.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+      <span className="text-[13px] text-[#6b7785]">{weekday}</span>
+    </div>
+  );
+}
+
 function Daily({ scope, ready }) {
   const [date, setDate] = useState(today());
   const [rows, setRows] = useState(null);
@@ -127,7 +180,7 @@ function Daily({ scope, ready }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input type="date" max={today()} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className={`${inputClass} !w-[170px]`} aria-label="Date" />
+        <DatePick value={date} max={today()} onChange={setDate} />
         <button type="button" onClick={() => setDate(today())} className="h-9 rounded-lg border px-3 text-sm">
           Today
         </button>
