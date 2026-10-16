@@ -173,7 +173,16 @@ function PaySalary({ onClose, onDone }) {
       .then(({ data }) => {
         if (cancelled || !data.success) return;
         setExistingId(data.existingId);
-        setRows(data.employees.map((e) => ({ ...e, pay: true, salary: String(e.salary || 0), bonus: "", deduction: "" })));
+        // the deduction starts at what the month's absent and half days cost; it can still be changed
+        setRows(
+          data.employees.map((e) => ({
+            ...e,
+            pay: true,
+            salary: String(e.salary || 0),
+            bonus: "",
+            deduction: e.attendanceDeduction ? String(e.attendanceDeduction) : "",
+          })),
+        );
       })
       .catch(() => !cancelled && setRows([]));
     return () => {
@@ -209,7 +218,9 @@ function PaySalary({ onClose, onDone }) {
     <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
       <DialogHeader>
         <DialogTitle>Pay Salary</DialogTitle>
-        <DialogDescription>Everyone active in the branch is listed with their monthly salary. Add bonus or deduction, untick anyone not paid.</DialogDescription>
+        <DialogDescription>
+          Everyone active in the branch is listed with their monthly salary. The deduction is filled from the month&apos;s attendance (absent days, and half of a half day); change it if needed. Untick anyone not paid.
+        </DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
@@ -293,6 +304,13 @@ function PaySalary({ onClose, onDone }) {
                 <td>
                   <b className="block font-medium">{r.name}</b>
                   <span className="text-[12px] text-[#98a6ad]">{r.designation}</span>
+                  {(r.absent > 0 || r.half > 0) && (
+                    <span className="block text-[12px] text-[#d9453c]">
+                      Absent {r.absent}
+                      {r.half > 0 ? ` · Half ${r.half}` : ""} · cut {money(r.attendanceDeduction)}
+                    </span>
+                  )}
+                  {r.unmarked > 0 && <span className="block text-[12px] text-[#c77700]">{r.unmarked} day(s) not marked</span>}
                 </td>
                 {["salary", "bonus", "deduction"].map((k) => (
                   <td key={k} className="text-right">
