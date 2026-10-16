@@ -84,8 +84,14 @@ export default function PartnerStatement() {
           {[
             ["Opening", s.opening, ""],
             ["Purchased", s.totalSale, ""],
+            // Baki Khata lines the shop wrote by hand
+            ...(s.khataGiven > 0 ? [["Baki Khata (given)", s.khataGiven, ""]] : []),
+            ...(s.paidOut > 0 ? [["Paid back to you", s.paidOut, ""]] : []),
             ["Paid", s.totalPaid, "text-[#0b8a45]"],
+            ...(s.khataTaken > 0 ? [["Baki Khata (taken)", s.khataTaken, "text-[#0b8a45]"]] : []),
             ["Returned", s.returned, ""],
+            ...(s.advance > 0 ? [["Advance", s.advance, "text-[#0b8a45]"]] : []),
+            ...(s.dismiss > 0 ? [["Dismissed", s.dismiss, ""]] : []),
             ["Due now", s.due, s.due > 0 ? "text-[#d63939]" : "text-[#0b8a45]"],
           ].map(([label, value, tone]) => (
             <div key={label} className="border border-[#eef0f3] bg-card px-4 py-3 dark:border-white/10">
