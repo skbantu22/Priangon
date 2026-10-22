@@ -13,7 +13,7 @@ import { Field, today } from "@/components/ui/Application/Admin/purchase/purchas
 
 const TYPE_LABEL = { retail: "Buyer", dealer: "Dealer", subDealer: "Sub Dealer", wholesaler: "Wholesaler" };
 
-/** Sale Return, like 360's: what came back from one invoice, back into stock */
+/** Sale Return, like 360's: what came back from one invoice. Good units go back into stock, damaged ones do not. */
 export default function SaleReturnPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -21,6 +21,8 @@ export default function SaleReturnPage() {
   const [error, setError] = useState("");
   const [qty, setQty] = useState({});
   const [imeis, setImeis] = useState({});
+  const [damaged, setDamaged] = useState({});
+  const [damagedImeis, setDamagedImeis] = useState({});
   const [form, setForm] = useState({ returnDate: today(), refundAmount: "", refundMethod: "cash", note: "" });
   const [saving, setSaving] = useState(false);
 
@@ -43,7 +45,18 @@ export default function SaleReturnPage() {
     if (next.length > max) return;
     setImeis({ ...imeis, [line]: next });
     setQty({ ...qty, [line]: String(next.length) });
+    // an IMEI no longer coming back cannot be marked damaged
+    setDamagedImeis({ ...damagedImeis, [line]: (damagedImeis[line] || []).filter((x) => next.includes(x)) });
   };
+
+  const toggleDamaged = (line, imei) => {
+    const list = damagedImeis[line] || [];
+    setDamagedImeis({ ...damagedImeis, [line]: list.includes(imei) ? list.filter((x) => x !== imei) : [...list, imei] });
+  };
+
+  // a handset is damaged by IMEI, any other product by a quantity
+  const damagedFor = (item) => (item.imeis?.length ? (damagedImeis[item.line] || []).length : Number(damaged[item.line]) || 0);
+  const damagedTotal = lines.reduce((sum, i) => sum + damagedFor(i), 0);
 
   const save = async () => {
     if (!lines.length) return showToast("error", "Enter the quantity coming back");
@@ -51,6 +64,8 @@ export default function SaleReturnPage() {
     if (bad) return showToast("error", `${bad.productName}: only ${bad.returnable} can be returned`);
     const noImei = lines.find((i) => i.imeis?.length && (imeis[i.line] || []).length !== Number(qty[i.line]));
     if (noImei) return showToast("error", `${noImei.productName}: tick the IMEI coming back`);
+    const tooMany = lines.find((i) => damagedFor(i) > Number(qty[i.line]) || !Number.isInteger(damagedFor(i)));
+    if (tooMany) return showToast("error", `${tooMany.productName}: damaged cannot be more than the return quantity`);
     if (Number(form.refundAmount) - total > 0.009) return showToast("error", "Refund cannot be more than the return total");
 
     setSaving(true);
@@ -59,7 +74,13 @@ export default function SaleReturnPage() {
         saleId: sale._id,
         ...form,
         refundAmount: Number(form.refundAmount) || 0,
-        items: lines.map((i) => ({ line: i.line, qty: Number(qty[i.line]), imeis: imeis[i.line] || [] })),
+        items: lines.map((i) => ({
+          line: i.line,
+          qty: Number(qty[i.line]),
+          imeis: imeis[i.line] || [],
+          damagedQty: damagedFor(i),
+          damagedImeis: damagedImeis[i.line] || [],
+        })),
       });
       if (!data.success) return showToast("error", data.message);
       showToast("success", data.message);
@@ -90,10 +111,10 @@ export default function SaleReturnPage() {
         </p>
 
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
               <tr className={theadRow}>
-                {["Product", "Sold", "Returned", "Returnable", "Price", "Return Qty", "Subtotal"].map((h) => (
+                {["Product", "Sold", "Returned", "Returnable", "Price", "Return Qty", "Damaged", "Subtotal"].map((h) => (
                   <th key={h} className={thClass}>
                     {h}
                   </th>
@@ -108,12 +129,23 @@ export default function SaleReturnPage() {
                     <span className="text-[12px] text-[#98a6ad]">{[i.size, i.color].filter(Boolean).join(" · ")}</span>
                     {i.imeis?.length > 0 && (
                       <span className="mt-1 flex flex-wrap gap-1">
-                        {i.openImeis.map((imei) => (
-                          <label key={imei} className="flex cursor-pointer items-center gap-1 border px-[6px] py-[2px] font-mono text-[11px]">
-                            <input type="checkbox" checked={(imeis[i.line] || []).includes(imei)} onChange={() => toggleImei(i.line, imei, i.returnable)} />
-                            {imei}
-                          </label>
-                        ))}
+                        {i.openImeis.map((imei) => {
+                          const ticked = (imeis[i.line] || []).includes(imei);
+                          return (
+                            <span key={imei} className="flex items-center gap-2 border px-[6px] py-[2px] font-mono text-[11px]">
+                              <label className="flex cursor-pointer items-center gap-1">
+                                <input type="checkbox" checked={ticked} onChange={() => toggleImei(i.line, imei, i.returnable)} />
+                                {imei}
+                              </label>
+                              {ticked && (
+                                <label className="flex cursor-pointer items-center gap-1 font-sans text-[#ff5b5b]">
+                                  <input type="checkbox" checked={(damagedImeis[i.line] || []).includes(imei)} onChange={() => toggleDamaged(i.line, imei)} />
+                                  Damaged
+                                </label>
+                              )}
+                            </span>
+                          );
+                        })}
                       </span>
                     )}
                   </td>
@@ -134,6 +166,24 @@ export default function SaleReturnPage() {
                       className={`${inputClass} !h-[34px] !w-[90px]`}
                       aria-label={`Return quantity for ${i.productName}`}
                     />
+                  </td>
+                  <td className={tdClass}>
+                    {i.imeis?.length > 0 ? (
+                      <span className="font-semibold text-[#ff5b5b]">{damagedFor(i) || ""}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        min="0"
+                        max={Number(qty[i.line]) || 0}
+                        value={damaged[i.line] || ""}
+                        placeholder="0"
+                        disabled={!(Number(qty[i.line]) > 0)}
+                        title="How many of the returned units are broken"
+                        onChange={(e) => setDamaged({ ...damaged, [i.line]: e.target.value })}
+                        className={`${inputClass} !h-[34px] !w-[90px]`}
+                        aria-label={`Damaged quantity for ${i.productName}`}
+                      />
+                    )}
                   </td>
                   <td className={`${tdClass} font-semibold`}>{Number(qty[i.line]) > 0 ? money(Number(qty[i.line]) * i.price) : ""}</td>
                 </tr>
@@ -180,6 +230,18 @@ export default function SaleReturnPage() {
                 <span>Items</span>
                 <b>{lines.reduce((sum, i) => sum + Number(qty[i.line]), 0)}</b>
               </div>
+              {damagedTotal > 0 && (
+                <>
+                  <div className="flex justify-between py-1">
+                    <span>Back into stock</span>
+                    <b>{lines.reduce((sum, i) => sum + Number(qty[i.line]), 0) - damagedTotal}</b>
+                  </div>
+                  <div className="flex justify-between py-1 text-[#ff5b5b]">
+                    <span>Damaged (not back in stock)</span>
+                    <b>{damagedTotal}</b>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between border-t pt-2 text-[16px]">
                 <span>Return Total</span>
                 <b>৳ {money(total)}</b>

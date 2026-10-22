@@ -5,7 +5,8 @@ import { activityLog } from "@/lib/activityLog";
  * Goods a customer brings back from a POS sale. The units go back into
  * the branch they were sold from, and the return total comes off what the
  * customer owes (customerBalances counts it). Cash handed back at once is
- * a "pay" customer payment (refundPaymentId).
+ * a "pay" customer payment (refundPaymentId). Units that come back damaged
+ * are still credited to the customer, but are not put back on the shelf.
  */
 const saleReturnItemSchema = new mongoose.Schema(
   {
@@ -21,6 +22,10 @@ const saleReturnItemSchema = new mongoose.Schema(
     purchasePrice: { type: Number, default: 0, min: 0 },
     subtotal: { type: Number, required: true, min: 0 },
     imeis: { type: [String], default: [] },
+    // of qty, the units that came back broken: they never reach sellable stock
+    // and their IMEI cannot be sold again
+    damagedQty: { type: Number, default: 0, min: 0 },
+    damagedImeis: { type: [String], default: [] },
   },
   { _id: false },
 );

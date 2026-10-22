@@ -8,7 +8,7 @@ import { showToast } from "@/lib/showToast";
 import { DateRange, ExportButtons, ListCard, btn, exportExcel, exportPdf, fmtDate, inputClass, methodLabel, money, printTable, tdClass, thClass, theadRow, totalRow } from "@/components/ui/Application/Admin/supplier/supplierKit";
 
 const TYPE_LABEL = { retail: "Buyer", dealer: "Dealer", subDealer: "Sub Dealer", wholesaler: "Wholesaler" };
-const COLUMNS = ["Sl", "Date", "Return No", "Invoice", "Customer", "Type", "Qty", "Total", "Refund", "Refund By", "Note", "By"];
+const COLUMNS = ["Sl", "Date", "Return No", "Invoice", "Customer", "Type", "Qty", "Damaged", "Total", "Refund", "Refund By", "Note", "By"];
 
 /** Sales Return List, like 360's */
 export default function SaleReturnListPage() {
@@ -42,7 +42,7 @@ export default function SaleReturnListPage() {
   const list = rows || [];
   const sum = (key) => list.reduce((total, r) => total + (r[key] || 0), 0);
   const exportRows = () =>
-    list.map((r, i) => [i + 1, fmtDate(r.returnDate), r.returnNumber, r.orderNumber, r.customerName, TYPE_LABEL[r.customerType] || "Buyer", r.qty, r.total, r.refundAmount, methodLabel(r.refundMethod), r.note, r.createdBy]);
+    list.map((r, i) => [i + 1, fmtDate(r.returnDate), r.returnNumber, r.orderNumber, r.customerName, TYPE_LABEL[r.customerType] || "Buyer", r.qty, r.damaged || 0, r.total, r.refundAmount, methodLabel(r.refundMethod), r.note, r.createdBy]);
 
   return (
     <ListCard title="Sales Return List">
@@ -86,7 +86,7 @@ export default function SaleReturnListPage() {
             {!rows &&
               [1, 2].map((n) => (
                 <tr key={n}>
-                  <td colSpan={13} className={tdClass}>
+                  <td colSpan={14} className={tdClass}>
                     <div className="h-4 animate-pulse bg-slate-100 dark:bg-muted" />
                   </td>
                 </tr>
@@ -111,6 +111,7 @@ export default function SaleReturnListPage() {
                 <td className={tdClass}>{r.customerName}</td>
                 <td className={tdClass}>{TYPE_LABEL[r.customerType] || "Buyer"}</td>
                 <td className={tdClass}>{r.qty}</td>
+                <td className={`${tdClass} font-semibold text-[#ff5b5b]`}>{r.damaged || ""}</td>
                 <td className={`${tdClass} font-semibold`}>{money(r.total)}</td>
                 <td className={`${tdClass} text-[#0b8a45]`}>{money(r.refundAmount)}</td>
                 <td className={tdClass}>{r.refundAmount ? methodLabel(r.refundMethod) : ""}</td>
@@ -133,6 +134,7 @@ export default function SaleReturnListPage() {
                   Total
                 </td>
                 <td className={tdClass}>{sum("qty")}</td>
+                <td className={tdClass}>{sum("damaged") || ""}</td>
                 <td className={tdClass}>{money(sum("total"))}</td>
                 <td className={tdClass}>{money(sum("refundAmount"))}</td>
                 <td colSpan={4} className={tdClass} />

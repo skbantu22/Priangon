@@ -10,6 +10,7 @@ import VariantModal from "@/components/ui/Application/Admin/pos/VariantModal";
 import PosTopbar from "@/components/ui/Application/Admin/pos/PosTopbar";
 import CheckoutModal from "@/components/ui/Application/Admin/pos/CheckoutModal";
 import ExchangeModal from "@/components/ui/Application/Admin/pos/ExchangeModal";
+import ReturnSheet from "@/components/ui/Application/Admin/ReturnSheet";
 import { shallowEqual, useDispatch, useSelector } from "react-redux";
 import {
   useInfiniteQuery,
@@ -107,6 +108,7 @@ export default function POSPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isExchangeMode, setIsExchangeMode] = useState(false);
   const [isExchangeOpen, setIsExchangeOpen] = useState(false);
+  const [isReturnOpen, setIsReturnOpen] = useState(false);
   const [localExchangeTotal, setLocalExchangeTotal] = useState(0);
   const [exchangePayloadCache, setExchangePayloadCache] = useState(null);
 
@@ -888,6 +890,7 @@ export default function POSPage() {
         onRestoreHeld={restoreHeldSale}
         onDeleteHeld={deleteHeldSale}
         onExchange={openExchange}
+        onReturn={() => setIsReturnOpen(true)}
         till={selectedTill}
         branches={showrooms.filter((branch) => branch?._id && branch.isActive !== false)}
         saleCenterName={tillLabel(selectedTill)}
@@ -1030,6 +1033,9 @@ export default function POSPage() {
           setExchangePayloadCache(null);
         }}
       />
+
+      {/* goods coming back: found by product, barcode, IMEI or invoice; good ones restock, damaged ones do not */}
+      <ReturnSheet open={isReturnOpen} onClose={() => setIsReturnOpen(false)} showroomId={selectedTill} />
     </div>
   );
 }

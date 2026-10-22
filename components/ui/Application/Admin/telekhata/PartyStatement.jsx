@@ -13,6 +13,7 @@ import { showToast } from "@/lib/showToast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { bnNumber, dateLabel, money, printHtml, shortDate, t, todayInput, windowFor } from "./telekhataKit";
 import { AppBar, BottomSheet, DotsIcon, PdfIcon, PickCard, Screen, Switch } from "./tkUI";
+import ReturnSheet from "@/components/ui/Application/Admin/ReturnSheet";
 
 const RANGES = [
   ["day", "দিন"],
@@ -69,6 +70,7 @@ export default function PartyStatement({ type, id, askKind = false }) {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({ amount: "", date: "", note: "" });
   const [editing, setEditing] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false); // goods coming back: good or damaged
 
   const win = useMemo(() => (range.key === "custom" ? { start: range.start, end: range.end } : windowFor(range.key, range.offset)), [range]);
 
@@ -488,14 +490,23 @@ export default function PartyStatement({ type, id, askKind = false }) {
       )}
 
       {party && (
-        <div className="fixed inset-x-0 bottom-0 z-30 mx-auto grid max-w-xl grid-cols-2 gap-4 bg-white p-4 dark:bg-background">
+        <div className={`fixed inset-x-0 bottom-0 z-30 mx-auto grid max-w-xl gap-3 bg-white p-4 dark:bg-background ${type === "customer" ? "grid-cols-3" : "grid-cols-2"}`}>
           <button type="button" onClick={() => start("give")} className="h-14 rounded-xl bg-[#ff3b30] text-[19px] font-medium text-white shadow-md active:scale-95">
             দিচ্ছি
           </button>
           <button type="button" onClick={() => start("take")} className="h-14 rounded-xl bg-[#2fb34f] text-[19px] font-medium text-white shadow-md active:scale-95">
             নিচ্ছি
           </button>
+          {type === "customer" && (
+            <button type="button" onClick={() => setReturnOpen(true)} className="h-14 rounded-xl bg-[#f5a623] text-[19px] font-medium text-white shadow-md active:scale-95">
+              ফেরত
+            </button>
+          )}
         </div>
+      )}
+
+      {type === "customer" && party && (
+        <ReturnSheet bn open={returnOpen} onClose={() => setReturnOpen(false)} customer={{ _id: id, name: party.name }} showroomId={till.id} onDone={refresh} />
       )}
 
       {/* "which kind of baki" sheet */}

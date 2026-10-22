@@ -122,6 +122,7 @@ export async function POST(req) {
         discount,
         total: round2(gross - discount),
         expireDate: dateOrNull(raw.expireDate),
+        warrantyMonths: Math.min(120, Math.max(0, Math.floor(Number(raw.warrantyMonths) || 0))),
         imeis,
         newRates: ratesByVariant.get(String(variant._id)) || cleanRates(),
       });

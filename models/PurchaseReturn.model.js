@@ -24,6 +24,9 @@ const returnItemSchema = new mongoose.Schema(
     // the return type (damaged, wrong item...) and its name as it was then
     returnTypeId: { type: mongoose.Schema.Types.ObjectId, ref: "PurchaseReturnType", default: null },
     reason: { type: String, trim: true, default: "" },
+    // set when the units were broken ones a customer brought back (Damaged Stock):
+    // they never sat in sellable stock, so deleting this puts them back on that shelf
+    damagedLotId: { type: mongoose.Schema.Types.ObjectId, ref: "DamagedLot", default: null },
   },
   { _id: false },
 );

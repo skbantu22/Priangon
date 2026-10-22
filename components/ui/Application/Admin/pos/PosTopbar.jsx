@@ -9,6 +9,7 @@ import {
   PauseCircle,
   History,
   Repeat,
+  RotateCcw,
   Maximize,
   Minimize,
   Trash2,
@@ -36,6 +37,7 @@ export default function PosTopbar({
   onRestoreHeld,
   onDeleteHeld,
   onExchange,
+  onReturn,
   till,
   branches = [],
   saleCenterName,
@@ -183,6 +185,13 @@ export default function PosTopbar({
           <Repeat className="size-5" />
           <span className="hidden lg:inline">Exchange (F6)</span>
         </button>
+
+        {onReturn && (
+          <button type="button" onClick={onReturn} title="Return" aria-label="Return" className={topButton}>
+            <RotateCcw className="size-5" />
+            <span className="hidden lg:inline">Return</span>
+          </button>
+        )}
 
         <Link href="/admin/sales" className={`${topButton} max-sm:hidden`}>
           <History className="size-5" />

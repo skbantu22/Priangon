@@ -35,7 +35,11 @@ export async function GET(req) {
 
     return NextResponse.json({
       success: true,
-      data: returns.map((r) => ({ ...r, qty: r.items.reduce((sum, i) => sum + i.qty, 0) })),
+      data: returns.map((r) => ({
+        ...r,
+        qty: r.items.reduce((sum, i) => sum + i.qty, 0),
+        damaged: r.items.reduce((sum, i) => sum + (i.damagedQty || 0), 0),
+      })),
     });
   } catch (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

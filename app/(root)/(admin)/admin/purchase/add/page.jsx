@@ -139,6 +139,7 @@ function AddPurchase() {
             unitPrice: String(item.purchasePrice),
             discount: item.discount ? String(item.discount) : "",
             expireDate: "",
+            warrantyMonths: "",
             imeis: [],
           })),
         );
@@ -158,6 +159,7 @@ function AddPurchase() {
           unitPrice: hit.lastCost ? String(hit.lastCost) : "",
           discount: "",
           expireDate: "",
+          warrantyMonths: "",
           imeis: [],
         },
         ...current,
@@ -229,6 +231,7 @@ function AddPurchase() {
           unitPrice: num(item.unitPrice),
           discount: num(item.discount),
           expireDate: item.expireDate || null,
+          warrantyMonths: num(item.warrantyMonths),
           imeis: item.imeis,
         })),
         discountType: discount.type,
@@ -383,10 +386,10 @@ function AddPurchase() {
         </div>
 
         <div className="mt-3 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1300px] border-collapse text-left text-sm">
             <thead>
               <tr className={theadClass}>
-                {["SL No", "Product Name", "Received Qty", "Extra Qty", "Qty", "Actual Purchase Price", "Purchase Price", "Discount", "Subtotal", "Expire Date", "IMEI"].map((h) => (
+                {["SL No", "Product Name", "Received Qty", "Extra Qty", "Qty", "Actual Purchase Price", "Purchase Price", "Discount", "Subtotal", "Expire Date", "Supplier Warranty (months)", "IMEI"].map((h) => (
                   <th key={h} className={`${thClass} text-center`}>
                     {h}
                   </th>
@@ -399,7 +402,7 @@ function AddPurchase() {
             <tbody>
               {!items.length && (
                 <tr>
-                  <td colSpan={12} className={`${tdClass} py-10 text-center text-muted-foreground`}>
+                  <td colSpan={13} className={`${tdClass} py-10 text-center text-muted-foreground`}>
                     Choose a brand or category above to add products.
                   </td>
                 </tr>
@@ -471,6 +474,9 @@ function AddPurchase() {
                       <input type="date" value={item.expireDate} onChange={(e) => updateItem(index, { expireDate: e.target.value })} className={`${cell} w-[140px]`} aria-label={`Expire date for ${item.productName}`} />
                     </td>
                     <td className={tdClass}>
+                      <input type="number" min="0" max="120" value={item.warrantyMonths} placeholder="0" onChange={(e) => updateItem(index, { warrantyMonths: e.target.value })} className={`${cell} w-[90px]`} aria-label={`Supplier warranty in months for ${item.productName}`} />
+                    </td>
+                    <td className={tdClass}>
                       <button
                         type="button"
                         onClick={() => openImei(index)}
@@ -503,7 +509,7 @@ function AddPurchase() {
                   <td className={tdClass}>{totals.itemCount}</td>
                   <td colSpan={3} className={tdClass} />
                   <td className={tdClass}>{money(totals.subtotal)}</td>
-                  <td colSpan={3} className={tdClass} />
+                  <td colSpan={4} className={tdClass} />
                 </tr>
               </tfoot>
             )}
@@ -730,6 +736,10 @@ function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
         <label className="text-[12px] font-medium text-muted-foreground">
           Expire Date
           <input type="date" value={item.expireDate} onChange={(event) => onChange({ expireDate: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+        </label>
+        <label className="text-[12px] font-medium text-muted-foreground">
+          Supplier Warranty (months)
+          <input type="number" min="0" max="120" value={item.warrantyMonths} placeholder="0" onChange={(event) => onChange({ warrantyMonths: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           IMEI

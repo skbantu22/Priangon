@@ -30,6 +30,10 @@ const purchaseItemSchema = new mongoose.Schema(
     total: { type: Number, required: true, min: 0 },
     expireDate: { type: Date, default: null },
 
+    // months the supplier stands behind these units, counted from the purchase
+    // date: a unit that comes back broken can go back to him until then
+    warrantyMonths: { type: Number, default: 0, min: 0, max: 120 },
+
     // units already sent back to the supplier (purchase returns)
     returnedQty: { type: Number, default: 0, min: 0 },
 
