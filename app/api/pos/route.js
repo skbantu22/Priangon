@@ -31,6 +31,7 @@ export async function GET(req) {
     const showroomId = till.showroomId;
     const categoryId = searchParams.get("categoryId");
     const brand = (searchParams.get("brand") || "").trim();
+    const quality = (searchParams.get("quality") || "").trim();
     const sort = searchParams.get("sort") || "latest";
     const q = (searchParams.get("q") || "").trim();
 
@@ -102,6 +103,11 @@ export async function GET(req) {
       query.brand = { $regex: `^${escapeRegex(brand)}$`, $options: "i" };
     }
 
+    // the grade a part is sold as — Original, Copy, OLED and the like
+    if (quality) {
+      query.quality = { $regex: `^${escapeRegex(quality)}$`, $options: "i" };
+    }
+
     if (q) {
       const allowed = new Set(stockedProductIds.map((id) => String(id)));
       const fromVariant = (matchedVariants || [])
@@ -132,7 +138,7 @@ export async function GET(req) {
       }[sort] || { _id: -1 };
 
     const products = await Product.find(query)
-      .select("name brand category subcategory sellingPrice dealerPrice subDealerPrice wholesalerPrice media variants warranty trackSerial vatGroup")
+      .select("name brand quality category subcategory sellingPrice dealerPrice subDealerPrice wholesalerPrice media variants warranty trackSerial vatGroup")
       .sort(sortBy)
       .skip(skip)
       .limit(limit)
@@ -190,6 +196,7 @@ export async function GET(req) {
           _id: product._id,
           name: product.name,
           brand: product.brand || "",
+          quality: product.quality || "",
           category: product.category || null,
           subcategory: product.subcategory || null,
           warranty: product.warranty || { type: "none", months: 0 },

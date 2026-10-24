@@ -303,6 +303,9 @@ export default function ProductGallery({
   brands = [],
   selectedBrand,
   setSelectedBrand,
+  qualities = [],
+  selectedQuality = "",
+  setSelectedQuality = () => {},
   sort,
   setSort,
   emptyHint = "No products found",
@@ -425,6 +428,17 @@ export default function ProductGallery({
   const selectClass =
     "h-10 min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none focus:border-primary dark:border-white/10 dark:bg-card dark:text-gray-200";
 
+  // Written out in full because Tailwind reads class names from the source:
+  // a template-built class never reaches the stylesheet. Search takes the
+  // wide column, then one column per dropdown that is actually shown.
+  const FILTER_GRID = {
+    1: "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]",
+    2: "md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]",
+    3: "md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]",
+  };
+  const filterGrid =
+    FILTER_GRID[1 + (qualities.length > 0 ? 1 : 0) + (subcategories.length > 0 ? 1 : 0)];
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-4">
       {/* ---------------- CATEGORY CHIPS ---------------- */}
@@ -473,14 +487,11 @@ export default function ProductGallery({
       {/* ---------------- PRODUCTS PANEL ---------------- */}
       <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200/70 bg-white/60 dark:border-white/10 dark:bg-white/[0.02]">
         {/* filter bar */}
-        <div
-          className={`grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 ${
-            subcategories.length > 0
-              ? "md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_auto]"
-              : "md:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))_auto]"
-          }`}
-        >
-          <label className="col-span-2 hidden h-10 items-center gap-2 sm:flex rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
+        <div className={`grid shrink-0 grid-cols-2 gap-2 p-2 sm:p-3 ${filterGrid}`}>
+          {/* The category chips above already pick a category, so there is no
+              dropdown for it here — on a phone that second picker only ate the
+              room the search box needed. */}
+          <label className="col-span-2 flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
             <Search className="size-4 text-gray-400" />
             <input
               value={localFilter}
@@ -490,18 +501,20 @@ export default function ProductGallery({
             />
           </label>
 
-          <select
-            value={selectedCategoryId}
-            onChange={(e) => setSelectedCategoryId(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All Categories</option>
-            {categories.map((cat) => (
-              <option key={cat._id} value={cat._id}>
-                {cat.name || cat.title}
-              </option>
-            ))}
-          </select>
+          {qualities.length > 0 && (
+            <select
+              value={selectedQuality}
+              onChange={(e) => setSelectedQuality(e.target.value)}
+              className={selectClass}
+            >
+              <option value="">All Quality</option>
+              {qualities.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {subcategories.length > 0 && (
             <select

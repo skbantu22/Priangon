@@ -96,6 +96,7 @@ export default function POSPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedQuality, setSelectedQuality] = useState("");
   const [sort, setSort] = useState("latest");
   const [lastOrderId, setLastOrderId] = useState(null);
   // bumped after each sale so the cart panel resets its payment inputs
@@ -274,6 +275,7 @@ export default function POSPage() {
     categoryId: selectedCategoryId,
     subcategoryId: selectedSubcategoryId,
     brand: selectedBrand,
+    quality: selectedQuality,
     sort,
   };
   const hasFilter = !!(
@@ -281,13 +283,14 @@ export default function POSPage() {
     selectedCategoryId ||
     selectedSubcategoryId ||
     selectedBrand ||
+    selectedQuality ||
     sort !== "latest"
   );
 
   const localProducts = useMemo(
     () => filterPosProducts(allProducts, listFilters),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allProducts, search, selectedCategoryId, selectedSubcategoryId, selectedBrand, sort],
+    [allProducts, search, selectedCategoryId, selectedSubcategoryId, selectedBrand, selectedQuality, sort],
   );
 
   // Only when the shop has more products than the eager load holds does a
@@ -356,6 +359,23 @@ export default function POSPage() {
   const categories =
     categoryQuery.isSuccess && !emptyTill ? categoryQuery.data || [] : [];
   const brands = brandQuery.isSuccess && !emptyTill ? brandQuery.data || [] : [];
+
+  // The grades actually on this shelf — Original, Copy, OLED and so on. Read
+  // off the loaded products rather than the whole quality list, so the filter
+  // never offers a grade this shop does not stock.
+  const qualities = useMemo(() => {
+    const seen = new Map();
+
+    for (const product of allProducts) {
+      const label = String(product.quality || "").trim();
+      if (!label) continue;
+
+      const key = label.toLowerCase();
+      if (!seen.has(key)) seen.set(key, label);
+    }
+
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [allProducts]);
   const subcategories = useMemo(
     () =>
       catalogQuery.isSuccess && !emptyTill
@@ -396,6 +416,17 @@ export default function POSPage() {
       setSelectedBrand("");
     }
   }, [brandQuery.isSuccess, brands, selectedBrand]);
+
+  // a grade that is no longer on the shelf must not keep the list empty
+  useEffect(() => {
+    if (
+      selectedQuality &&
+      qualities.length > 0 &&
+      !qualities.some((name) => name.toLowerCase() === selectedQuality.toLowerCase())
+    ) {
+      setSelectedQuality("");
+    }
+  }, [qualities, selectedQuality]);
 
   // 🚀 Optimized Handlers with useCallback
   const addToCart = useCallback(
@@ -929,6 +960,9 @@ export default function POSPage() {
             brands={brands}
             selectedBrand={selectedBrand}
             setSelectedBrand={setSelectedBrand}
+            qualities={qualities}
+            selectedQuality={selectedQuality}
+            setSelectedQuality={setSelectedQuality}
             sort={sort}
             setSort={setSort}
           />
