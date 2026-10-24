@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 
 import GlobalStoreProvider from "@/components/ui/Application/GlobalStoreProvider";
 import PosPrefetch from "@/components/ui/Application/PosPrefetch";
+import ServiceWorker from "@/components/ui/Application/ServiceWorker";
 import SupportChannels from "@/components/ui/Application/website/SupportChannels";
 
 // Fonts come from Google in the browser, not at build time: next/font/google
@@ -18,6 +19,25 @@ export const metadata = {
     template: "%s | SB Telecom",
   },
   description: "SB Telecom: Global Connectivity Solutions",
+
+  // what Android and iOS read when the app is added to the home screen
+  applicationName: "SB Telecom",
+  appleWebApp: {
+    capable: true,
+    title: "SB Telecom",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#00801a",
+  width: "device-width",
+  initialScale: 1,
+  // the app fills the screen under the notch once installed
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {
@@ -35,6 +55,7 @@ export default function RootLayout({ children }) {
         </GlobalStoreProvider>
 
         <SupportChannels />
+        <ServiceWorker />
 
         {/* Toast Notifications */}
         <Toaster position="top-right" richColors />
