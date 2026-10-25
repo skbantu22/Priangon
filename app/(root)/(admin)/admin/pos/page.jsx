@@ -21,6 +21,7 @@ import {
 import {
   filterPosProducts,
   posBrandsQueryOptions,
+  posQualitiesQueryOptions,
   posCatalogQueryOptions,
   posCategoriesQueryOptions,
   posProductsQueryOptions,
@@ -345,6 +346,11 @@ export default function POSPage() {
     enabled: !!selectedShowroomId,
     refetchOnWindowFocus: false,
   });
+  const qualityQuery = useQuery({
+    ...posQualitiesQueryOptions(selectedShowroomId),
+    enabled: !!selectedShowroomId,
+    refetchOnWindowFocus: false,
+  });
   // This till has finished loading and has nothing on the shelf. Chips must
   // not keep Grocery / ANKER from another store while the grid says empty.
   const emptyTill =
@@ -363,19 +369,34 @@ export default function POSPage() {
   // The grades actually on this shelf — Original, Copy, OLED and so on. Read
   // off the loaded products rather than the whole quality list, so the filter
   // never offers a grade this shop does not stock.
+  //
+  // The order comes from /admin/quality, where the shop arranged them, so the
+  // dropdown reads the way the shopkeeper thinks rather than A–Z. A grade on a
+  // product but missing from that list still shows, at the end, so nothing on
+  // the shelf becomes unreachable.
   const qualities = useMemo(() => {
-    const seen = new Map();
+    const onShelf = new Map();
 
     for (const product of allProducts) {
       const label = String(product.quality || "").trim();
       if (!label) continue;
 
       const key = label.toLowerCase();
-      if (!seen.has(key)) seen.set(key, label);
+      if (!onShelf.has(key)) onShelf.set(key, label);
     }
 
-    return [...seen.values()].sort((a, b) => a.localeCompare(b));
-  }, [allProducts]);
+    const ordered = [];
+
+    for (const name of qualityQuery.data || []) {
+      const key = name.toLowerCase();
+      if (!onShelf.has(key)) continue;
+
+      ordered.push(onShelf.get(key));
+      onShelf.delete(key);
+    }
+
+    return [...ordered, ...[...onShelf.values()].sort((a, b) => a.localeCompare(b))];
+  }, [allProducts, qualityQuery.data]);
   const subcategories = useMemo(
     () =>
       catalogQuery.isSuccess && !emptyTill
