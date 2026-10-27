@@ -456,7 +456,25 @@ function AddPurchase() {
                     </td>
                     <td className={`${tdClass} font-semibold`}>{units}</td>
                     <td className={tdClass}>
-                      <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, { unitPrice: e.target.value })} className={`${cell} w-[110px]`} aria-label={`Price for ${item.productName}`} />
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, { unitPrice: String(Math.max(0, round2(num(item.unitPrice) - 1))) })}
+                          className="flex h-[32px] w-[30px] shrink-0 items-center justify-center rounded-l-[4px] bg-[#ff5b5b] text-white hover:bg-[#f24242]"
+                          aria-label={`Lower price of ${item.productName} by 1`}
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, { unitPrice: e.target.value })} className={`${cell} w-[90px] rounded-none text-center`} aria-label={`Price for ${item.productName}`} />
+                        <button
+                          type="button"
+                          onClick={() => updateItem(index, { unitPrice: String(round2(num(item.unitPrice) + 1)) })}
+                          className="flex h-[32px] w-[30px] shrink-0 items-center justify-center rounded-r-[4px] bg-[#10c469] text-white hover:bg-[#0eab5c]"
+                          aria-label={`Raise price of ${item.productName} by 1`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                     </td>
                     <td className={`${tdClass} whitespace-nowrap`}>
                       {money(round2(cost))}
@@ -710,10 +728,28 @@ function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
           Qty
           <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{units}</div>
         </label>
-        <label className="text-[12px] font-medium text-muted-foreground">
+        <div className="text-[12px] font-medium text-muted-foreground">
           Purchase Price
-          <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => onChange({ unitPrice: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
-        </label>
+          <div className="mt-1 flex items-center">
+            <button
+              type="button"
+              onClick={() => onChange({ unitPrice: String(Math.max(0, round2(num(item.unitPrice) - 1))) })}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white active:bg-[#f24242]"
+              aria-label="Lower price by 1"
+            >
+              <Minus size={16} />
+            </button>
+            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => onChange({ unitPrice: event.target.value })} className={`${inputClass} !h-11 min-w-0 w-full !rounded-none text-center !text-base`} aria-label="Purchase price" />
+            <button
+              type="button"
+              onClick={() => onChange({ unitPrice: String(round2(num(item.unitPrice) + 1)) })}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white active:bg-[#0eab5c]"
+              aria-label="Raise price by 1"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
         <label className="text-[12px] font-medium text-muted-foreground">
           Actual Price
           <div className={`${inputClass} mt-1 flex !h-11 flex-col justify-center leading-tight`}>

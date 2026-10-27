@@ -250,6 +250,7 @@ export default function TelekhataHome() {
           <Tile onClick={soon} icon={FcSms} label={t("Marketing", "মার্কেটিং")} />
           <Tile onClick={soon} icon={FcSimCardChip} label={t("Top up", "টপ আপ")} />
           <Tile href="/admin/warranty" icon={FcApproval} label={t("Warranty", "ওয়ারেন্টি")} />
+          <Tile href="/admin/inventory/damaged" icon={FcExpired} label={t("Damaged stock", "নষ্ট মাল")} />
           <Tile href={ADMIN_INVENTORY_STOCK} icon={FcExpired} label={t("Expired products", "মেয়াদোত্তীর্ণ পণ্য")} />
           <Tile href={ADMIN_APP_SETTINGS} icon={FcPrint} label={t("Printer", "প্রিন্টার")} />
           <Tile href={ADMIN_ASSET_SHOW} icon={FcDonate} label={t("Capital", "পুঁজি")} />

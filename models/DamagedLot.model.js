@@ -36,7 +36,9 @@ const damagedLotSchema = new mongoose.Schema(
     writtenOffQty: { type: Number, default: 0, min: 0 }, // written off as a loss
 
     // the customer's return it came in on
-    saleReturnId: { type: mongoose.Schema.Types.ObjectId, ref: "SaleReturn", required: true, index: true },
+    // (a lot made from a warranty claim has no sale return; it points at the claim instead)
+    saleReturnId: { type: mongoose.Schema.Types.ObjectId, ref: "SaleReturn", default: null, index: true },
+    warrantyClaimId: { type: mongoose.Schema.Types.ObjectId, ref: "WarrantyClaim", default: null, index: true },
     returnNumber: { type: String, default: "" },
     orderNumber: { type: String, default: "" },
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", default: null },

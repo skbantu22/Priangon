@@ -47,6 +47,8 @@ const warrantyClaimSchema = new mongoose.Schema(
     showroomId: { type: mongoose.Schema.Types.ObjectId, ref: "Showroom" },
     receivedBy: { type: String, trim: true, default: "" },
     deliveredAt: { type: Date, default: null },
+    // set once a copy of the unit is on the damaged shelf; the claim itself stays as it is
+    damagedLotId: { type: mongoose.Schema.Types.ObjectId, ref: "DamagedLot", default: null },
   },
   { timestamps: true },
 );

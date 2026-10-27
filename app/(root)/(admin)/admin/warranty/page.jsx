@@ -224,6 +224,19 @@ export default function WarrantyPage() {
     }
   };
 
+  // also puts the claim's unit on the Damaged Stock shelf; the claim stays here
+  const copyToDamaged = async (id) => {
+    try {
+      const res = await fetch(`/api/warranty/claims/${id}/damaged`, { method: "POST" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      showToast("success", data.message);
+      loadClaims();
+    } catch (err) {
+      showToast("error", err.message || "Could not add to damaged stock");
+    }
+  };
+
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const openCount = (counts.received || 0) + (counts.sent_to_service || 0);
 
@@ -461,6 +474,17 @@ export default function WarrantyPage() {
                         </option>
                       ))}
                     </select>
+                    {c.damagedLotId ? (
+                      <p className="mt-1.5 text-[11px] font-medium text-emerald-700">✓ On damaged shelf</p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => copyToDamaged(c._id)}
+                        className="mt-1.5 text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        + Add to Damaged Stock
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
