@@ -165,8 +165,8 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
   const { name, brand, quality, warranty, variants, imageUrl, rawProduct, stock, minPrice, maxPrice, options } =
     summarize(item);
   const soldOut = stock <= 0;
-  // the grade it is sold as (Original, Copy, OLED) rides along with the name
-  const fullName = quality ? `${name} · ${quality}` : name;
+  // the grade it is sold as (Original, Copy, OLED) sits beside the brand
+  const tag = [brand, quality].filter(Boolean).join(" · ");
   const [label, labelClass] = stockLabel(stock);
   const warrantyText =
     warranty?.type && warranty.type !== "none" && warranty.months
@@ -200,7 +200,7 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
     <div className={`relative overflow-hidden rounded-lg bg-linear-to-b from-violet-50 to-white dark:from-white/5 dark:to-transparent ${soldOut ? "opacity-50 grayscale" : ""} ${className}`}>
       <Image
         src={imageUrl}
-        alt={fullName}
+        alt={name}
         fill
         sizes={sizes}
         className="object-contain p-2 transition duration-300 group-hover:scale-105"
@@ -218,10 +218,10 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
         {image("size-14 shrink-0", "56px")}
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {fullName}
+            {name}
           </h3>
           <p className="line-clamp-1 text-[11px] text-gray-400">
-            {[brand, options.slice(0, 4).join(" · "), warrantyText]
+            {[tag, options.slice(0, 4).join(" · "), warrantyText]
               .filter(Boolean)
               .join(" — ")}
           </p>
@@ -259,16 +259,16 @@ function ProductItem({ item, view, setOpenProduct, addToCart }) {
         </span>
       )}
 
-      {brand && (
+      {tag && (
         <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-          {brand}
+          {tag}
         </p>
       )}
       <h3
-        title={fullName}
-        className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-gray-900 dark:text-gray-100 ${brand ? "" : "mt-2"}`}
+        title={name}
+        className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 text-gray-900 dark:text-gray-100 ${tag ? "" : "mt-2"}`}
       >
-        {fullName}
+        {name}
       </h3>
 
       <div className="mt-1 flex items-end justify-between gap-2">
