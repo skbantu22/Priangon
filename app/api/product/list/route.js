@@ -86,7 +86,7 @@ export async function GET(request) {
     const [products, catalog] = await Promise.all([
       ProductModel.find(query)
         .select(
-          "name brand category subcategory code unit mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice minSalePrice alertQuantity media variants deletedAt",
+          "name brand quality category subcategory code unit mrp sellingPrice purchasePrice dealerPrice subDealerPrice wholesalerPrice minSalePrice alertQuantity media variants deletedAt",
         )
         .lean(),
       catalogForTill(location === "all" ? "all" : location),
@@ -155,6 +155,7 @@ export async function GET(request) {
         code: p.code || "",
         unit: p.unit || "Pcs",
         brand: p.brand || "",
+        quality: String(p.quality || "").trim(),
         category: catMap.get(String(p.category))?.name || "",
         subcategory: subMap.get(String(p.subcategory || ""))?.name || "",
         media: p.media?.[0] || null,

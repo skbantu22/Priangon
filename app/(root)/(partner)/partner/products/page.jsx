@@ -97,6 +97,8 @@ function PosTile({ product, open, onOpen }) {
   const maxPrice = prices.length ? Math.max(...prices) : 0;
   const warranty = product.warranty;
   const warrantyText = warranty?.type !== "none" && warranty?.months > 0 ? formatWarrantyPeriod(warranty.months) : "";
+  // the grade it is sold as (Original, Copy, OLED) sits beside the brand
+  const tag = [product.brand, product.quality].filter(Boolean).join(" · ");
   const stockText = stock <= 0 ? "Out of stock" : stock <= 5 ? `Low Stock (${stock})` : `In Stock (${stock})`;
   const stockClass = stock <= 0 ? "text-red-500" : stock <= 5 ? "text-amber-600" : "text-emerald-600";
 
@@ -144,8 +146,8 @@ function PosTile({ product, open, onOpen }) {
           <ShieldCheck className="size-3" /> {warrantyText}
         </span>
       )}
-      {product.brand && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{product.brand}</p>}
-      <h3 className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 ${product.brand ? "" : "mt-2"}`}>{product.name}</h3>
+      {tag && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{tag}</p>}
+      <h3 className={`line-clamp-2 min-h-10 text-[14px] font-semibold leading-5 ${tag ? "" : "mt-2"}`}>{product.name}</h3>
       <div className="mt-1 flex items-end justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[17px] font-bold text-primary">

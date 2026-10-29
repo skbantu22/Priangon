@@ -98,7 +98,7 @@ export async function GET(req) {
     if (brand) query.brand = { $regex: `^${escapeRegex(brand)}$`, $options: "i" };
 
     const products = await Product.find(query)
-      .select("name brand category subcategory sellingPrice mrp dealerPrice subDealerPrice wholesalerPrice media variants warranty")
+      .select("name brand quality category subcategory sellingPrice mrp dealerPrice subDealerPrice wholesalerPrice media variants warranty")
       .sort({ name: 1 })
       .skip((page - 1) * PAGE_SIZE)
       .limit(PAGE_SIZE + 1)
@@ -143,6 +143,7 @@ export async function GET(req) {
           _id: p._id,
           name: p.name,
           brand: p.brand || "",
+          quality: String(p.quality || "").trim(),
           category: p.category ? String(p.category) : "",
           subcategory: p.subcategory ? String(p.subcategory) : "",
           warranty: p.warranty || { type: "none", months: 0 },

@@ -31,6 +31,7 @@ import {
   setCustomer,
   clearCustomer,
   updateQty,
+  setItemPrice,
   setItemImeis,
   selectPosSummary,
 } from "@/store/reducer/posCartSlice";
@@ -504,7 +505,7 @@ export default function CartSidebar({
 
       {/* ================= ITEMS ================= */}
       <div className="mx-3 flex min-h-[220px] flex-1 flex-col lg:min-h-[260px] overflow-hidden rounded-xl border border-gray-100 dark:border-white/10">
-        <div className="hidden shrink-0 grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 lg:grid dark:bg-white/5 dark:text-gray-300">
+        <div className="hidden shrink-0 grid-cols-[18px_minmax(0,1fr)_92px_112px_66px_22px] items-center gap-1.5 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold text-gray-600 lg:grid dark:bg-white/5 dark:text-gray-300">
           <span>#</span>
           <span>Product</span>
           <span className="text-center">Qty</span>
@@ -526,7 +527,7 @@ export default function CartSidebar({
               return (
                 <div
                   key={id || idx}
-                  className="grid grid-cols-[18px_minmax(0,1fr)_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-2 first:border-t-0 lg:grid-cols-[18px_minmax(0,1fr)_92px_62px_66px_22px] lg:py-1 dark:border-white/10"
+                  className="grid grid-cols-[18px_minmax(0,1fr)_22px] items-center gap-1.5 border-t border-gray-100 px-3 py-2 first:border-t-0 lg:grid-cols-[18px_minmax(0,1fr)_92px_112px_66px_22px] lg:py-1 dark:border-white/10"
                 >
                   <span className="text-[12px] text-gray-500">{idx + 1}</span>
 
@@ -614,7 +615,34 @@ export default function CartSidebar({
                                 {money(normal)}
                               </span>
                             )}
-                            <span className={tiered ? "font-semibold text-emerald-700 dark:text-emerald-400" : ""}>{money(price)}</span>
+                            {/* − / + move the invoice price 1 taka at a time; the field takes any price */}
+                            <span className="flex items-center justify-end">
+                              <button
+                                type="button"
+                                onClick={() => dispatch(setItemPrice({ variantId: id, price: price - 1 }))}
+                                aria-label="Lower price by 1"
+                                className="flex h-6 w-5 shrink-0 items-center justify-center rounded-l bg-[#ff5b5b] text-white active:bg-[#f24242]"
+                              >
+                                <Minus className="size-3" strokeWidth={3} />
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={price}
+                                onChange={(e) => dispatch(setItemPrice({ variantId: id, price: e.target.value }))}
+                                aria-label={`Price for ${item.name}`}
+                                className={`h-6 w-[62px] min-w-0 border-y border-gray-200 bg-white text-center text-[12px] dark:border-white/10 dark:bg-transparent ${tiered ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-gray-800 dark:text-gray-200"}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => dispatch(setItemPrice({ variantId: id, price: price + 1 }))}
+                                aria-label="Raise price by 1"
+                                className="flex h-6 w-5 shrink-0 items-center justify-center rounded-r bg-[#10c469] text-white active:bg-[#0eab5c]"
+                              >
+                                <Plus className="size-3" strokeWidth={3} />
+                              </button>
+                            </span>
                           </span>
 
                           <span className="text-right text-[12px] font-bold leading-tight text-gray-900 dark:text-white">

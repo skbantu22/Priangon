@@ -108,6 +108,15 @@ const posCartSlice = createSlice({
       item.qty = Math.max(1, Number(qty) || 1);
     },
 
+    // the counter bargains: this line is invoiced at a price typed or stepped by hand
+    setItemPrice(state, action) {
+      const { variantId, price } = action.payload;
+
+      const item = state.cart.find((i) => sameId(i.variantId, variantId));
+
+      if (item) item.price = Math.max(0, Math.round((Number(price) || 0) * 100) / 100);
+    },
+
     // IMEI / serial numbers typed for a cart line (one per unit)
     setItemImeis(state, action) {
       const { variantId, imeis } = action.payload;
@@ -203,6 +212,7 @@ export const {
   increaseQty,
   decreaseQty,
   updateQty,
+  setItemPrice,
   setItemImeis,
   removeCartItem,
   clearCart,

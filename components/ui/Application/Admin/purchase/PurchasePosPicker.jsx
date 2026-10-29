@@ -203,8 +203,10 @@ function ProductTile({ product, onAdd, qtyOf }) {
   const added = lines.reduce((sum, line) => sum + qtyOf(line._id), 0);
   const [open, setOpen] = useState(lines.length > 1);
   const image = product.image || "/placeholder.png";
+  // the grade it is sold as (Original, Copy, OLED) sits beside the brand
+  const tag = [product.brand, product.quality].filter(Boolean).join(" · ");
 
-  const add = (event) => {
+  const add =(event) => {
     event.stopPropagation();
     if (lines.length !== 1) {
       setOpen(true);
@@ -229,7 +231,7 @@ function ProductTile({ product, onAdd, qtyOf }) {
       <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-linear-to-b from-violet-50 to-white">
         <Image src={image} alt={product.name} fill sizes="160px" className="object-contain p-2" unoptimized={skipOptimize(image)} />
       </div>
-      {product.brand && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{product.brand}</p>}
+      {tag && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-wide text-gray-400">{tag}</p>}
       <h3 className="line-clamp-2 min-h-10 text-[13px] font-semibold leading-5 sm:text-[14px]">{product.name}</h3>
       <div className="mt-1 flex items-end justify-between gap-2">
         <p className="text-[12px] text-muted-foreground">Stock {product.totalStock}</p>
