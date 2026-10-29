@@ -124,7 +124,8 @@ export async function POST(req) {
         expireDate: dateOrNull(raw.expireDate),
         warrantyMonths: Math.min(120, Math.max(0, Math.floor(Number(raw.warrantyMonths) || 0))),
         imeis,
-        newRates: ratesByVariant.get(String(variant._id)) || cleanRates(),
+        // a purchase order carries its own rates; a direct purchase sets the ones typed on its line
+        newRates: ratesByVariant.get(String(variant._id)) || cleanRates(raw.newRates),
       });
     }
 

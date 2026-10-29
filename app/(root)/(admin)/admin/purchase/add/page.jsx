@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
@@ -197,7 +197,10 @@ function AddPurchase() {
 
   const lossLines = items.filter((item) => {
     const cost = unitCost(item);
-    return cost > 0 && RATES.some(([f]) => item.rates?.[f] > 0 && item.rates[f] <= cost);
+    return cost > 0 && RATES.some(([f]) => {
+      const rate = num(item.newRates?.[f]) || num(item.rates?.[f]);
+      return rate > 0 && rate <= cost;
+    });
   });
 
   const setPayment = (index, patch) => setPayments((list) => list.map((p, i) => (i === index ? { ...p, ...patch } : p)));
@@ -233,6 +236,7 @@ function AddPurchase() {
           expireDate: item.expireDate || null,
           warrantyMonths: num(item.warrantyMonths),
           imeis: item.imeis,
+          newRates: Object.fromEntries(RATES.map(([f]) => [f, num(item.newRates?.[f])])),
         })),
         discountType: discount.type,
         discountValue: num(discount.value),
@@ -372,6 +376,7 @@ function AddPurchase() {
               item={item}
               index={index}
               count={items.length}
+              order={order}
               onChange={(patch) => updateItem(index, patch)}
               onRemove={() => removeItem(index)}
               onImei={() => openImei(index)}
@@ -412,7 +417,8 @@ function AddPurchase() {
                 const change = item.lastCost && cost ? round2(cost - item.lastCost) : 0;
                 const units = num(item.quantity) + num(item.extraQty);
                 return (
-                  <tr key={item.variantId}>
+                  <Fragment key={item.variantId}>
+                  <tr>
                     <td className={tdClass}>{items.length - index}</td>
                     <td className={`${tdClass} min-w-[220px]`}>
                       <b className="block font-medium">
@@ -515,6 +521,14 @@ function AddPurchase() {
                       </button>
                     </td>
                   </tr>
+                  {!order && (
+                    <tr>
+                      <td colSpan={13} className={`${tdClass} !py-2 text-left`}>
+                        <SaleRates item={item} cost={cost} onChange={(patch) => updateItem(index, patch)} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -667,7 +681,47 @@ function SumRow({ label, strong, children }) {
   );
 }
 
-function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
+/**
+ * The four sale rates of a line, typed while buying: a field left blank keeps the
+ * product's rate (shown as the placeholder); one typed goes onto the product when
+ * the purchase is saved. A rate at or under this cost is marked red, so the loss
+ * can be fixed here instead of on the product page afterwards.
+ */
+function SaleRates({ item, cost, onChange, mobile = false }) {
+  const typed = item.newRates || {};
+
+  return (
+    <div className={mobile ? "mt-3 border-t border-[#e6ebf1] pt-3 dark:border-border" : ""}>
+      <p className="mb-1 text-[12px] font-medium text-muted-foreground">
+        Sale rates <span className="font-normal">— leave blank to keep the current rate</span>
+      </p>
+      <div className={mobile ? "grid grid-cols-2 gap-2" : "flex flex-wrap gap-3"}>
+        {RATES.map(([field, label]) => {
+          const rate = num(typed[field]) || num(item.rates?.[field]);
+          const loss = cost > 0 && rate > 0 && rate <= cost;
+          return (
+            <label key={field} className="text-[12px] text-muted-foreground">
+              {label}
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={typed[field] ?? ""}
+                placeholder={item.rates?.[field] ? String(item.rates[field]) : "—"}
+                onChange={(event) => onChange({ newRates: { ...typed, [field]: event.target.value } })}
+                className={`${mobile ? `${inputClass} mt-1 !h-11 w-full !text-base` : `${cell} mt-0.5 block w-[110px]`} ${loss ? "!border-red-400 !text-red-600" : ""}`}
+                aria-label={`${label} rate for ${item.productName}`}
+              />
+              {loss && <span className="block text-[11px] text-red-600">Loss at this cost</span>}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
   const cost = unitCost(item);
   const change = item.lastCost && cost ? round2(cost - item.lastCost) : 0;
   const units = num(item.quantity) + num(item.extraQty);
@@ -728,7 +782,7 @@ function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
           Qty
           <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{units}</div>
         </label>
-        <div className="text-[12px] font-medium text-muted-foreground">
+        <div className="col-span-2 text-[12px] font-medium text-muted-foreground">
           Purchase Price
           <div className="mt-1 flex items-center">
             <button
@@ -794,6 +848,7 @@ function MobileLine({ item, index, count, onChange, onRemove, onImei }) {
           </button>
         </label>
       </div>
+      {!order && <SaleRates item={item} cost={cost} onChange={onChange} mobile />}
     </article>
   );
 }
