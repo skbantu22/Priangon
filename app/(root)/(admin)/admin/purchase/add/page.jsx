@@ -709,7 +709,7 @@ function SaleRates({ item, cost, onChange, mobile = false }) {
                 value={typed[field] ?? ""}
                 placeholder={item.rates?.[field] ? String(item.rates[field]) : "—"}
                 onChange={(event) => onChange({ newRates: { ...typed, [field]: event.target.value } })}
-                className={`${mobile ? `${inputClass} mt-1 !h-11 w-full !text-base` : `${cell} mt-0.5 block w-[110px]`} ${loss ? "!border-red-400 !text-red-600" : ""}`}
+                className={`${mobile ? `${inputClass} mt-0.5 !h-9 w-full !text-sm` : `${cell} mt-0.5 block w-[110px]`} ${loss ? "!border-red-400 !text-red-600" : ""}`}
                 aria-label={`${label} rate for ${item.productName}`}
               />
               {loss && <span className="block text-[11px] text-red-600">Loss at this cost</span>}
@@ -744,14 +744,14 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1.5">
         <label className="col-span-2 text-[12px] font-medium text-muted-foreground">
           Received Qty
-          <div className="mt-1 flex">
+          <div className="mt-0.5 flex">
             <button
               type="button"
               onClick={() => onChange({ quantity: String(Math.max(1, num(item.quantity) - 1)) })}
-              className="flex h-11 w-11 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white"
               aria-label={`One less ${item.productName}`}
             >
               <Minus size={16} />
@@ -761,13 +761,13 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
               min="1"
               value={item.quantity}
               onChange={(event) => onChange({ quantity: event.target.value })}
-              className={`${inputClass} !h-11 min-w-0 flex-1 !rounded-none !text-center !text-base`}
+              className={`${inputClass} !h-9 min-w-0 flex-1 !rounded-none !text-center !text-sm`}
               aria-label={`Received quantity for ${item.productName}`}
             />
             <button
               type="button"
               onClick={() => onChange({ quantity: String(num(item.quantity) + 1) })}
-              className="flex h-11 w-11 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white"
               aria-label={`One more ${item.productName}`}
             >
               <Plus size={16} />
@@ -776,28 +776,28 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Extra Qty
-          <input type="number" min="0" value={item.extraQty} placeholder="0" onChange={(event) => onChange({ extraQty: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+          <input type="number" min="0" value={item.extraQty} placeholder="0" onChange={(event) => onChange({ extraQty: event.target.value })} className={`${inputClass} mt-0.5 !h-9 w-full !text-sm`} />
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Qty
-          <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{units}</div>
+          <div className={`${inputClass} mt-0.5 flex !h-9 items-center font-semibold`}>{units}</div>
         </label>
         <div className="col-span-2 text-[12px] font-medium text-muted-foreground">
           Purchase Price
-          <div className="mt-1 flex items-center">
+          <div className="mt-0.5 flex items-center">
             <button
               type="button"
               onClick={() => onChange({ unitPrice: String(Math.max(0, round2(num(item.unitPrice) - 1))) })}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white active:bg-[#f24242]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-l-[6px] bg-[#ff5b5b] text-white active:bg-[#f24242]"
               aria-label="Lower price by 1"
             >
               <Minus size={16} />
             </button>
-            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => onChange({ unitPrice: event.target.value })} className={`${inputClass} !h-11 min-w-0 w-full !rounded-none text-center !text-base`} aria-label="Purchase price" />
+            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => onChange({ unitPrice: event.target.value })} className={`${inputClass} !h-9 min-w-0 w-full !rounded-none text-center !text-sm`} aria-label="Purchase price" />
             <button
               type="button"
               onClick={() => onChange({ unitPrice: String(round2(num(item.unitPrice) + 1)) })}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white active:bg-[#0eab5c]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-r-[6px] bg-[#10c469] text-white active:bg-[#0eab5c]"
               aria-label="Raise price by 1"
             >
               <Plus size={16} />
@@ -806,7 +806,7 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
         </div>
         <label className="text-[12px] font-medium text-muted-foreground">
           Actual Price
-          <div className={`${inputClass} mt-1 flex !h-11 flex-col justify-center leading-tight`}>
+          <div className={`${inputClass} mt-0.5 flex !h-9 flex-col justify-center leading-tight`}>
             <span>{money(round2(cost))}</span>
             {change !== 0 && (
               <span className={`text-[11px] ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>
@@ -817,26 +817,26 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Discount
-          <input type="number" min="0" step="0.01" value={item.discount} placeholder="0" onChange={(event) => onChange({ discount: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+          <input type="number" min="0" step="0.01" value={item.discount} placeholder="0" onChange={(event) => onChange({ discount: event.target.value })} className={`${inputClass} mt-0.5 !h-9 w-full !text-sm`} />
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Subtotal
-          <div className={`${inputClass} mt-1 flex !h-11 items-center font-semibold`}>{money(round2(lineTotal(item)))}</div>
+          <div className={`${inputClass} mt-0.5 flex !h-9 items-center font-semibold`}>{money(round2(lineTotal(item)))}</div>
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Expire Date
-          <input type="date" value={item.expireDate} onChange={(event) => onChange({ expireDate: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+          <input type="date" value={item.expireDate} onChange={(event) => onChange({ expireDate: event.target.value })} className={`${inputClass} mt-0.5 !h-9 w-full !text-sm`} />
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           Supplier Warranty (months)
-          <input type="number" min="0" max="120" value={item.warrantyMonths} placeholder="0" onChange={(event) => onChange({ warrantyMonths: event.target.value })} className={`${inputClass} mt-1 !h-11 w-full !text-base`} />
+          <input type="number" min="0" max="120" value={item.warrantyMonths} placeholder="0" onChange={(event) => onChange({ warrantyMonths: event.target.value })} className={`${inputClass} mt-0.5 !h-9 w-full !text-sm`} />
         </label>
         <label className="text-[12px] font-medium text-muted-foreground">
           IMEI
           <button
             type="button"
             onClick={onImei}
-            className={`mt-1 flex h-11 w-full items-center justify-center rounded-[6px] text-[13px] font-medium ${
+            className={`mt-0.5 flex h-9 w-full items-center justify-center rounded-[6px] text-[13px] font-medium ${
               item.imeis.length && item.imeis.length === units
                 ? "bg-emerald-100 text-emerald-700"
                 : item.trackSerial
