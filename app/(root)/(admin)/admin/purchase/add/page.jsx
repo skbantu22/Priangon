@@ -690,6 +690,12 @@ function SumRow({ label, strong, children }) {
 function SaleRates({ item, cost, onChange, mobile = false }) {
   const typed = item.newRates || {};
 
+  // 1 taka a click, from the rate typed, else the product's own, else this cost
+  const step = (field, by) => {
+    const from = num(typed[field]) || num(item.rates?.[field]) || cost;
+    onChange({ newRates: { ...typed, [field]: String(Math.max(0, round2(from + by))) } });
+  };
+
   return (
     <div className={mobile ? "mt-3 border-t border-[#e6ebf1] pt-3 dark:border-border" : ""}>
       <p className="mb-1 text-[12px] font-medium text-muted-foreground">
@@ -702,16 +708,34 @@ function SaleRates({ item, cost, onChange, mobile = false }) {
           return (
             <label key={field} className="text-[12px] text-muted-foreground">
               {label}
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={typed[field] ?? ""}
-                placeholder={item.rates?.[field] ? String(item.rates[field]) : "—"}
-                onChange={(event) => onChange({ newRates: { ...typed, [field]: event.target.value } })}
-                className={`${mobile ? `${inputClass} mt-0.5 !h-9 w-full !text-sm` : `${cell} mt-0.5 block w-[110px]`} ${loss ? "!border-red-400 !text-red-600" : ""}`}
-                aria-label={`${label} rate for ${item.productName}`}
-              />
+              <div className="mt-0.5 flex items-center">
+                <button
+                  type="button"
+                  onClick={() => step(field, -1)}
+                  className={`flex shrink-0 items-center justify-center rounded-l-[4px] bg-[#ff5b5b] text-white active:bg-[#f24242] ${mobile ? "h-9 w-9" : "h-[34px] w-7"}`}
+                  aria-label={`Lower ${label} rate by 1`}
+                >
+                  <Minus size={14} />
+                </button>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={typed[field] ?? ""}
+                  placeholder={item.rates?.[field] ? String(item.rates[field]) : "—"}
+                  onChange={(event) => onChange({ newRates: { ...typed, [field]: event.target.value } })}
+                  className={`${mobile ? `${inputClass} !h-9 min-w-0 w-full !text-sm` : `${cell} w-[84px]`} !rounded-none text-center ${loss ? "!border-red-400 !text-red-600" : ""}`}
+                  aria-label={`${label} rate for ${item.productName}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => step(field, 1)}
+                  className={`flex shrink-0 items-center justify-center rounded-r-[4px] bg-[#10c469] text-white active:bg-[#0eab5c] ${mobile ? "h-9 w-9" : "h-[34px] w-7"}`}
+                  aria-label={`Raise ${label} rate by 1`}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
               {loss && <span className="block text-[11px] text-red-600">Loss at this cost</span>}
             </label>
           );

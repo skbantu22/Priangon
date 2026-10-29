@@ -494,7 +494,8 @@ export default function ProductGallery({
           {/* The category chips above already pick a category, so there is no
               dropdown for it here — on a phone that second picker only ate the
               room the search box needed. */}
-          <label className="col-span-2 flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:col-span-1 dark:border-white/10 dark:bg-card">
+          {/* on a phone the search sits under the quality / sort / view row, next to the products; wide screens keep it first */}
+          <label className="order-last col-span-2 flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:border-primary md:order-none md:col-span-1 dark:border-white/10 dark:bg-card">
             <Search className="size-4 text-gray-400" />
             <input
               value={localFilter}
