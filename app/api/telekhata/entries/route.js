@@ -20,7 +20,7 @@ import {
   supplierBalance,
   supplierLedger,
 } from "@/lib/supplierService";
-import { cleanType, fromSystem, round } from "@/lib/telekhata";
+import { cleanType, fromSystem, partyBalances, round } from "@/lib/telekhata";
 import { POST as createShowroomSale } from "@/app/api/showroom-orders/route";
 import { POST as createPurchase } from "@/app/api/purchase/create/route";
 
@@ -371,11 +371,20 @@ export async function POST(req) {
     // apart again.
     const shop = String(body.showroomId || "warehouse");
 
+    // What the handwritten book alone still says, for this party at this shop.
+    // The decisions below need it: a customer can owe nothing on any invoice
+    // and still owe thousands on the handwritten page, and money against that
+    // page is a repayment — not an advance, and not the shop paying them back.
+    const khataOnly = (
+      await partyBalances({ partyType, showroomId: shop, ids: [body.partyId] })
+    )[0]?.balance || 0;
+
     if (kind === "money" && partyType === "customer") {
       const balance = await customerBalance(party, { showroomId: shop });
 
       if (direction === "take") {
-        // money in: first their due, then an advance
+        // money in: their invoice dues first, then the handwritten page, and
+        // only what is left over on top of both is really an advance
         const owes = Math.max(0, balance.due);
         const pay = round(Math.min(rest, owes));
         if (pay > 0) {
@@ -384,14 +393,24 @@ export async function POST(req) {
           done.push(`বাকি আদায় ${pay}`);
           rest = round(rest - pay);
         }
-        if (rest > 0.009) {
-          await createCustomerPayment({ customer: party, type: "advance", body: { amount: rest, note, date, method: "cash", showroomId: shop }, createdBy });
-          done.push(`অগ্রিম ${rest}`);
-          rest = 0;
+
+        // leave this much for the Telekhata line at the end: written as a
+        // "take" row it cancels that much of the handwritten baki
+        const onBook = round(Math.min(rest, Math.max(0, khataOnly)));
+        const extra = round(rest - onBook);
+
+        if (extra > 0.009) {
+          await createCustomerPayment({ customer: party, type: "advance", body: { amount: extra, note, date, method: "cash", showroomId: shop }, createdBy });
+          done.push(`অগ্রিম ${extra}`);
+          rest = onBook;
         }
       } else {
-        // money out: give back what the shop owes them; a fresh credit stays here
-        const owed = Math.max(0, -balance.due);
+        // Money out. Pay back only what the party is owed once the
+        // handwritten page is counted too — a customer carrying baki there is
+        // not owed anything, however their invoices happen to look. Capped by
+        // the invoice side as well, which is all a customer payment may
+        // settle; anything beyond stays on the handwritten page.
+        const owed = Math.min(Math.max(0, -balance.due), Math.max(0, -round(balance.due + khataOnly)));
         const pay = round(Math.min(rest, owed));
         if (pay > 0) {
           await createCustomerPayment({ customer: party, type: "pay", body: { amount: pay, note, date, method: "cash", showroomId: shop }, createdBy });
@@ -404,9 +423,12 @@ export async function POST(req) {
     if (kind === "money" && partyType === "supplier") {
       const balance = await supplierBalance(party, { showroomId: shop });
 
+      // A supplier's handwritten page reads the other way round: a "give" row
+      // means the shop handed something over, so the supplier owes more.
       if (direction === "give") {
-        // money out: first their bills, then an advance
-        const owes = Math.max(0, balance.due);
+        // money out: their bills first, then the handwritten page, and only
+        // what is left on top of both is really money paid ahead
+        const owes = Math.min(Math.max(0, balance.due), Math.max(0, round(balance.due - khataOnly)));
         const pay = round(Math.min(rest, owes));
         if (pay > 0) {
           const allocations = share(await supplierDue(party._id), pay, "purchaseId");
@@ -414,14 +436,21 @@ export async function POST(req) {
           done.push(`বিল পরিশোধ ${pay}`);
           rest = round(rest - pay);
         }
-        if (rest > 0.009) {
-          await createSupplierPayment({ supplier: party, type: "advance", body: { amount: rest, note, date, method: "cash", showroomId: shop }, createdBy });
-          done.push(`অগ্রিম ${rest}`);
-          rest = 0;
+
+        // kept back for the Telekhata line, which cancels that much of what
+        // the handwritten page says the shop still owes
+        const onBook = round(Math.min(rest, Math.max(0, -khataOnly)));
+        const extra = round(rest - onBook);
+
+        if (extra > 0.009) {
+          await createSupplierPayment({ supplier: party, type: "advance", body: { amount: extra, note, date, method: "cash", showroomId: shop }, createdBy });
+          done.push(`অগ্রিম ${extra}`);
+          rest = onBook;
         }
       } else {
-        // money in: what the supplier owes the shop; a fresh credit stays here
-        const owed = Math.max(0, -balance.due);
+        // money in: what the supplier owes the shop once the handwritten page
+        // is counted; a fresh credit stays on that page
+        const owed = Math.min(Math.max(0, -balance.due), Math.max(0, round(-balance.due + khataOnly)));
         const pay = round(Math.min(rest, owed));
         if (pay > 0) {
           await createSupplierPayment({ supplier: party, type: "receive", body: { amount: pay, note, date, method: "cash", showroomId: shop }, createdBy });

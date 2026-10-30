@@ -129,9 +129,17 @@ function AddPurchase() {
             barcode: item.barcode,
             stock: item.stockAtOrder,
             lastCost: item.prevPurchasePrice,
-            // the rates the order will set, where it sets one
+            // what the product carries today, shown as the placeholder
             rates: Object.fromEntries(
               RATES.map(([f]) => [f, num(item[f]) || num(item[`prev${f[0].toUpperCase()}${f.slice(1)}`])]),
+            ),
+            // Where the order named a rate, fill it in. The note above promises
+            // the order's rates go onto the products once the goods are taken
+            // in; they only do if they are carried here, because the save reads
+            // newRates. Fields the order left alone stay blank, which keeps the
+            // product's own rate.
+            newRates: Object.fromEntries(
+              RATES.map(([f]) => [f, num(item[f]) > 0 ? String(num(item[f])) : ""]),
             ),
             newRate: Object.fromEntries(RATES.map(([f]) => [f, num(item[f]) > 0])),
             quantity: String(item.quantity),
@@ -521,13 +529,11 @@ function AddPurchase() {
                       </button>
                     </td>
                   </tr>
-                  {!order && (
-                    <tr>
-                      <td colSpan={13} className={`${tdClass} !py-2 text-left`}>
-                        <SaleRates item={item} cost={cost} onChange={(patch) => updateItem(index, patch)} />
-                      </td>
-                    </tr>
-                  )}
+                  <tr>
+                    <td colSpan={13} className={`${tdClass} !py-2 text-left`}>
+                      <SaleRates item={item} cost={cost} onChange={(patch) => updateItem(index, patch)} />
+                    </td>
+                  </tr>
                   </Fragment>
                 );
               })}
@@ -708,6 +714,8 @@ function SaleRates({ item, cost, onChange, mobile = false }) {
           return (
             <label key={field} className="text-[12px] text-muted-foreground">
               {label}
+              {/* the dot the receiving note points at: this rate came from the order */}
+              {item.newRate?.[field] && <span className="ml-1 text-[#1766a8]" title="Set by the purchase order">●</span>}
               <div className="mt-0.5 flex items-center">
                 <button
                   type="button"
@@ -872,7 +880,7 @@ function MobileLine({ item, index, count, order, onChange, onRemove, onImei }) {
           </button>
         </label>
       </div>
-      {!order && <SaleRates item={item} cost={cost} onChange={onChange} mobile />}
+      <SaleRates item={item} cost={cost} onChange={onChange} mobile />
     </article>
   );
 }
